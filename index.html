@@ -2561,6 +2561,23 @@ function renderBT(){
     if(isNaN(n)) return esc(x);
     return (n/100).toLocaleString('en-IN',{maximumFractionDigits:2});
   }
+  // FINANCIALS DISPLAY RULE (readability): every figure in the Financials sub-tab (finTab) shows EXACTLY one
+  // decimal — 148.77->"148.8", 37->"37.0", 5->"5.0", 0.6->"0.6". crL1() = crL() forced to 1 dp (₹ crore money);
+  // fmt1() = the same for ratios / margins / % / EPS. These are financials-ONLY; the shared crL()/inr()/vv()
+  // keep their behaviour everywhere else (other sub-tabs, days, share counts, FY labels). Null/''/non-numeric
+  // stay blank/passed-through exactly like crL(), so an absent figure never becomes "0.0" or "NaN.0".
+  function crL1(x){
+    if(x==null||x==='') return '';
+    var n=Number(String(x).replace(/,/g,''));
+    if(isNaN(n)) return esc(x);
+    return (n/100).toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1});
+  }
+  function fmt1(x){
+    if(x==null||x==='') return '';
+    var n=Number(String(x).replace(/,/g,''));
+    if(isNaN(n)) return esc(x);
+    return n.toLocaleString('en-IN',{minimumFractionDigits:1,maximumFractionDigits:1});
+  }
   // true when at least one row carries a real value in any of the given keys (skip all-empty tables)
   function anyVal(rows,keys){
     return (rows||[]).some(function(x){return keys.some(function(k){return x&&x[k]!=null&&x[k]!=='';});});
@@ -3063,33 +3080,33 @@ function renderBT(){
     if(pnl.length){
       c1+=sub('P&amp;L (restated, &#8377; cr)', tbl(
         ['FY','Revenue','Other income','EBITDA','EBITDA %','Depreciation','Finance cost','PAT','PAT %','EPS (&#8377;)'],
-        pnl.map(function(x){return [vv(x.fy),crL(x.revenue),crL(x.other_income),crL(x.ebitda),vv(x.ebitda_margin_pct),crL(x.depreciation),crL(x.finance_cost),crL(x.pat),vv(x.pat_margin_pct),vv(x.eps)];})));
+        pnl.map(function(x){return [vv(x.fy),crL1(x.revenue),crL1(x.other_income),crL1(x.ebitda),fmt1(x.ebitda_margin_pct),crL1(x.depreciation),crL1(x.finance_cost),crL1(x.pat),fmt1(x.pat_margin_pct),fmt1(x.eps)];})));
       var r0=nnum(pnl[0].revenue), rl=nnum(pnl[pnl.length-1].revenue),
           m0=nnum(pnl[0].ebitda_margin_pct), ml=nnum(pnl[pnl.length-1].ebitda_margin_pct);
       var bits=[];
-      if(r0!=null&&rl!=null&&r0>0) bits.push('revenue '+(rl>=r0?'grew':'fell')+' '+inr(rl/r0)+'&times; over the period');
-      if(m0!=null&&ml!=null) bits.push('EBITDA margin '+vv(m0)+'% &rarr; '+vv(ml)+'%');
+      if(r0!=null&&rl!=null&&r0>0) bits.push('revenue '+(rl>=r0?'grew':'fell')+' '+fmt1(rl/r0)+'&times; over the period');
+      if(m0!=null&&ml!=null) bits.push('EBITDA margin '+fmt1(m0)+'% &rarr; '+fmt1(ml)+'%');
       if(bits.length) c1+=readLine(bits.join('; ')+' (computed from the table).');
     }
     // 2 — Balance sheet & cash flow
     var c2='';
     if(bsk.length) c2+=sub('Balance sheet (key lines, &#8377; cr)', tbl(
       ['FY','Net worth','Total debt','Cash','Net fixed assets','CWIP','Inventory','Receivables','Payables'],
-      bsk.map(function(x){return [vv(x.fy),crL(x.networth),crL(x.total_debt),crL(x.cash),crL(x.net_fixed_assets),crL(x.cwip),crL(x.inventory),crL(x.trade_receivables),crL(x.trade_payables)];})));
+      bsk.map(function(x){return [vv(x.fy),crL1(x.networth),crL1(x.total_debt),crL1(x.cash),crL1(x.net_fixed_assets),crL1(x.cwip),crL1(x.inventory),crL1(x.trade_receivables),crL1(x.trade_payables)];})));
     if(cfl.length) c2+=sub('Cash flow (&#8377; cr)', tbl(['FY','CFO','CFI','CFF','Note'],
-      cfl.map(function(x){return [vv(x.fy),crL(x.cfo),crL(x.cfi),crL(x.cff),vv(x.note)];})));
+      cfl.map(function(x){return [vv(x.fy),crL1(x.cfo),crL1(x.cfi),crL1(x.cff),vv(x.note)];})));
     if(bsk.length&&pnl.length){
       var trl=nnum(bsk[bsk.length-1].trade_receivables), rl2=nnum(pnl[pnl.length-1].revenue),
           cfo2=cfl.length?nnum(cfl[cfl.length-1].cfo):null, pat2=nnum(pnl[pnl.length-1].pat);
       var bits2=[];
-      if(trl!=null&&rl2!=null&&rl2>0) bits2.push('receivables = '+inr(trl/rl2*100)+'% of latest revenue');
-      if(cfo2!=null&&pat2!=null&&pat2>0) bits2.push('CFO/PAT = '+inr(cfo2/pat2)+'&times;'+(cfo2/pat2<0.8?' &#9888; (profits not yet converting to cash)':''));
+      if(trl!=null&&rl2!=null&&rl2>0) bits2.push('receivables = '+fmt1(trl/rl2*100)+'% of latest revenue');
+      if(cfo2!=null&&pat2!=null&&pat2>0) bits2.push('CFO/PAT = '+fmt1(cfo2/pat2)+'&times;'+(cfo2/pat2<0.8?' &#9888; (profits not yet converting to cash)':''));
       if(bits2.length) c2+=readLine(bits2.join('; ')+' (computed).');
     }
     // 3 — Returns & efficiency (skip all-empty tables — show-only-what-exists)
     var c3='';
     if(anyVal(f.return_ratios,['roe_pct','roce_pct','ronw_pct'])) c3+=sub('Return ratios', tbl(['FY','RoE %','RoCE %','RoNW %'],
-      byFy2(f.return_ratios).map(function(x){return [vv(x.fy),vv(x.roe_pct),vv(x.roce_pct),vv(x.ronw_pct)];})));
+      byFy2(f.return_ratios).map(function(x){return [vv(x.fy),fmt1(x.roe_pct),fmt1(x.roce_pct),fmt1(x.ronw_pct)];})));
     if(anyVal(f.working_capital,['debtor_days','inventory_days','creditor_days','ccc_days'])) c3+=sub('Working capital cycle', tbl(
       ['FY','Debtor days','Inventory days','Creditor days','CCC days'],
       byFy2(f.working_capital).map(function(x){return [vv(x.fy),vv(x.debtor_days),vv(x.inventory_days),vv(x.creditor_days),vv(x.ccc_days)];})));
@@ -3098,24 +3115,24 @@ function renderBT(){
     var c4='';
     if(f.debt_profile&&typeof f.debt_profile==='object'){
       var dp=f.debt_profile, db='';
-      if(dp.total_lakhs!=null) db+='<div>Total debt: <strong>&#8377;'+crL(dp.total_lakhs)+' cr</strong></div>';
+      if(dp.total_lakhs!=null) db+='<div>Total debt: <strong>&#8377;'+crL1(dp.total_lakhs)+' cr</strong></div>';
       if(dp.loans&&dp.loans.length){
         db+=tbl(['Lender','Type','&#8377; cr','Rate %','Floating','Purpose'],
-          dp.loans.map(function(l){return [vv(l.lender),vv(l.type),crL(l.amount_lakhs),vv(l.rate_pct),l.floating?'yes':'',
+          dp.loans.map(function(l){return [vv(l.lender),vv(l.type),crL1(l.amount_lakhs),fmt1(l.rate_pct),l.floating?'yes':'',
             vv(l.purpose)+(l.non_business_purpose?' <span class="ipd-sev m">non-business</span>':'')];}));
         var dirl=dp.loans.filter(function(l){return /director|promoter/i.test(String(l.type||'')+String(l.lender||''));})
                          .reduce(function(a,l){var n=Number(String(l.amount_lakhs==null?'':l.amount_lakhs).replace(/,/g,'')); return a+(isNaN(n)?0:n);},0);
-        if(dirl>0) db+=readLine('&#8377;'+crL(dirl)+' cr of the debt is unsecured loans from directors/promoters &mdash; see Governance for the related-party picture (computed).');
+        if(dirl>0) db+=readLine('&#8377;'+crL1(dirl)+' cr of the debt is unsecured loans from directors/promoters &mdash; see Governance for the related-party picture (computed).');
       }
       c4+=sub('Debt profile', db);
     }
     if(f.one_offs&&f.one_offs.length) c4+=sub('One-offs / exceptionals (&#8377; cr)', tbl(['FY','Item','&#8377; cr','Note'],
-      f.one_offs.map(function(x){return [vv(x.fy),vv(x.item),crL(x.amount_lakhs),vv(x.note)];})));
+      f.one_offs.map(function(x){return [vv(x.fy),vv(x.item),crL1(x.amount_lakhs),vv(x.note)];})));
     if(f.receivables_aging&&typeof f.receivables_aging==='object'){
       var ra=f.receivables_aging;
       c4+=sub('Receivables outstanding &gt; 1 yr',
-        (ra.gt_1yr_amount_lakhs!=null?'&#8377;'+crL(ra.gt_1yr_amount_lakhs)+' cr':'')+
-        (ra.gt_1yr_pct_networth!=null?' ('+esc(ra.gt_1yr_pct_networth)+'% of net worth)':''));
+        (ra.gt_1yr_amount_lakhs!=null?'&#8377;'+crL1(ra.gt_1yr_amount_lakhs)+' cr':'')+
+        (ra.gt_1yr_pct_networth!=null?' ('+fmt1(ra.gt_1yr_pct_networth)+'% of net worth)':''));
     }
     b+=grp('Profit &amp; loss', c1, '')+
        grp('Balance sheet &amp; cash flow', c2, '')+
