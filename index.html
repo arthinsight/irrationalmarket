@@ -1159,7 +1159,7 @@ svg { display: block; width: 100%; }
 <!--IPODD-PANEL-START-->
 <div id="tab-ipodd" class="tabpanel">
   <div class="ipd-wrap">
-    <h1 style="font-size:var(--fs-lg,18px);margin:0 0 2px">IPO RHP Analysis <span class="subtle" style="font-size:var(--fs-sm,12.5px);font-weight:400">&mdash; DRHP-sourced company reference (pre / newly-listed)</span></h1>
+    <h1 style="font-size:var(--fs-lg,18px);margin:0 0 2px">IPO RHP Analysis <span class="subtle" style="font-size:var(--fs-sm,12.5px);font-weight:400">&mdash; prospectus-sourced company reference (pre / newly-listed)</span></h1>
     <div class="ipd-pick ipd-searchwrap"><input id="ipd-search" type="text" placeholder="search company or symbol&hellip;" autocomplete="off"><span id="ipd-count" class="subtle"></span><button id="ipd-compare-btn" type="button">Compare all &#8644;</button></div>
     <div id="ipd-list" class="ipd-list"></div>
     <div id="ipd-view"></div>
@@ -2634,7 +2634,7 @@ function renderBT(){
     return '<div class="intel-strip"><div class="intel-row"><b>Intelligence</b>'+pe+'</div>'+
       (gate?'<div class="intel-row">Gate: '+gate+'</div>':'')+
       (checks?'<div class="intel-row">Forensic: '+checks+'</div>':'')+
-      '<div class="ipd-src">Deterministic checks on the DRHP at IPO &#8377;'+esc(i.ipo_price)+' ('+esc(i.ipo_price_source||'')+'). AI-assisted, not investment advice.</div></div>'; }
+      '<div class="ipd-src">Deterministic checks on the prospectus at IPO &#8377;'+esc(i.ipo_price)+' ('+esc(i.ipo_price_source||'')+'). AI-assisted, not investment advice.</div></div>'; }
   function iDurability(r){ var i=intel(r); if(!i||!i.growth_durability) return ''; var d=i.growth_durability;
     if(!d.verdict||d.verdict==='not_applicable_bfsi'||d.verdict==='insufficient') return '';
     var vc=(d.verdict==='durable')?'ok':(d.verdict==='fragile')?'bad':'warn';
@@ -2727,16 +2727,20 @@ function renderBT(){
     var s=i.insider||{}; if(s.ipo_price_multiple!=null) bits.push('promoter cost '+esc(s.ipo_price_multiple)+'&times; below IPO'+(s.pure_exit?' &mdash; OFS pure exit':''));
     return sub('Intelligence synthesis &mdash; what it means at &#8377;'+esc(i.ipo_price), bits.length?'<ul>'+bits.map(function(b){return '<li>'+b+'</li>';}).join('')+'</ul>':'<span class="ipd-src">gate not runnable at current data</span>'); }
 
+  // Derived filing stage (DISPLAY label only — internal key stays 'DRHP:'): a resolved IPO price / anchors /
+  // final price band are RHP-stage-or-later artefacts a DRAFT RHP never carries → 'RHP'; a true draft → 'DRHP'.
+  function docType(r){ var i=intel(r); return (r.listed_on||(i&&i.ipo_price!=null))?'RHP':'DRHP'; }
   // ── hero strip (always above the sub-tabs) ──
   function hero(r){
-    var badge= r.pre ? '<span class="ipd-badge pre">Pre-listing (DRHP)</span>'
+    var dt=docType(r);
+    var badge= r.pre ? '<span class="ipd-badge pre">Pre-listing ('+dt+')</span>'
              : r.listed_on ? '<span class="ipd-badge listed">Listed '+esc(r.listed_on)+'</span>'
              : '<span class="ipd-badge listed">Listed</span>';
     var chips=badge;
     if(r.industry) chips+='<span class="ipd-chip"><span class="l">Industry</span>'+esc(r.industry)+'</span>';
     if(r.sector) chips+='<span class="ipd-chip"><span class="l">Sector</span>'+esc(r.sector)+'</span>';
     if(r.isin) chips+='<span class="ipd-vint">ISIN '+esc(r.isin)+'</span>';
-    chips+='<span class="ipd-vint">DRHP-sourced</span>';
+    chips+='<span class="ipd-vint">'+dt+'-sourced</span>';
     if(hasRpt(r)) chips+='<span class="ipd-vint">forensic report</span>';
     // related-party red-flag: line count + distinct counterparties from governance.rpts
     // (DRHP_ANALYSIS_STANDARD 2026-07-09 — the agreed light dashboard signal; depth in the docx report)
@@ -2748,7 +2752,9 @@ function renderBT(){
              ' txn line(s)'+(_n?' &middot; '+_n+' counterpart'+(_n>1?'ies':'y'):'')+'</span>';
     }
     var symNote=r.pre?' <span class="ipd-src">pre-listing id &mdash; resolves to the NSE symbol on listing</span>':'';
-    var h='<div class="zone ipd-zone"><div class="ipd-co">'+esc(r.co)+' <span class="subtle" style="font-size:var(--fs-base,14px);font-weight:600">'+esc(r.s)+'</span>'+symNote+'</div>'+
+    // strip the internal 'DRHP:' key prefix from the DISPLAYED id (key itself is untouched — bridge/join safe)
+    var sDisp=r.pre?String(r.s||'').replace(/^DRHP:/,''):r.s;
+    var h='<div class="zone ipd-zone"><div class="ipd-co">'+esc(r.co)+' <span class="subtle" style="font-size:var(--fs-base,14px);font-weight:600">'+esc(sDisp)+'</span>'+symNote+'</div>'+
       '<div class="ipd-chips">'+chips+'</div>';
     if(r.one_liner) h+='<div class="ipd-oneliner">'+esc(r.one_liner)+'</div>';
     h+=iTrustStrip(r);                                  // intelligence trust strip (gate + forensic chips)
