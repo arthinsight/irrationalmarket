@@ -826,7 +826,8 @@ svg { display: block; width: 100%; }
 #tab-ipodd .intel-strip{margin:8px 0 6px;padding:8px 12px;border:1px solid var(--bd,#e2e8f0);border-radius:var(--r-sm,6px);background:var(--soft,#f8fafc)}
 #tab-ipodd .intel-row{font-size:var(--fs-sm,12.5px);line-height:1.9;margin:1px 0}
 #tab-ipodd .intel-gate{display:inline-block;margin-right:10px;white-space:nowrap}
-#tab-ipodd .intel-cklbl{font-size:var(--fs-xs,11px);color:var(--sub,#64748b);margin-right:6px}
+#tab-ipodd .intel-cklbl{font-size:var(--fs-xs,11px);color:var(--sub,#64748b);margin-right:4px}
+#tab-ipodd .intel-ck{display:inline-block;white-space:nowrap;margin:0 12px 3px 0}
 #tab-ipodd .intel-pe{font-weight:700;margin-left:8px}
 #tab-ipodd .intel-chip{display:inline-block;font-size:var(--fs-xs,11px);font-weight:800;border-radius:999px;padding:1px 8px;margin:0 2px;color:#fff}
 #tab-ipodd .intel-chip.ok{background:var(--bull,#059669)}
@@ -2623,7 +2624,9 @@ function renderBT(){
     var g=i.gate||{}, fx=i.forensic||[], gate='';
     ['forensic','true_pe','insider','percentiles','scenarios','growth_durability'].forEach(function(k){
       if(g[k]) gate+='<span class="intel-gate">'+esc(k.replace(/_/g,' '))+' '+iChip(g[k])+'</span>'; });
-    var checks=''; fx.forEach(function(c){ checks+=iChip(c.verdict)+'<span class="intel-cklbl">'+esc(String(c.check||'').replace(/[_<>=*]+/g,' ').trim())+'</span>'; });
+    // each check = label THEN its chip, grouped + non-breaking, so a FAIL chip can never be misread onto
+    // the neighbouring check's label (was chip-before-label, ungrouped — CFO_vs_PAT FAIL looked like EPS).
+    var checks=''; fx.forEach(function(c){ checks+='<span class="intel-ck"><span class="intel-cklbl">'+esc(String(c.check||'').replace(/[_<>=*]+/g,' ').trim())+'</span>'+iChip(c.verdict)+'</span>'; });
     var tp=i.true_pe||{}, fwd=tp.forward||{}, pe='', rng=tp.forward_range;
     if(fwd.fy_label&&tp.headline!=null){ var rr=(rng&&rng.length===2)?(esc(rng[0])+'&ndash;'+esc(rng[1])):esc(tp.headline);
       pe='<span class="intel-pe">True fwd P/E '+esc(fwd.fy_label)+' '+rr+'&times;<span class="subtle"> ('+esc(fwd.base_fy_label)+' reported '+esc(tp.reported)+'&times;, normalized '+esc(tp.normalized)+'&times;)</span></span>'; }
