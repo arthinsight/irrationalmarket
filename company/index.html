@@ -79,6 +79,10 @@
 .u-subnav button.on{color:var(--hl);border-bottom-color:var(--hl)}
 .u-subnav button:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
 
+@media (max-width: 700px) {
+  .co-page table { display: block; width: max-content; max-width: 100%; overflow-x: auto; }
+}
+
 :root{--bg:#f8fafc;--card:rgba(255,255,255,.95);--line:rgba(15,23,42,.08);--txt:#0f172a;--mut:#475569;--hl:#2563eb;}
 
 /* shared standalone-page shell — header (name/logo, top-left), body rhythm, footer */
@@ -121,6 +125,17 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent}
 .sitenav-a:hover{color:var(--txt)}
 .sitenav-a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* PHONE: the nav is chrome, not content. Five sections plus a search box wrapped onto FOUR rows and
+   took 130px of a 844px screen before a reader saw anything (measured 2026-08-17). One row that
+   scrolls sideways instead — the sections stay reachable, the page starts near the top. Placed here,
+   after `.sitenav`'s own `flex-wrap:wrap`, because an equal-specificity rule emitted earlier loses. */
+@media (max-width:700px){
+  .sitenav{flex-wrap:nowrap;overflow-x:auto;gap:0;-webkit-overflow-scrolling:touch}
+  .sitenav-a{padding:var(--sp-2);white-space:nowrap}
+  .sitenav-logo{padding-right:var(--sp-2);margin-right:var(--sp-1)}
+  .cosearch{flex:0 0 auto;margin-left:var(--sp-2)}
+  .cosearch input{width:8.5rem}
+}
 
 </style>
 <style id="co-m2-css">
@@ -391,6 +406,14 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 .co-sub{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;gap:0;
   margin:0 0 var(--sp-2);padding:var(--sp-1) 0 0;background:var(--bg);
   border-bottom:1px solid var(--line)}
+/* PHONE: the section ribbon becomes one scrolling row, like the site nav above it. Seven sections
+   wrapped to two rows, so the two navs together took 126px before any company data appeared. The
+   sticky offset is what makes this safe to scroll horizontally: the row stays put vertically while a
+   reader swipes through the sections. */
+@media (max-width:700px){
+  .co-sub{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .co-sub button{white-space:nowrap;flex:0 0 auto}
+}
 .co-sub button{appearance:none;border:none;background:none;font-family:inherit;
   font-size:var(--fs-sm);font-weight:600;color:var(--mut);cursor:pointer;
   padding:var(--sp-1) var(--sp-3) var(--sp-2);border-bottom:2px solid transparent}
@@ -419,7 +442,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 </head>
 <body>
 <div class="wrap">
-<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../dashboard.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../dashboard.html?tab=tab-annc">Announcements</a><a class="sitenav-a" href="../dashboard.html?tab=tab-ipodd">IPOs</a><a class="sitenav-a" href="../dashboard.html?tab=tab-momentum2">Universe</a><!--COS-START--><div class="cosearch" id="cosearch"><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company" aria-label="Search for company"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
+<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../index.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../index.html?tab=tab-annc">Announcements</a><a class="sitenav-a" href="../index.html?tab=tab-ipodd">IPOs</a><a class="sitenav-a" href="../index.html?tab=tab-momentum2">Universe</a><!--COS-START--><div class="cosearch" id="cosearch"><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company" aria-label="Search for company"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
 
 
 <div id="tab-momentum2" class="co-page">
