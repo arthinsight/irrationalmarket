@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About Arth Insight | Indian Stock Market Data and Intelligence</title>
+<link rel="canonical" href="https://arthinsight.com/about/">
+<meta name="description" content="Arth Insight is an Indian stock-market data and intelligence platform covering IPOs, corporate announcements, company financials, momentum and market themes for over 2,400 listed Indian companies.">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="icon" type="image/png" sizes="180x180" href="../icon-180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Arth Insight">
+<meta property="og:title" content="About Arth Insight | Indian Stock Market Data and Intelligence">
+<meta property="og:description" content="Arth Insight is an Indian stock-market data and intelligence platform covering IPOs, corporate announcements, company financials, momentum and market themes for over 2,400 listed Indian companies.">
+<meta property="og:url" content="https://arthinsight.com/about/">
+<meta property="og:image" content="https://arthinsight.com/og-1200x630.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="About Arth Insight | Indian Stock Market Data and Intelligence">
+<meta name="twitter:description" content="Arth Insight is an Indian stock-market data and intelligence platform covering IPOs, corporate announcements, company financials, momentum and market themes for over 2,400 listed Indian companies.">
+<meta name="twitter:image" content="https://arthinsight.com/og-1200x630.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== ui_tokens.py — design system tokens (UI_STANDARD.md) ===== */
+:root {
+  --g50: #f8fafc;
+  --g100: #f1f5f9;
+  --g200: #e2e8f0;
+  --g300: #cbd5e1;
+  --g400: #94a3b8;
+  --g500: #64748b;
+  --g600: #475569;
+  --g700: #334155;
+  --g800: #1e293b;
+  --g900: #0f172a;
+  --good: #059669;
+  --good-bg: rgba(5,150,105,.08);
+  --warn: #d97706;
+  --warn-bg: rgba(217,119,6,.09);
+  --bad: #dc2626;
+  --bad-bg: rgba(220,38,38,.07);
+  --info: #2563eb;
+  --info-bg: rgba(37,99,235,.07);
+  --hover: rgba(15,23,42,.04);
+  --chip-bg: #eef2f8;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(15,23,42,.06);
+  --sh-2: 0 4px 14px rgba(15,23,42,.08);
+  --page-max: 1440px;
+}
+
+/* shared sub-tab ribbon — underline tabs, one component for every tab (UI_STANDARD P3) */
+.u-subnav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:var(--sp-1);
+  margin:0 0 var(--sp-4);padding:var(--sp-2) 0 0;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.u-subnav button{appearance:none;border:none;background:none;font-family:'Inter',-apple-system,
+  Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);font-weight:600;color:var(--mut);
+  cursor:pointer;padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent;
+  transition:var(--transition)}
+.u-subnav button:hover{color:var(--txt)}
+.u-subnav button.on{color:var(--hl);border-bottom-color:var(--hl)}
+.u-subnav button:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+
+:root{--bg:#f8fafc;--card:rgba(255,255,255,.95);--line:rgba(15,23,42,.08);--txt:#0f172a;--mut:#475569;--hl:#2563eb;}
+
+/* shared standalone-page shell — header (name/logo, top-left), body rhythm, footer */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);
+  line-height:var(--lh-base);-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:var(--sp-8) var(--sp-5) 72px}
+h1,h2{font-family:'Outfit',sans-serif;color:var(--txt);margin:0}
+header{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-8)}
+header img{width:44px;height:44px;object-fit:contain;border-radius:var(--r-sm)}
+h1{font-size:var(--fs-2xl);line-height:var(--lh-tight);font-weight:600;letter-spacing:-.01em}
+.sub{font-size:var(--fs-md);color:var(--mut);margin:var(--sp-1) 0 0}
+h2{font-size:var(--fs-lg);font-weight:600;margin:var(--sp-6) 0 var(--sp-2)}
+p{margin:0 0 var(--sp-3);max-width:68ch;color:var(--g700)}
+ul{margin:0 0 var(--sp-3);padding-left:var(--sp-5)}
+li{margin-bottom:var(--sp-2);max-width:68ch;color:var(--g700)}
+strong{color:var(--txt);font-weight:600}
+.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--hl);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:var(--sp-4) var(--sp-5);margin:var(--sp-6) 0;
+  box-shadow:var(--sh-1)}
+.note h2{margin-top:0}
+footer{margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);
+  font-size:var(--fs-sm);color:var(--mut)}
+a{color:var(--hl)}
+a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* the site nav — links back into the dashboard from a standalone page. Defined HERE, with the rest
+   of the shell, because standalone pages never load the dashboard's bucket stylesheet: putting it
+   there rendered a correct nav as unstyled links, which the presence check happily passed. */
+.sitenav{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);margin:0 0 var(--sp-3);
+  padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.sitenav-logo{display:flex;align-items:center;gap:var(--sp-2);text-decoration:none;
+  padding:0 var(--sp-3) 0 0;margin-right:var(--sp-2);border-right:1px solid var(--line)}
+/* the brand name is an <h1> on public pages (it carries the page's entity name for search), so it
+   must be reset out of the shell's h1 sizing and sit inline in the bar */
+.sitenav-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:var(--fs-md);
+  color:var(--txt);white-space:nowrap;margin:0;line-height:1;letter-spacing:0}
+.sitenav-logo img{width:28px;height:28px;object-fit:contain;border-radius:var(--r-sm);display:block}
+.sitenav-a{font-size:var(--fs-base);font-weight:600;color:var(--mut);text-decoration:none;
+  padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent}
+.sitenav-a:hover{color:var(--txt)}
+.sitenav-a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+
+</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://arthinsight.com/#organization","name":"Arth Insight","alternateName":"ArthInsight","url":"https://arthinsight.com/","logo":{"@type":"ImageObject","url":"https://arthinsight.com/icon-180.png","width":180,"height":180},"image":"https://arthinsight.com/og-1200x630.png","description":"Arth Insight is an Indian stock market data and intelligence platform covering IPOs, company financials, corporate announcements, momentum and market themes.","sameAs":["https://x.com/arthinsightcom","https://www.instagram.com/arthinsightcom","https://www.youtube.com/@arthinsightcom"]},{"@type":"WebSite","@id":"https://arthinsight.com/#website","url":"https://arthinsight.com/","name":"Arth Insight","description":"Arth Insight is an Indian stock market data and intelligence platform covering IPOs, company financials, corporate announcements, momentum and market themes.","inLanguage":"en-IN","publisher":{"@id":"https://arthinsight.com/#organization"}}]}</script>
+</head>
+<body>
+<div class="wrap">
+<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../dashboard.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../dashboard.html?tab=tab-annc">Announcements</a><a class="sitenav-a" href="../dashboard.html?tab=tab-ipodd">IPOs</a><a class="sitenav-a" href="../dashboard.html?tab=tab-momentum2">Universe</a></nav>
+<header><div><h1>Arth Insight</h1><p class="sub">Indian Stock Market Data and Intelligence</p></div></header>
+<p><strong>Arth Insight</strong> is an Indian stock-market data and intelligence platform. It brings
+together public filings, exchange disclosures and market data for <strong>2,418 listed
+Indian companies</strong>, and presents them in a form investors can actually read.</p>
+
+<h2>What Arth Insight covers</h2>
+<ul>
+  <li><strong>IPOs</strong> &mdash; prospectus-sourced company reference for new and recently listed
+      issues, anchor and lead-manager track records, post-listing performance and lock-in calendars</li>
+  <li><strong>Corporate announcements</strong> &mdash; a daily digest of what companies filed with the
+      exchanges, with the material events separated from the routine</li>
+  <li><strong>Company financials</strong> &mdash; quarterly results and financial history</li>
+  <li><strong>Momentum and themes</strong> &mdash; where price and participation are concentrating
+      across the market</li>
+</ul>
+
+<h2>How it is built</h2>
+<p>Arth Insight reads primary sources &mdash; company filings with NSE and BSE, offer documents, and
+exchange circulars &mdash; and states what they say, with the figure and the document it came from.
+Where a number is derived, it is labelled as derived.</p>
+
+<div class="note">
+<h2>What Arth Insight is not</h2>
+<p>Arth Insight is an educational and informational platform. It does not provide investment advice,
+stock recommendations, price targets or portfolio services, and nothing on this site should be read
+as a recommendation to buy or sell any security. Observe only. Please consult a SEBI-registered
+investment adviser before making investment decisions.</p>
+<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
+</div>
+</body>
+</html>

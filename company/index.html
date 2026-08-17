@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company — Arth Insight</title>
+<link rel="canonical" href="https://arthinsight.com/company/">
+<meta name="description" content="Stage analysis, price history and research for a listed Indian company: stage, volume behaviour, delivery trend and filings.">
+<meta name="robots" content="noindex,follow">
+<link rel="icon" type="image/png" sizes="180x180" href="../icon-180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Arth Insight">
+<meta property="og:title" content="Company — Arth Insight">
+<meta property="og:description" content="Stage analysis, price history and research for a listed Indian company: stage, volume behaviour, delivery trend and filings.">
+<meta property="og:url" content="https://arthinsight.com/company/">
+<meta property="og:image" content="https://arthinsight.com/og-1200x630.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Company — Arth Insight">
+<meta name="twitter:description" content="Stage analysis, price history and research for a listed Indian company: stage, volume behaviour, delivery trend and filings.">
+<meta name="twitter:image" content="https://arthinsight.com/og-1200x630.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== ui_tokens.py — design system tokens (UI_STANDARD.md) ===== */
+:root {
+  --g50: #f8fafc;
+  --g100: #f1f5f9;
+  --g200: #e2e8f0;
+  --g300: #cbd5e1;
+  --g400: #94a3b8;
+  --g500: #64748b;
+  --g600: #475569;
+  --g700: #334155;
+  --g800: #1e293b;
+  --g900: #0f172a;
+  --good: #059669;
+  --good-bg: rgba(5,150,105,.08);
+  --warn: #d97706;
+  --warn-bg: rgba(217,119,6,.09);
+  --bad: #dc2626;
+  --bad-bg: rgba(220,38,38,.07);
+  --info: #2563eb;
+  --info-bg: rgba(37,99,235,.07);
+  --hover: rgba(15,23,42,.04);
+  --chip-bg: #eef2f8;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(15,23,42,.06);
+  --sh-2: 0 4px 14px rgba(15,23,42,.08);
+  --page-max: 1440px;
+}
+
+/* shared sub-tab ribbon — underline tabs, one component for every tab (UI_STANDARD P3) */
+.u-subnav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:var(--sp-1);
+  margin:0 0 var(--sp-4);padding:var(--sp-2) 0 0;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.u-subnav button{appearance:none;border:none;background:none;font-family:'Inter',-apple-system,
+  Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);font-weight:600;color:var(--mut);
+  cursor:pointer;padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent;
+  transition:var(--transition)}
+.u-subnav button:hover{color:var(--txt)}
+.u-subnav button.on{color:var(--hl);border-bottom-color:var(--hl)}
+.u-subnav button:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+
+:root{--bg:#f8fafc;--card:rgba(255,255,255,.95);--line:rgba(15,23,42,.08);--txt:#0f172a;--mut:#475569;--hl:#2563eb;}
+
+/* shared standalone-page shell — header (name/logo, top-left), body rhythm, footer */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);
+  line-height:var(--lh-base);-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:var(--sp-8) var(--sp-5) 72px}
+h1,h2{font-family:'Outfit',sans-serif;color:var(--txt);margin:0}
+header{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-8)}
+header img{width:44px;height:44px;object-fit:contain;border-radius:var(--r-sm)}
+h1{font-size:var(--fs-2xl);line-height:var(--lh-tight);font-weight:600;letter-spacing:-.01em}
+.sub{font-size:var(--fs-md);color:var(--mut);margin:var(--sp-1) 0 0}
+h2{font-size:var(--fs-lg);font-weight:600;margin:var(--sp-6) 0 var(--sp-2)}
+p{margin:0 0 var(--sp-3);max-width:68ch;color:var(--g700)}
+ul{margin:0 0 var(--sp-3);padding-left:var(--sp-5)}
+li{margin-bottom:var(--sp-2);max-width:68ch;color:var(--g700)}
+strong{color:var(--txt);font-weight:600}
+.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--hl);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:var(--sp-4) var(--sp-5);margin:var(--sp-6) 0;
+  box-shadow:var(--sh-1)}
+.note h2{margin-top:0}
+footer{margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);
+  font-size:var(--fs-sm);color:var(--mut)}
+a{color:var(--hl)}
+a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* the site nav — links back into the dashboard from a standalone page. Defined HERE, with the rest
+   of the shell, because standalone pages never load the dashboard's bucket stylesheet: putting it
+   there rendered a correct nav as unstyled links, which the presence check happily passed. */
+.sitenav{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);margin:0 0 var(--sp-3);
+  padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.sitenav-logo{display:flex;align-items:center;gap:var(--sp-2);text-decoration:none;
+  padding:0 var(--sp-3) 0 0;margin-right:var(--sp-2);border-right:1px solid var(--line)}
+/* the brand name is an <h1> on public pages (it carries the page's entity name for search), so it
+   must be reset out of the shell's h1 sizing and sit inline in the bar */
+.sitenav-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:var(--fs-md);
+  color:var(--txt);white-space:nowrap;margin:0;line-height:1;letter-spacing:0}
+.sitenav-logo img{width:28px;height:28px;object-fit:contain;border-radius:var(--r-sm);display:block}
+.sitenav-a{font-size:var(--fs-base);font-weight:600;color:var(--mut);text-decoration:none;
+  padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent}
+.sitenav-a:hover{color:var(--txt)}
+.sitenav-a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+
+</style>
+<style id="co-m2-css">
+#tab-momentum2 .m2wrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start;max-width:100%}
+#tab-momentum2 .m2main{min-width:0;display:flex;flex-direction:column;gap:14px}
+#tab-momentum2 .m2side{min-width:0;position:sticky;top:8px}
+#tab-momentum2 .m2main table{max-width:100%}
+#tab-momentum2 .m2card{background:var(--card);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:14px 16px;color:var(--txt)}
+#tab-momentum2 .m2sec{font-size:var(--fs-xs,11px);text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin-bottom:8px}
+#tab-momentum2 #m2-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+#tab-momentum2 #m2-head .sym{font-size:var(--fs-xl,22px);font-weight:800}
+#tab-momentum2 #m2-head .ret{font-size:var(--fs-md,15px);font-weight:700}
+#tab-momentum2 #m2-head .mcap{font-size:var(--fs-md,15px);font-weight:700;font-variant-numeric:tabular-nums}
+#tab-momentum2 #m2-head .mcap i{font-style:normal;font-size:var(--fs-xs,11px);font-weight:600;color:var(--mut);
+  letter-spacing:.05em;text-transform:uppercase;margin-right:4px}
+#tab-momentum2 .m2notmem{font-size:var(--fs-xs,11px);color:var(--mut);padding:var(--sp-3) 0;text-align:center}
+#tab-momentum2 .stg{display:inline-block;padding:1px 8px;border-radius:var(--r-md,8px);font-size:var(--fs-sm,12.5px);font-weight:600;white-space:nowrap}
+#tab-momentum2 .stg1{background:var(--warn-bg);color:var(--warn)}#tab-momentum2 .stg2{background:var(--good-bg);color:var(--good)}
+#tab-momentum2 .stg3{background:var(--warn-bg);color:var(--warn)}#tab-momentum2 .stg4{background:var(--bad-bg);color:var(--bad)}
+#tab-momentum2 .stg0{background:#333;color:#aaa}
+#tab-momentum2 .pos{color:var(--good)}#tab-momentum2 .neg{color:var(--bad)}
+#tab-momentum2 .chip{display:inline-block;background:var(--g100);color:var(--g700);border-radius:var(--r-md,8px);padding:1px 8px;font-size:var(--fs-xs,11px);margin:2px 4px 2px 0}
+#tab-momentum2 .m2thesis{font-size:var(--fs-base,14px);line-height:1.5;margin-bottom:8px}
+#tab-momentum2 .m2note{font-size:var(--fs-sm,12.5px);color:var(--mut);margin:6px 0}
+#tab-momentum2 .m2ins-blk{margin-top:10px}
+#tab-momentum2 .m2ins-blk .hd{font-size:var(--fs-xs,11px);text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:4px}
+#tab-momentum2 .m2ins-row{font-size:var(--fs-sm,12.5px);padding:4px 0;border-top:1px solid rgba(255,255,255,.05);display:flex;gap:8px}
+#tab-momentum2 .tier{font-size:var(--fs-xs,11px);font-weight:700;border-radius:var(--r-md,8px);padding:0 6px;height:16px;line-height:16px}
+#tab-momentum2 .t1{background:var(--good-bg);color:var(--good)}#tab-momentum2 .t2{background:var(--info-bg);color:var(--confluence)}
+#tab-momentum2 .imp{font-size:var(--fs-xs,11px);font-weight:700;border-radius:var(--r-md,8px);padding:0 6px}
+#tab-momentum2 .imp.High{background:var(--bad-bg);color:var(--bad)}#tab-momentum2 .imp.Medium{background:var(--warn-bg);color:var(--warn)}
+#tab-momentum2 .m2chartbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+#tab-momentum2 .m2tf button{font-family:inherit;background:var(--g100);color:var(--g700);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:3px 11px;margin-right:5px;cursor:pointer;font-size:var(--fs-sm,12.5px)}
+#tab-momentum2 .m2tf button.active{background:var(--hl);color:#fff;border-color:var(--hl)}
+#tab-momentum2 .m2hover{font-size:var(--fs-sm,12.5px);color:var(--txt);font-variant-numeric:tabular-nums}
+#tab-momentum2 #m2-chart svg{width:100%;height:auto;display:block}
+#tab-momentum2 .m2price{fill:none;stroke:var(--good);stroke-width:1.6}
+#tab-momentum2 .m2vol{fill:var(--line)}
+#tab-momentum2 .m2axis{stroke:var(--line);stroke-width:1}
+#tab-momentum2 .m2lbl{fill:var(--mut);font-size:var(--fs-xs,11px)}
+#tab-momentum2 .m2cross{stroke:var(--mut);stroke-width:1;stroke-dasharray:3 3}
+#tab-momentum2 .m2crossh{stroke:var(--mut);stroke-width:1;stroke-dasharray:3 3}
+#tab-momentum2 .m2grid{stroke:var(--g100);stroke-width:1}
+#tab-momentum2 #m2-chart{position:relative}
+#tab-momentum2 .m2tip{position:absolute;pointer-events:none;display:none;z-index:5;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm,6px);padding:4px 8px;font-size:var(--fs-xs,11px);line-height:1.4;color:var(--txt);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.55);font-variant-numeric:tabular-nums}
+#tab-momentum2 .m2tip b{color:var(--good)}
+#tab-momentum2 .m2empty{color:var(--mut);font-size:var(--fs-sm,12.5px);padding:40px;text-align:center}
+#tab-momentum2 .m2kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 26px}
+#tab-momentum2 .m2kv .kv{display:flex;justify-content:space-between;gap:12px;font-size:var(--fs-sm,12.5px);padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+#tab-momentum2 .m2kv .kv .k{color:var(--mut)}#tab-momentum2 .m2kv .kv .v{font-weight:600;text-align:right}
+#tab-momentum2 .m2gsec{margin-top:10px}
+#tab-momentum2 .m2gh{font-size:var(--fs-xs,11px);font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--mut);margin:2px 0 4px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06)}
+#tab-momentum2 .m2gcap{font-size:var(--fs-xs,11px);font-style:italic;color:var(--mut);margin:-2px 0 4px}
+#tab-momentum2 .m2side .hdr{font-size:var(--fs-xs,11px);text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin-bottom:8px}
+#tab-momentum2 #m2-search{width:100%;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--g100);border-radius:var(--r-md,8px);color:var(--txt);font-size:var(--fs-sm,12.5px)}
+#tab-momentum2 .m2volf{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:-2px 0 9px}
+#tab-momentum2 .m2volf .m2volf-l{font-size:var(--fs-xs,11px);color:var(--mut);margin-right:2px;letter-spacing:.02em}
+#tab-momentum2 .m2volf button{padding:3px 8px;background:var(--bg);border:1px solid var(--g100);border-radius:var(--r-sm,6px);color:var(--txt);font-size:var(--fs-xs,11px);cursor:pointer}
+#tab-momentum2 .m2volf button.active{background:var(--hl);border-color:var(--hl);color:#fff}
+#tab-momentum2 #m2-list{max-height:84vh;overflow:auto;display:flex;flex-direction:column;gap:4px}
+#tab-momentum2 .m2thm{font-size:var(--fs-sm,12.5px);padding:5px 0;border-top:1px solid rgba(255,255,255,.05)}
+#tab-momentum2 .m2thm .hot{font-size:var(--fs-xs,11px);font-weight:700;color:var(--warn);margin-left:6px}
+#tab-momentum2 .m2thm .why{color:var(--mut);display:block;margin-top:2px}
+#tab-momentum2 .m2item{background:var(--card);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:7px 10px;cursor:pointer;color:var(--txt)}
+#tab-momentum2 .m2item:hover{border-color:var(--hl)}
+#tab-momentum2 .m2item.sel{border-color:var(--hl);background:var(--card)}
+#tab-momentum2 .m2item .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#tab-momentum2 .m2item .nm{font-weight:700;font-size:var(--fs-sm,12.5px)}
+#tab-momentum2 .m2item .r2{font-size:var(--fs-xs,11px);color:var(--mut);margin-top:3px;display:flex;justify-content:space-between}
+#tab-momentum2 .mmhist{width:100%;font-size:var(--fs-sm,12.5px);border-collapse:collapse}
+#tab-momentum2 .mmhist th{position:sticky;top:0;background:var(--g100);color:var(--txt);text-align:right;padding:4px 9px}
+#tab-momentum2 .mmhist th:first-child,#tab-momentum2 .mmhist td:first-child{text-align:left}
+#tab-momentum2 .mmhist td{text-align:right;padding:3px 9px;border-top:1px solid rgba(255,255,255,.06)}
+#tab-momentum2 .mmhwrap{max-height:340px;overflow:auto}
+/* Volume analysis: same section furniture as Stage analysis (.m2sec header, .mmhist table), no
+   inline font sizes, and NO inner scroll box — the months read as one table (owner 2026-08-15). */
+#tab-momentum2 .m2vol-h{cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px}
+#tab-momentum2 .m2vol-h .m2sec{margin-bottom:0}
+#tab-momentum2 .m2vol-tw{font-size:var(--fs-md,15px);color:var(--hl);line-height:1}
+#tab-momentum2 .m2vol-b{display:block;margin-top:10px}
+#tab-momentum2 .mmhcap{font-size:var(--fs-xs,11px);color:var(--mut);margin-bottom:6px}
+#tab-momentum2 .m2recent{background:var(--card);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:10px 14px;margin-bottom:14px;color:var(--txt)}
+#tab-momentum2 .m2recent-h{font-weight:700;font-size:var(--fs-sm,12.5px);cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px}
+#tab-momentum2 .m2recent-cta{margin-left:auto;font-weight:700;font-size:var(--fs-xs,11px);color:var(--bg);background:var(--hl);border-radius:var(--r-md,8px);padding:3px 11px;white-space:nowrap;flex:0 0 auto}
+#tab-momentum2 .m2recent.open .m2recent-cta{color:var(--txt);background:transparent;border:1px solid var(--line)}
+#tab-momentum2 .m2recent-tw{display:inline-block;transition:transform .15s;color:var(--mut);font-size:var(--fs-xs,11px)}
+#tab-momentum2 .m2recent.open .m2recent-tw{transform:rotate(90deg)}
+#tab-momentum2 .m2recent-b{display:none;margin-top:10px;max-height:420px;overflow:auto}
+#tab-momentum2 .m2recent.open .m2recent-b{display:block}
+#tab-momentum2 .m2recent table{width:100%;font-size:var(--fs-sm,12.5px);border-collapse:collapse}
+#tab-momentum2 .m2recent th{position:sticky;top:0;background:var(--g100);color:var(--txt);text-align:right;padding:4px 9px}
+#tab-momentum2 .m2recent th:first-child,#tab-momentum2 .m2recent th:nth-child(2),#tab-momentum2 .m2recent td:first-child,#tab-momentum2 .m2recent td:nth-child(2){text-align:left}
+#tab-momentum2 .m2recent td{text-align:right;padding:3px 9px;border-top:1px solid rgba(255,255,255,.06)}
+#tab-momentum2 .m2recent .m2reclink{cursor:pointer;color:var(--hl)}
+#tab-momentum2 .m2recent .m2reclink:hover{text-decoration:underline}
+#tab-momentum2 .m2recent tr.m2exrow>td{background:var(--warn-bg);color:var(--warn);font-weight:600}
+#tab-momentum2 .m2exrow .m2reclink{color:var(--hl)}
+#tab-momentum2 .m2exrow .sig-neg{color:var(--bad)}
+#tab-momentum2 .m2exrow .sig-strong,#tab-momentum2 .m2exrow .sig-pos{color:var(--good)}
+#tab-momentum2 .m2exrow .sig-warn{color:var(--warn)}
+#tab-momentum2 .m2exrow .sig-mut,#tab-momentum2 .m2exrow .dis{color:var(--warn)}
+#tab-momentum2 .m2exbadge{font-size:var(--fs-xs,11px);color:var(--warn);border:1px solid var(--warn);background:var(--warn-bg);border-radius:var(--r-sm,6px);padding:0 4px;margin-left:5px;font-weight:700;white-space:nowrap}
+#tab-momentum2 .m2recent tr.m2nerow>td{background:var(--info-bg);color:var(--hl);font-weight:600}
+#tab-momentum2 .m2nerow .m2reclink{color:var(--hl)}
+#tab-momentum2 .m2nerow .sig-neg{color:var(--bad)}
+#tab-momentum2 .m2nerow .sig-strong,#tab-momentum2 .m2nerow .sig-pos{color:var(--good)}
+#tab-momentum2 .m2nerow .sig-warn{color:var(--warn)}
+#tab-momentum2 .m2nerow .sig-mut,#tab-momentum2 .m2nerow .dis{color:var(--mut)}
+#tab-momentum2 .m2nebadge{font-size:var(--fs-xs,11px);color:var(--hl);border:1px solid var(--hl);background:var(--info-bg);border-radius:var(--r-sm,6px);padding:0 4px;margin-left:5px;font-weight:700;white-space:nowrap}
+#tab-momentum2 .sig-strong{color:var(--good);font-weight:700}
+#tab-momentum2 .sig-pos{color:var(--good)}
+#tab-momentum2 .sig-neg{color:var(--bad)}
+#tab-momentum2 .sig-warn{color:var(--warn)}
+#tab-momentum2 .sig-mut{color:var(--mut)}
+#tab-momentum2 .m2disc{margin-top:16px;font-size:var(--fs-xs,11px);color:var(--mut);text-align:center;border-top:1px solid var(--g100);padding-top:10px}
+/* recent-activity: make each row visibly clickable (cursor + hover + trailing 'view' cue) */
+#tab-momentum2 .m2recent .m2rhint{font-size:var(--fs-xs,11px);color:var(--mut);margin-bottom:6px}
+#tab-momentum2 .m2recent tr.m2recrow{cursor:pointer}
+#tab-momentum2 .m2recent tr.m2recrow:hover>td{background:rgba(90,160,255,.10)}
+#tab-momentum2 .m2recent tr.m2exrow.m2recrow:hover>td{background:var(--warn-bg)}
+#tab-momentum2 .m2recent tr.m2nerow.m2recrow:hover>td{background:var(--info-bg)}
+/* Key data — grouped (two-row header) stage-analysis metrics table, horizontally scrollable */
+#tab-momentum2 #m2-vol-collapse.open #m2-vol-body{display:block}
+#tab-momentum2 #m2-vol-collapse:not(.open) #m2-vol-body{display:none}
+</style><style id="co-dd-css">
+#tab-deepdive .dd-wrap{max-width:100%;margin:0 auto}   /* fills the shared .tabpanel width (UI_STANDARD §3.6) */
+#tab-deepdive .dd-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
+#tab-deepdive #dd-search{padding:7px 11px;border:1px solid var(--line,rgba(15,23,42,.15));border-radius:var(--r-md,8px);background:var(--card,#fff);color:var(--txt,#0f172a);font-size:var(--fs-sm,12.5px);min-width:230px}
+#tab-deepdive #dd-count{font-size:var(--fs-xs,11px);color:var(--mut,#475569);font-weight:600}
+/* searchable directory (replaces the old <select> dropdown) */
+#tab-deepdive .dd-list{max-height:340px;overflow:auto;border:1px solid var(--line,rgba(15,23,42,.12));border-radius:var(--r-md,8px);background:var(--card,#fff);margin:0 0 14px}
+#tab-deepdive .dd-lrow{padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--line,rgba(15,23,42,.06));border-left:3px solid transparent;transition:background .12s}
+#tab-deepdive .dd-lrow:last-child{border-bottom:none}
+#tab-deepdive .dd-lrow:hover{background:var(--hl-glow,rgba(37,99,235,.06))}
+#tab-deepdive .dd-lrow.sel{background:var(--hl-glow,rgba(37,99,235,.08));border-left-color:var(--hl,#2563eb)}
+#tab-deepdive .dd-ltop{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#tab-deepdive .dd-lco{font-size:var(--fs-base,14px);font-weight:700;color:var(--txt,#0f172a)}
+#tab-deepdive .dd-lsym{font-size:var(--fs-xs,11px);font-weight:600;color:var(--mut,#475569);letter-spacing:.3px}
+#tab-deepdive .dd-lchip{font-size:var(--fs-xs,11px);font-weight:800;border:1.5px solid;border-radius:var(--r-pill,999px);padding:1px 8px;background:var(--card,#fff)}
+#tab-deepdive .dd-lsub{font-size:var(--fs-xs,11px);color:var(--mut,#475569);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
+/* themed section boxes — reuse the dashboard .zone; just spacing + the numbered header */
+#tab-deepdive .dd-zone{margin:14px 0}
+#tab-deepdive .dd-zone h2{display:flex;align-items:center;gap:10px;margin-top:0}
+#tab-deepdive .dd-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:var(--r-md,8px);background:var(--hl,#2563eb);color:#fff;font-size:var(--fs-sm,12.5px);font-weight:800;flex:0 0 auto}
+#tab-deepdive .dd-zsrc{margin-left:auto;font-size:var(--fs-xs,11px);font-weight:600;color:var(--mut,#475569);text-transform:none;letter-spacing:0;text-align:right}
+/* hero — plain themed panel (no gradient), like Market Intel zones */
+#tab-deepdive .dd-co{font-size:var(--fs-xl,22px);font-weight:700;letter-spacing:-.02em;color:var(--txt,#0f172a)}
+#tab-deepdive .dd-sub{font-size:var(--fs-sm,12.5px);color:var(--mut,#475569);margin-top:3px;font-weight:500}
+#tab-deepdive .dd-idchips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:9px 0 0}
+#tab-deepdive .dd-vint{display:inline-block;font-size:var(--fs-xs,11px);font-weight:700;color:var(--mut,#475569);border:1px solid var(--line,rgba(15,23,42,.12));border-radius:var(--r-sm,6px);padding:2px 7px;background:var(--card,#fff)}
+#tab-deepdive .dd-vint.stale{color:var(--conflict,#d97706);border-color:rgba(217,119,6,.4)}
+#tab-deepdive .dd-thesis{font-size:var(--fs-base,14px);line-height:1.55;font-style:italic;color:var(--txt,#0f172a);margin:12px 0 14px;border-left:3px solid var(--hl,#2563eb);padding-left:14px}
+#tab-deepdive .dd-ratios{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
+#tab-deepdive .dd-chip{background:var(--hl-glow,rgba(37,99,235,.06));color:var(--hl,#2563eb);border:1px solid var(--line,rgba(37,99,235,.15));border-radius:var(--r-pill,999px);padding:5px 12px;font-size:var(--fs-xs,11px);font-weight:700}
+#tab-deepdive .dd-chip .l{opacity:.6;font-weight:600;margin-right:5px}
+#tab-deepdive .dd-chip.muted{opacity:.55}
+#tab-deepdive .dd-chip.info{background:transparent;color:var(--mut,#475569);border-style:dashed}
+#tab-deepdive .dd-suptag{font-size:var(--fs-xs,11px);font-weight:800;background:var(--conflict,#d97706);color:#fff;border-radius:var(--r-sm,6px);padding:1px 5px;margin-left:5px;vertical-align:1px}
+#tab-deepdive .dd-kn{margin:2px 0 6px}
+#tab-deepdive .dd-block{margin:14px 0}
+#tab-deepdive .dd-block:first-child{margin-top:2px}
+#tab-deepdive .dd-btitle{font-size:var(--fs-xs,11px);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mut,#475569);margin-bottom:5px}
+#tab-deepdive .dd-src{font-size:var(--fs-xs,11px);font-weight:600;color:var(--mut,#475569);margin-left:8px;text-transform:none;letter-spacing:0}
+#tab-deepdive .dd-body{font-size:var(--fs-base,14px);line-height:1.6;color:var(--txt,#0f172a)}
+#tab-deepdive .dd-body ul{margin:4px 0;padding-left:20px}
+#tab-deepdive .dd-body li{margin-bottom:5px}
+#tab-deepdive .dd-body table{border-collapse:collapse;margin:8px 0;font-size:var(--fs-sm,12.5px);width:100%}
+#tab-deepdive .dd-body th,#tab-deepdive .dd-body td{border:1px solid var(--line,rgba(15,23,42,.1));padding:6px 9px;text-align:left}
+#tab-deepdive .dd-body th{background:var(--hl-glow,rgba(37,99,235,.06));font-weight:700}
+#tab-deepdive table.dd-fin{border-collapse:collapse;width:100%;font-size:var(--fs-sm,12.5px);margin:4px 0 10px}
+#tab-deepdive table.dd-fin th,#tab-deepdive table.dd-fin td{border:1px solid var(--line,rgba(15,23,42,.1));padding:6px 8px;text-align:right}
+#tab-deepdive table.dd-fin th:first-child,#tab-deepdive table.dd-fin td:first-child{text-align:left}
+#tab-deepdive table.dd-fin thead th{background:var(--hl-glow,rgba(37,99,235,.06));font-weight:800;color:var(--txt,#0f172a)}
+#tab-deepdive table.dd-fin tr.est td{background:rgba(217,119,6,.08);color:var(--conflict,#d97706);font-style:italic}
+#tab-deepdive table.dd-fin tr.con td{background:var(--hl-glow,rgba(37,99,235,.06));font-style:italic}
+#tab-deepdive .dd-est-tag{font-size:var(--fs-xs,11px);font-weight:800;background:var(--conflict,#d97706);color:#fff;border-radius:var(--r-sm,6px);padding:1px 6px;margin-left:6px;vertical-align:1px;font-style:normal}
+#tab-deepdive .dd-con-tag{font-size:var(--fs-xs,11px);font-weight:800;background:var(--hl,#2563eb);color:#fff;border-radius:var(--r-sm,6px);padding:1px 6px;margin-left:6px;vertical-align:1px;font-style:normal}
+#tab-deepdive .dd-gapnote{font-size:var(--fs-sm,12.5px);color:var(--conflict,#d97706);background:rgba(217,119,6,.07);border:1px dashed rgba(217,119,6,.35);border-radius:var(--r-md,8px);padding:7px 10px;margin:6px 0}
+#tab-deepdive .dd-conf{font-size:var(--fs-sm,12.5px);font-weight:800;color:var(--bull,#059669);margin-bottom:6px}
+#tab-deepdive .dd-rat{font-size:var(--fs-sm,12.5px);color:var(--mut,#475569);line-height:1.55;margin:4px 0}
+#tab-deepdive .dd-rat strong{color:var(--txt,#0f172a)}
+#tab-deepdive .dd-drv{display:inline-block;background:var(--card,#fff);border:1px solid var(--line,rgba(15,23,42,.12));border-radius:var(--r-sm,6px);font-size:var(--fs-xs,11px);padding:2px 7px;margin:2px 5px 2px 0}
+#tab-deepdive .dd-drv .l{color:var(--mut,#475569)}
+#tab-deepdive .dd-disc{font-size:var(--fs-xs,11px);color:var(--conflict,#d97706);background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.25);border-radius:var(--r-md,8px);padding:9px 12px;margin:12px 0 0}
+#tab-deepdive .dd-disc-min{font-size:var(--fs-xs,11px);color:var(--mut,#475569);margin-top:10px}
+#tab-deepdive svg.dd-chart{width:100%;height:200px;display:block;background:var(--card,#fff);border:1px solid var(--line,rgba(15,23,42,.1));border-radius:var(--r-md,8px)}
+#tab-deepdive .dd-srcline{text-align:center;font-size:var(--fs-xs,11px);color:var(--mut,#475569);margin:18px 0 6px;padding-top:12px;border-top:1px solid var(--line,rgba(15,23,42,.08))}
+#tab-deepdive .dd-track-head{display:flex;align-items:center;gap:16px}
+#tab-deepdive .dd-grade{flex:0 0 auto;width:54px;height:54px;display:flex;align-items:center;justify-content:center;font-size:var(--fs-2xl,28px);font-weight:900;border:3px solid;border-radius:var(--r-md,8px)}
+#tab-deepdive .dd-gsum{font-size:var(--fs-base,14px);font-weight:600;color:var(--txt,#0f172a);line-height:1.4}
+#tab-deepdive .dd-trow{font-size:var(--fs-sm,12.5px);line-height:1.5;color:var(--txt,#0f172a);padding:5px 0;border-bottom:1px solid var(--line,rgba(15,23,42,.06))}
+#tab-deepdive .dd-due{display:inline-block;font-size:var(--fs-xs,11px);font-weight:700;background:var(--hl-glow,rgba(37,99,235,.06));color:var(--hl,#2563eb);border-radius:var(--r-sm,6px);padding:1px 7px;margin-right:6px}
+#tab-deepdive .dd-pv{color:var(--mut,#475569);font-size:var(--fs-sm,12.5px)}
+#tab-deepdive .dd-agm{font-size:var(--fs-xs,11px);font-weight:800;background:var(--mut,#475569);color:#fff;border-radius:var(--r-sm,6px);padding:1px 5px;margin-right:5px;vertical-align:1px}
+#tab-deepdive .dd-vd{display:inline-block;font-size:var(--fs-xs,11px);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-right:6px}
+#tab-deepdive .dd-vnote{color:var(--mut,#475569);font-size:var(--fs-sm,12.5px)}
+/* v3: sticky in-panel nav (anchor chips) — wraps on mobile, no horizontal page scroll */
+/* shared underline sub-nav (UI_STANDARD P3) — matches IPO .ipodd-subbar / .u-subnav */
+#tab-deepdive .dd-nav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:var(--sp-1,4px);padding:var(--sp-2,8px) 0 0;margin:0 0 var(--sp-4,16px);background:var(--bg,#f8fafc);border-bottom:1px solid var(--line,rgba(15,23,42,.08))}
+#tab-deepdive .dd-nav button{appearance:none;border:none;background:none;font-family:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;font-size:var(--fs-base,14px);font-weight:600;color:var(--mut,#475569);cursor:pointer;padding:var(--sp-2,8px) var(--sp-3,12px);border-bottom:2px solid transparent;transition:var(--transition,all .2s)}
+#tab-deepdive .dd-nav button:hover{color:var(--txt,#0f172a);border-bottom-color:var(--hl,#2563eb)}
+#tab-deepdive .dd-nav button:focus-visible{outline:2px solid var(--hl,#2563eb);outline-offset:2px;border-radius:var(--r-sm,6px)}
+#tab-deepdive .dd-anchor{scroll-margin-top:58px}
+/* v3: KPI / valuation stat cards */
+#tab-deepdive .dd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 2px}
+#tab-deepdive .dd-kpi{background:var(--card,#fff);border:1px solid var(--line,rgba(15,23,42,.1));border-radius:var(--r-md,8px);padding:10px 12px;min-width:0}
+#tab-deepdive .dd-kpi .l{font-size:var(--fs-xs,11px);font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut,#475569)}
+#tab-deepdive .dd-kpi .v{font-size:var(--fs-md,15px);font-weight:800;color:var(--txt,#0f172a);margin-top:3px;line-height:1.3;overflow-wrap:anywhere}
+#tab-deepdive .dd-kpi .s{font-size:var(--fs-xs,11px);color:var(--mut,#475569);margin-top:3px;line-height:1.4}
+/* v3: credibility grade chip (executive band) */
+#tab-deepdive .dd-gchip{display:inline-block;font-size:var(--fs-xs,11px);font-weight:800;border:2px solid;border-radius:var(--r-pill,999px);padding:3px 11px;background:var(--card,#fff);cursor:help}
+/* v3: collapsible narrative zones + '+N more' overflow */
+#tab-deepdive .dd-fold summary{cursor:pointer;list-style:none}
+#tab-deepdive .dd-fold summary::-webkit-details-marker{display:none}
+#tab-deepdive .dd-fold summary h2{margin:0}
+#tab-deepdive .dd-caret{margin-left:8px;flex:0 0 auto;color:var(--mut,#475569);font-size:var(--fs-xs,11px);transition:transform .15s}
+#tab-deepdive .dd-fold[open] .dd-caret{transform:rotate(180deg)}
+#tab-deepdive .dd-foldbody{margin-top:10px}
+#tab-deepdive .dd-more{font-family:inherit;display:inline-block;margin:6px 0 0;border:1px dashed var(--line,rgba(37,99,235,.35));background:transparent;color:var(--hl,#2563eb);font-size:var(--fs-xs,11px);font-weight:700;border-radius:var(--r-md,8px);padding:4px 12px;cursor:pointer}
+/* v3: peer mini-table scrolls inside its own container on narrow screens */
+#tab-deepdive .dd-peerwrap{overflow-x:auto}
+
+/* the hero, re-scoped to #co-hero */
+#co-hero .dd-zone{margin:14px 0}
+#co-hero .dd-zone h2{display:flex;align-items:center;gap:10px;margin-top:0}
+#co-hero .dd-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:var(--r-md,8px);background:var(--hl,#2563eb);color:#fff;font-size:var(--fs-sm,12.5px);font-weight:800;flex:0 0 auto}
+#co-hero .dd-co{font-size:var(--fs-xl,22px);font-weight:700;letter-spacing:-.02em;color:var(--txt,#0f172a)}
+#co-hero .dd-sub{font-size:var(--fs-sm,12.5px);color:var(--mut,#475569);margin-top:3px;font-weight:500}
+#co-hero .dd-idchips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:9px 0 0}
+#co-hero .dd-vint{display:inline-block;font-size:var(--fs-xs,11px);font-weight:700;color:var(--mut,#475569);border:1px solid var(--line,rgba(15,23,42,.12));border-radius:var(--r-sm,6px);padding:2px 7px;background:var(--card,#fff)}
+#co-hero .dd-vint.stale{color:var(--conflict,#d97706);border-color:rgba(217,119,6,.4)}
+#co-hero .dd-thesis{font-size:var(--fs-base,14px);line-height:1.55;font-style:italic;color:var(--txt,#0f172a);margin:12px 0 14px;border-left:3px solid var(--hl,#2563eb);padding-left:14px}
+#co-hero .dd-ratios{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
+#co-hero .dd-chip{background:var(--hl-glow,rgba(37,99,235,.06));color:var(--hl,#2563eb);border:1px solid var(--line,rgba(37,99,235,.15));border-radius:var(--r-pill,999px);padding:5px 12px;font-size:var(--fs-xs,11px);font-weight:700}
+#co-hero .dd-chip .l{opacity:.6;font-weight:600;margin-right:5px}
+#co-hero .dd-chip.muted{opacity:.55}
+#co-hero .dd-chip.info{background:transparent;color:var(--mut,#475569);border-style:dashed}
+#co-hero .dd-con-tag{font-size:var(--fs-xs,11px);font-weight:800;background:var(--hl,#2563eb);color:#fff;border-radius:var(--r-sm,6px);padding:1px 6px;margin-left:6px;vertical-align:1px;font-style:normal}
+#co-hero .dd-conf{font-size:var(--fs-sm,12.5px);font-weight:800;color:var(--bull,#059669);margin-bottom:6px}
+#co-hero .dd-agm{font-size:var(--fs-xs,11px);font-weight:800;background:var(--mut,#475569);color:#fff;border-radius:var(--r-sm,6px);padding:1px 5px;margin-right:5px;vertical-align:1px}
+#co-hero .dd-gchip{display:inline-block;font-size:var(--fs-xs,11px);font-weight:800;border:2px solid;border-radius:var(--r-pill,999px);padding:3px 11px;background:var(--card,#fff);cursor:help}</style><style id="co-search-css">
+.cosearch{position:relative;margin-left:auto;flex:0 0 auto}
+.cosearch input{width:230px;max-width:44vw;padding:7px 10px;font:inherit;font-size:var(--fs-sm,12.5px);
+  color:var(--txt);background:var(--card);border:1px solid var(--line);border-radius:var(--r-md,8px)}
+.cosearch input:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
+.cosearch .cosl{position:absolute;right:0;top:calc(100% + 4px);z-index:60;min-width:270px;max-width:80vw;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md,8px);
+  box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden;display:none}
+.cosearch .cosr{display:flex;gap:8px;align-items:baseline;padding:7px 11px;cursor:pointer;
+  font-size:var(--fs-sm,12.5px);color:var(--txt);border-bottom:1px solid var(--line)}
+.cosearch .cosr:last-child{border-bottom:none}
+.cosearch .cosr:hover,.cosearch .cosr.on{background:var(--hover,rgba(15,23,42,.04))}
+.cosearch .cosr .co{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cosearch .cosr .sy{flex:0 0 auto;font-weight:700;color:var(--mut);font-size:var(--fs-xs,11px)}
+.cosearch .cosmore{padding:6px 11px;font-size:var(--fs-xs,11px);color:var(--mut);background:var(--chip-bg)}
+</style><style id="co-css">
+/* The page reuses Momentum's pane styles verbatim (all `#tab-momentum2 …`), so only the page-level
+   frame is defined here: a wider measure than the prose shell, and the section sub-nav. */
+/* SAME COLUMN AS THE TABS. The shell's prose width (820px) then a hand-picked 1100px both left this
+   page narrower than every dashboard tab, which centre on --page-max — so the side margins read as
+   "too much space" against Big Picture. One page width, from the token, everywhere. */
+.wrap:has(.co-page){max-width:calc(var(--page-max) + var(--sp-5) * 2);
+  padding-left:var(--sp-5);padding-right:var(--sp-5)}
+.co-page{display:flex;flex-direction:column;gap:14px}
+/* SECOND-LEVEL NAV: tighter than the site nav above it, and a notch smaller (owner 2026-08-17).
+   It is subordinate navigation, so it should read as subordinate — minimum breathing room above and
+   below, --fs-sm against the site nav's --fs-base. */
+.co-sub{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;gap:0;
+  margin:0 0 var(--sp-2);padding:var(--sp-1) 0 0;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.co-sub button{appearance:none;border:none;background:none;font-family:inherit;
+  font-size:var(--fs-sm);font-weight:600;color:var(--mut);cursor:pointer;
+  padding:var(--sp-1) var(--sp-3) var(--sp-2);border-bottom:2px solid transparent}
+.co-sub button:hover{color:var(--txt)}
+.co-sub button.on{color:var(--hl);border-bottom-color:var(--hl)}
+.co-sub button:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+.co-sec[hidden]{display:none}
+/* The hero is the page HEADING now, not one card in a stack — strip the zone chrome it wore when it
+   sat inside the research column, and let the company name lead at the page's largest size. */
+#co-hero:empty{display:none}
+#co-hero .dd-zone{margin:0 0 var(--sp-3)}
+#tab-deepdive .dd-nav{display:none}   /* hoisted into .co-sub — one row of tabs, not two */
+/* ONE CHART PER PAGE (owner 2026-08-17). The deep-dive draws its own small price SVG inside the
+   Summary zone; on a single running page that sits a few hundred pixels below Momentum's price+
+   volume chart. Two charts of the same stock, drawn from different series and at different scales,
+   ask the reader to reconcile them — and the momentum one is the fuller of the two (volume, the
+   1Y/3Y/5Y/Max range, corp-action adjusted). Hidden here rather than deleted upstream: the module
+   is shared, and this is a decision about THIS page's layout, not about the renderer. */
+#tab-deepdive svg.dd-chart,#co-hero svg.dd-chart{display:none}
+/* BOTH scopes: the chart lives in the Summary hero, and the hero is HOISTED out of #tab-deepdive
+   into #co-hero on render — so a rule scoped only to the old ancestor silently stopped matching and
+   the second chart came back. Moving markup moves it out of its stylesheet; that is the third time
+   in one day, so both homes are named here. */
+.co-miss{padding:var(--sp-8) var(--sp-4);text-align:center;color:var(--mut);font-size:var(--fs-sm)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../dashboard.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../dashboard.html?tab=tab-annc">Announcements</a><a class="sitenav-a" href="../dashboard.html?tab=tab-ipodd">IPOs</a><a class="sitenav-a" href="../dashboard.html?tab=tab-momentum2">Universe</a><!--COS-START--><div class="cosearch" id="cosearch"><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company" aria-label="Search for company"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
+
+
+<div id="tab-momentum2" class="co-page">
+  <!-- SUB-NAV FIRST, directly under the site nav (owner 2026-08-17). It used to sit below the hero,
+       which put a row of tabs in the middle of the page and, once sticky, floated it over the
+       content it had been sitting beneath. Section navigation belongs with the navigation. -->
+  <div class="co-sub" id="co-sub"><!-- built from the sections that actually render --></div>
+  <!-- The deep-dive's Summary hero is MOVED here on render: it is the best identity block we have
+       (company name, sector, mcap, credibility, ISIN, concall vintage, thesis, ratios), and it was
+       sitting below the fold while a thinner momentum head repeated the same symbol and mcap above
+       it. One heading, at the top of the CONTENT. -->
+  <div id="co-hero"></div>
+
+  <section class="co-sec" id="co-sec-stage" data-co-sec="stage">
+    <div id="m2-head"></div>
+    <div class="m2card" id="m2-insights"></div>
+    <div class="m2card">
+      <div class="m2chartbar">
+        <div class="m2tf" id="m2-tf"><button data-tf="1" class="active">1Y</button><button data-tf="3">3Y</button><button data-tf="5">5Y</button><button data-tf="0">Max</button></div>
+        <div class="m2hover" id="m2-hover"></div>
+      </div>
+      <div id="m2-chart"></div>
+    </div>
+    <div class="m2card"><div class="m2sec">Stage analysis</div><div id="m2-data"></div>
+      <div id="m2-data-ext"></div></div>
+    <div class="m2card"><div class="m2sec">Stage history</div><div id="m2-hist"></div></div>
+    <div class="m2card open" id="m2-vol-collapse">
+      <div class="m2vol-h" id="m2-vol-h"><span class="m2vol-tw" id="m2-vol-tw">&minus;</span>
+        <span class="m2sec">Volume analysis</span></div>
+      <div class="m2vol-b" id="m2-vol-body"><div id="m2-vol-table"></div></div>
+    </div>
+  </section>
+
+  <section class="co-sec" id="co-sec-research" data-co-sec="research" hidden>
+    <div id="tab-deepdive">
+      <div class="dd-nav" id="dd-nav"></div>
+      <div id="dd-view"></div>
+    </div>
+  </section>
+
+  <div class="m2disc">Technical states shown for educational purposes only &mdash; not investment
+  advice. Please consult a SEBI-registered investment adviser before making investment decisions.</div>
+</div>
+<!--CO-M2D-START-->
+<script>
+if(!window.M2D){window.M2D=(function(){
+  const esc=s=>(s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // strength colour cue for the (already-relabelled) signal labels — visual ranking, no buy/sell words
+  const SIGCLS={'Stage-1 Breakout':'sig-strong','New High':'sig-pos','VCP Pivot':'sig-pos','MA Pullback':'sig-pos','Breakdown':'sig-neg','Distribution':'sig-neg','Topping':'sig-warn','Advancing (S2)':'sig-mut','Entered Stage 2':'sig-strong','Repeat':'sig-mut'};
+  const sigSpan=s=>s?`<span class="${SIGCLS[s]||''}">${esc(s)}</span>`:'<span class="dis">—</span>';
+  // Stage-2 entry day: duration==1 while "Advancing (S2)" means it JUST entered Stage 2 -> show "Entered Stage 2".
+  const sigCell=(sig,dur)=>sigSpan((sig==='Advancing (S2)'&&Number(dur)===1)?'Entered Stage 2':sig);
+  // readable category labels (display only — raw value kept for the default filter / _is_default)
+  const CAT_LABEL={'agg accumulation':'Accumulating','agg and double':'Accumulating + Doubled','doubled':'Doubled','first time':'New'};
+  const catLabel=c=>CAT_LABEL[c]||c||'';
+  const STG={1:'1 · Basing',2:'2 · Advancing',3:'3 · Top',4:'4 · Decline'};
+  const stg=g=>g==null?'<span class="stg stg0">No data</span>':`<span class="stg stg${g}">${esc(STG[g]||g)}</span>`;
+  const f=(v,d)=>v==null?'—':(d!=null?Number(v).toFixed(d):v);
+  const pc=v=>v==null?'<span style="color:var(--mut)">—</span>':`<span class="${v<0?'neg':'pos'}">${Number(v).toFixed(1)}%</span>`;
+  const chips=(s,cls)=>(s||'').split(/[;,]/).map(x=>x.trim()).filter(Boolean).map(x=>`<span class="chip ${cls||''}">${esc(x)}</span>`).join('');
+  let cur=null, tf=1;
+  // State the lib OWNS. `STK`/`META`/`DATADIR`/`HIST` are injected by whoever hosts it: the tab
+  // passes its inline members and the bulk history it already fetches; the Company page passes an
+  // empty member list and its own relative data dir. Everything else (the price and company caches)
+  // belongs to the renderers and is private, so two hosts cannot corrupt each other's cache.
+  let STK=[], META={}, DATADIR='data', HIST={}, histLoaded=false;
+  const PRICE={};
+  const fileOf=s=>String(s).toUpperCase().replace(/[^A-Za-z0-9_.-]/g,'_')+'.json';
+
+  // ---- insights ----
+  function insights(r){
+    const I=r.ins||{};
+    const ST=I.st||[];
+    if(!I.has && !ST.length) return '<div class="m2note">No theme or concall coverage for this stock.</div>';
+    let h='';
+    if(I.has){
+      h+=`<div class="m2thesis">${I.thesis?esc(I.thesis):'<span class="m2note">No one-line thesis on record.</span>'}</div>`;
+      h+=`<div>${chips(I.sec)}${chips(I.layer)}${chips(I.cluster)}</div>`;
+      if(I.co) h+=`<div class="m2note">${esc(I.co)}${I.q?' · '+esc(I.q):''}${I.cd?' · call '+esc(I.cd):''}</div>`;
+    }
+    if(ST.length){
+      const byT={}; ST.forEach(x=>{(byT[x.theme]=byT[x.theme]||[]).push(x);});
+      h+='<div class="m2ins-blk"><div class="hd">Themes &amp; need of the hour</div>';
+      Object.keys(byT).forEach(t=>{
+        h+=`<div class="m2thm"><b>${esc(t)}</b></div>`;
+        byT[t].forEach(s=>{const gen=(s.status==='Unthemed');
+          h+=`<div class="m2ins-row">${(!gen&&s.tier)?'<span class="tier t'+(s.tier==='1'?'1':'2')+'">T'+esc(s.tier)+'</span>':''}<span><b>${esc(s.subtheme)}</b> ${(s.tag&&!gen)?'<span class="chip">'+esc(s.tag)+'</span>':''} ${(s.status&&!gen)?'<span class="m2note" style="display:inline">'+esc(s.status)+'</span>':''}</span></div>`;});
+      });
+      h+='</div>';
+    }
+    if((I.trig||[]).length){h+='<div class="m2ins-blk"><div class="hd">Near-term triggers</div>'+
+      I.trig.map(t=>`<div class="m2ins-row">${t.im?'<span class="imp '+esc(t.im)+'">'+esc(t.im)+'</span>':''}<span><b>${esc(t.tg||t.tm)}</b> ${t.tm&&t.tg?'<span class="m2note" style="display:inline">'+esc(t.tm)+'</span>':''} ${t.cd?'<span class="chip">'+esc(t.cd)+'</span>':''}</span></div>`).join('')+'</div>';}
+    return h;
+  }
+
+  // ---- key data (2-col pairs) ----
+  function kv(r){
+    // general stage fields (ungrouped)
+    const P=[['Stage',stg(r.g)],['Stage duration (d)',r.d==null?'—':r.d],
+      ['MCap latest (cr)',f(r.m,0)],['Close',f(r.cl,2)]];
+    // Institution Accumulation group
+    const IA=[['First Accumulation month',esc(r.fam)||'—'],['Category',esc(catLabel(r.c))],
+      ['Accumulation threshold date',esc(r.atd)||'—'],['Price doubled date',esc(r.pdd)||'—'],
+      ['Latest Accumulating %',f(r.a,1)+'%'],['Latest Accumulating month',esc(r.lm)||'—']];
+    const rows=arr=>arr.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+    return `<div class="m2kv">${rows(P)}</div>`+
+      `<div class="m2gsec"><div class="m2gh">Institution Accumulation</div><div class="m2kv">${rows(IA)}</div></div>`;
+  }
+
+  // ---- Key data: grouped stage-analysis metrics (two-row header, one row = selected stock) ----
+  const xnum=(v,d)=>{ if(v==null||v==='')return '—'; const n=Number(v); return isNaN(n)?esc(v):n.toFixed(d); };
+  const xint=v=>{ if(v==null||v==='')return '—'; const n=Number(v); return isNaN(n)?esc(v):String(Math.round(n)); };
+  const xpct=v=>{ if(v==null||v==='')return '—'; const n=Number(v); return isNaN(n)?esc(v):Math.round(n)+'%'; };
+  const xbool=v=>{ const s=String(v==null?'':v).toLowerCase(); return s==='true'?'✓':(s==='false'||s===''?'—':esc(v)); };
+  const xdate=v=>v?esc(v):'—';
+  // vpe_df_60d_sum is stored ALREADY ×100 (rounded 1dp) in universe_stage_analysis.csv — display as-is at 1dp.
+  // groups -> [header, [[colKey, label, formatter],...], asOfCaption?]; renders stacked (no wide table)
+  const XG=[
+    ['Volume / VPE',[['vpe_df_60d_sum','vol_vpe_60d Σ',v=>xnum(v,1)],['vpe_zone_cumul_df','zone_vol_vpe Σ',v=>xnum(v,2)]]],
+    ['Prior Base',[['duration_from_prev_signal','Days since',xint],['pct_change_from_prev_signal','Return %',xpct],['drawdown_from_prev_signal','Drawdown %',xpct],['stage_changed_since_prev_signal','Stage changed?',xbool]],'from the latest stage-change / pivot session'],
+    ['New Pivot',[['base_count','Base count',xint],['pivot_close','Pivot close',v=>xnum(v,2)],['pivot_low','Pivot low',v=>xnum(v,2)]],'from the latest stage-change / pivot session'],
+  ];
+  // Stacked like Key data (same .m2kv label:value grid), just grouped under sub-headers — no wide table.
+  function kvExt(r){
+    const sx=r.sx||{};
+    return XG.map(([g,cols,cap])=>{
+      let rows=cols.map(([k,lbl,fmt])=>`<div class="kv"><span class="k">${esc(lbl)}</span><span class="v">${fmt(sx[k])}</span></div>`).join('');
+      // Previous-stage fields (from the row payload, not sx) live under the Volume / VPE group. Shown only when non-null.
+      if(g==='Volume / VPE'){
+        if(r.prev_stage!=null) rows+=`<div class="kv"><span class="k">Prev stage</span><span class="v">${xint(r.prev_stage)}</span></div>`;
+        if(r.prev_zone_vpe!=null) rows+=`<div class="kv"><span class="k">Prev zone-VPE</span><span class="v">${xnum(r.prev_zone_vpe,2)}</span></div>`;
+      }
+      const c=cap?`<div class="m2gcap">${esc(cap)}</div>`:'';
+      return `<div class="m2gsec"><div class="m2gh">${esc(g)}</div>${c}<div class="m2kv">${rows}</div></div>`;
+    }).join('');
+  }
+
+  // ---- stage history table ----
+  function histTbl(sym){
+    // Members come from the bulk file (it is already loaded for the 30-day feed); anyone else from
+    // their own per-company file, which is the only place their history exists.
+    const own=COMP[sym]&&COMP[sym].hist;
+    if(!HIST[sym]&&own) return histRows(own);
+    if(!histLoaded) return '<div class="mmhcap">Loading stage history&hellip;</div>';
+    return histRows(HIST[sym]||[]);
+  }
+  function histRows(src){
+    const h=(src||[]).filter(x=>{            // x = [date, close, stage, dur, transition, signal]
+      if(x[3]===1) return true;                             // Duration==1 (stage-change day): always include, any signal
+      if(x[5]==='Advancing (S2)'||x[5]==='Repeat') return false;   // otherwise drop the continuation rows
+      if(!x[5]) return false;                               // otherwise drop blank-signal rows
+      return true;                                          // any other signal: keep
+    });
+    if(!h.length) return '<div class="mmhcap">No stage history rows (after filters).</div>';
+    const rows=h.slice().reverse();
+    // The window clause is dropped when the host did not supply hist_sessions, rather than printed
+    // as "within last undefined" — which is what the Company page showed, because it initialises the
+    // lib with an empty meta. A caption that states a number it does not have is worse than a
+    // caption that says less.
+    const _win = (META && META.hist_sessions) ? ` &middot; within last ${META.hist_sessions}` : '';
+    let t=`<div class="mmhcap">${rows.length} sessions (all Dur=1 rows + signals, excl. Advancing (S2)/Repeat${_win})</div><div class="mmhwrap"><table class="mmhist">`+
+      '<tr><th>Date</th><th>Close</th><th>Stage</th><th>Dur</th><th>Transition</th><th>Signal</th></tr>';
+    for(const x of rows) t+=`<tr><td>${esc(x[0])}</td><td>${x[1]==null?'—':Number(x[1]).toFixed(2)}</td><td>${x[2]==null?'—':esc(STG[x[2]]||x[2])}</td><td>${x[3]==null?'—':x[3]}</td><td>${x[4]?esc(x[4]):'—'}</td><td>${sigCell(x[5],x[3])}</td></tr>`;
+    return t+'</table></div>';
+  }
+
+  // ---- the per-company file: ONE fetch, three consumers ----
+  // The picker reaches ~2,131 stocks while the inline payload carries only the 195 members, so for
+  // everything else the record, its price and its stage history all come from this file. One promise
+  // per symbol, cached, so selecting a stock does not fetch the same file three times.
+  const COMP={}, COMPQ={};
+  function fetchCompany(sym){
+    if(COMP[sym]) return Promise.resolve(COMP[sym]);
+    if(COMPQ[sym]) return COMPQ[sym];
+    COMPQ[sym]=fetch(DATADIR+'/company/'+encodeURIComponent(fileOf(sym)))
+      .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[]; return m;})
+      .catch(e=>{delete COMPQ[sym]; throw e;});
+    return COMPQ[sym];
+  }
+  // A record for ANY pickable symbol: members come from the inline payload, everyone else from the
+  // per-company file once it has landed.
+  function recOf(sym){ return STK.find(x=>x.s===sym) || (COMP[sym]&&COMP[sym].stock) || null; }
+
+  // ---- SVG price+volume chart ----
+  const yrAgo=(iso,n)=>{const y=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);return new Date(y-n,m-1,d);};
+  const toDate=iso=>new Date(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10));
+  function chart(sym){
+    const box=document.getElementById('m2-chart'), hov=document.getElementById('m2-hover');
+    if(!PRICE[sym]){                                  // Phase-1 split: fetch this symbol's price on demand
+      box.innerHTML='<div class="m2empty">Loading price&hellip;</div>'; hov.textContent='';
+      fetchCompany(sym).then(()=>chart(sym))
+        // Reader-facing: no repo paths, no run-this-command, no raw fetch error. The serving hint is
+        // true only for a page opened off the file system, so it is shown only there (2026-08-15).
+        .catch(()=>{box.innerHTML='<div class="m2empty">Price unavailable'+(location.protocol==='file:'?' &mdash; opened from the file system, so the browser blocks the data fetch':'')+'.</div>'; hov.textContent='';});
+      return;
+    }
+    const all=PRICE[sym]||[];
+    if(all.length<2){box.innerHTML='<div class="m2empty">No NSE price history for this symbol.</div>';hov.textContent='';return;}
+    let data=all;
+    if(tf>0){const cut=yrAgo(all[all.length-1][0],tf); data=all.filter(p=>toDate(p[0])>=cut); if(data.length<2)data=all.slice(-2);}
+    const W=860,H=330,pL=58,pR=14,pT=12,pB=46,volH=62;
+    const closes=data.map(p=>p[1]),vols=data.map(p=>p[2]);
+    const cmin=Math.min(...closes),cmax=Math.max(...closes),vmax=Math.max(...vols,1),n=data.length;
+    const plotB=H-pB-volH,plotT=pT;
+    const X=i=>pL+(W-pL-pR)*(n<2?0:i/(n-1));
+    const Y=v=>plotB-(plotB-plotT)*((v-cmin)/((cmax-cmin)||1));
+    const VY=v=>(H-pB)-volH*(v/vmax);
+    const fmtP=v=> v>=1000?Math.round(v).toLocaleString('en-IN'):(v>=100?v.toFixed(0):v.toFixed(1));
+    const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmtD=iso=>MON[+iso.slice(5,7)-1]+" '"+iso.slice(2,4);
+    let gr='';                                                     // gridlines + axis labels
+    const NY=4;
+    for(let k=0;k<=NY;k++){const v=cmin+(cmax-cmin)*k/NY,y=Y(v);
+      gr+=`<line class="m2grid" x1="${pL}" y1="${y.toFixed(1)}" x2="${W-pR}" y2="${y.toFixed(1)}"/>`+
+          `<text class="m2lbl" x="${pL-7}" y="${(y+3.5).toFixed(1)}" text-anchor="end">${fmtP(v)}</text>`;}
+    const NX=Math.min(5,n-1);
+    for(let k=0;k<=NX;k++){const i=Math.round((n-1)*k/NX),x=X(i);
+      gr+=`<line class="m2grid" x1="${x.toFixed(1)}" y1="${plotT}" x2="${x.toFixed(1)}" y2="${plotB}"/>`+
+          `<text class="m2lbl" x="${x.toFixed(1)}" y="${H-8}" text-anchor="${k===0?'start':(k===NX?'end':'middle')}">${fmtD(data[i][0])}</text>`;}
+    const line=data.map((p,i)=>X(i).toFixed(1)+','+Y(p[1]).toFixed(1)).join(' ');
+    const bars=data.map((p,i)=>`<rect class="m2vol" x="${(X(i)-1).toFixed(1)}" y="${VY(p[2]).toFixed(1)}" width="2" height="${((H-pB)-VY(p[2])).toFixed(1)}"/>`).join('');
+    box.innerHTML=`<svg viewBox="0 0 ${W} ${H}">`+gr+
+      `<line class="m2axis" x1="${pL}" y1="${plotB}" x2="${W-pR}" y2="${plotB}"/>`+
+      bars+`<polyline class="m2price" points="${line}"/>`+
+      `<line id="m2cl" class="m2cross" x1="0" y1="${plotT}" x2="0" y2="${plotB}" style="display:none"/>`+
+      `<line id="m2clh" class="m2crossh" x1="${pL}" y1="0" x2="${W-pR}" y2="0" style="display:none"/>`+
+      `<circle id="m2dot" r="3.5" fill="var(--good)" stroke="var(--bg)" stroke-width="1" style="display:none"/>`+
+      `<rect id="m2ov" x="${pL}" y="${plotT}" width="${W-pL-pR}" height="${(H-pB)-plotT}" fill="transparent"/></svg>`+
+      `<div class="m2tip" id="m2-tip"></div>`;
+    const last=data[n-1]; hov.innerHTML=`Latest ${esc(last[0])} &nbsp; <b>${last[1].toFixed(2)}</b>`;
+    const svgEl=box.querySelector('svg'),ov=box.querySelector('#m2ov'),cl=box.querySelector('#m2cl'),clh=box.querySelector('#m2clh'),dot=box.querySelector('#m2dot'),tip=box.querySelector('#m2-tip');
+    ov.onmousemove=e=>{const r=svgEl.getBoundingClientRect(),br=box.getBoundingClientRect();
+      const fx=(e.clientX-r.left)/r.width*W; let i=Math.round((fx-pL)/((W-pL-pR)||1)*(n-1)); i=Math.max(0,Math.min(n-1,i));
+      const p=data[i],gx=X(i),gy=Y(p[1]);
+      cl.setAttribute('x1',gx);cl.setAttribute('x2',gx);cl.style.display='';
+      clh.setAttribute('y1',gy);clh.setAttribute('y2',gy);clh.style.display='';
+      dot.setAttribute('cx',gx);dot.setAttribute('cy',gy);dot.style.display='';
+      const px=(gx/W)*r.width+(r.left-br.left),py=(gy/H)*r.height+(r.top-br.top);
+      tip.innerHTML=`${esc(p[0])}<br><b>${p[1].toFixed(2)}</b> &middot; vol ${p[2].toLocaleString()}`;
+      tip.style.display='block';
+      const tw=tip.offsetWidth,th=tip.offsetHeight,below=py<th+16;
+      tip.style.left=Math.max(tw/2+2,Math.min(px,r.width-tw/2-2))+'px';
+      tip.style.top=(below?py+14:py-th-12)+'px';
+      tip.style.transform='translateX(-50%)';};
+    ov.onmouseleave=()=>{cl.style.display='none';clh.style.display='none';dot.style.display='none';tip.style.display='none';};
+  }
+
+  // ---- select ----
+  // ₹cr, grouped Indian-style. Replaces the return-since-trigger that used to sit in the head —
+  // that number runs to four figures on long-held names (CUPID showed 8902.1%), which says more
+  // about how long ago it triggered than about the stock (owner 2026-08-15).
+  function mcapCell(v){
+    if(v==null||v==='') return '';
+    const n=Number(v); if(!isFinite(n)) return '';
+    return `<span class="mcap"><i>mcap</i>₹${Math.round(n).toLocaleString('en-IN')} cr</span>`;
+  }
+
+
+  // ---- Volume analysis collapsible table ----
+  let DELVOL={}, delvolLoaded=false, delvolLatch=false;
+  function renderVolAnalysis(sym){
+    const tb=document.getElementById('m2-vol-table');
+    if(!tb) return;
+    if(!delvolLoaded){
+      tb.innerHTML='<div class="m2empty">Loading volume analysis&hellip;</div>';
+      return;
+    }
+    const data=DELVOL[sym]||[];
+    if(!data.length){
+      tb.innerHTML='<div class="m2empty">No volume analysis data for '+esc(sym)+'</div>';
+      return;
+    }
+    const rows=data.slice().reverse();
+    // No caption row and no .mmhwrap scroll box (owner 2026-08-15): the month count was restating
+    // what the table shows, and an inner scroller inside an already-collapsible card gave the page
+    // two nested scrolls. Same .mmhist table as Stage history, so the type matches the panes above.
+    let t='<table class="mmhist">'+
+      '<tr><th>Date</th><th>Volume (cr)</th><th>MCap (cr)</th><th>% MCap</th></tr>';
+    for(const r of rows){
+      const d=r[0];
+      const vol=r[1]!=null?Number(r[1]).toFixed(1):'—';
+      const mc=r[2]!=null?Number(r[2]).toFixed(0):'—';
+      const pct=r[3]!=null?Number(r[3]).toFixed(2)+'%':'—';
+      t+=`<tr><td>${esc(d)}</td><td>${vol}</td><td>${mc}</td><td>${pct}</td></tr>`;
+    }
+    tb.innerHTML=t+'</table>';
+  }
+
+  function loadDelVol(){
+    if(delvolLatch) return; delvolLatch=true;
+    const tb=document.getElementById('m2-vol-table');
+    if(tb)tb.innerHTML='<div class="m2empty">Loading volume analysis&hellip;</div>';
+    fetch(DATADIR+'/momentum2_delvol.json').then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(d=>{ DELVOL=d||{}; delvolLoaded=true; if(cur) renderVolAnalysis(cur); })
+      .catch(e=>{ delvolLatch=false;
+        const m='<div class="m2empty">Volume analysis unavailable &mdash; serve the dashboard over HTTP. '+esc(e.message)+'</div>';
+        if(tb)tb.innerHTML=m; });
+  }
+
+  function _set(id,h){var e=document.getElementById(id); if(e) e.innerHTML=h;}
+  function select_detail(sym){
+    cur=sym;
+    var r=recOf(sym);
+    if(!r){
+      // ALREADY FETCHED AND STILL NOTHING -> STOP. Without this the retry recurses forever: no
+      // record, so fetch; the fetch resolves from cache instantly; still no record, so fetch again.
+      // A company file can legitimately carry research but no momentum record (it is not in the
+      // stage universe), and every one of those froze the tab in a tight loop — no error, no
+      // network traffic, just a page that never responds. `COMP[sym]` is set by fetchCompany even
+      // when the file has no momentum section, so it is the honest "we have looked" flag.
+      if(COMP[sym]){
+        _set('m2-head','<span class="sym">'+esc(sym)+'</span>');
+        _set('m2-insights','<div class="m2empty">No stage analysis for '+esc(sym)+
+             ' &mdash; it is not in the stage universe.</div>');
+        _set('m2-data',''); _set('m2-data-ext',''); _set('m2-hist','');
+        _set('m2-chart',''); _set('m2-vol-table','');
+        return;
+      }
+      _set('m2-head','<span class="sym">'+esc(sym)+'</span>');
+      _set('m2-insights','<div class="m2empty">Loading&hellip;</div>');
+      fetchCompany(sym).then(function(){ if(cur===sym) select_detail(sym); })
+        .catch(function(e){ _set('m2-insights','<div class="m2empty">No data for '+esc(sym)+
+                                 ' &mdash; '+esc((e&&e.message)||e)+'</div>'); });
+      return;
+    }
+    _set('m2-head','<span class="sym">'+esc(r.s)+'</span>'+stg(r.g)+
+         (r.c?'<span class="chip">'+esc(catLabel(r.c))+'</span>':'')+mcapCell(r.m));
+    _set('m2-insights',insights(r));
+    _set('m2-data',kv(r));
+    _set('m2-data-ext',kvExt(r));
+    _set('m2-hist',histTbl(sym));
+    renderVolAnalysis(sym);
+    try{ chart(sym); }
+    catch(e){ _set('m2-chart','<div class="m2empty">Chart unavailable for '+esc(sym)+'.</div>'); }
+  }
+
+  return {init:function(o){o=o||{};STK=o.stocks||[];META=o.meta||{};DATADIR=o.datadir||'data';},
+          setHist:function(h){HIST=h||{};histLoaded=true;},
+          select:select_detail, chart:chart, recOf:recOf, fetchCompany:fetchCompany,
+          histTbl:histTbl, renderVol:renderVolAnalysis, loadDelVol:loadDelVol,
+          insights:insights, kv:kv, kvExt:kvExt, mcapCell:mcapCell,
+          esc:esc, stg:stg, catLabel:catLabel, sigCell:sigCell, pc:pc, f:f,
+          chips:chips, fileOf:fileOf,
+          cur:function(){return cur;}, setCur:function(s){cur=s;},
+          setTf:function(n){tf=n;if(cur)chart(cur);}};
+})();}
+</script>
+<!--CO-M2D-END--><script id="co-search-js">
+(function(){
+  // SHOWING IS `display:block`, NOT `display:''`. The stylesheet's default for .cosl is display:none,
+  // so clearing the INLINE value hands control back to that rule and the dropdown stays hidden — it
+  // built the right options every time and never appeared. Browser-verified 2026-08-17; the Node
+  // harness could not catch it because it reads innerHTML and does not evaluate CSS.
+  var q=document.getElementById('cos-q'), list=document.getElementById('cos-list');
+  if(!q||!list) return;
+  var ALL=[], loaded=false, MAX=6, loadErr='';
+  function load(){
+    if(loaded) return; loaded=true;
+    fetch('../data/index.json')
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(j){
+        ALL=(j.companies||[]).map(function(c){return {s:c.s, co:c.co||''};});
+        if(!ALL.length) loadErr='the company index is empty';
+      })
+      .catch(function(e){
+        // SAY SO. This used to swallow the failure and leave ALL empty, so typing produced nothing
+        // and the box looked broken rather than unable to load. The common case is the page opened
+        // from the file system, where the browser blocks the fetch outright.
+        ALL=[];
+        loadErr = (location.protocol==='file:')
+          ? 'opened from the file system — serve the folder over HTTP for search to work'
+          : ('could not load the company index (' + ((e && e.message) || e) + ')');
+      });
+  }
+  q.addEventListener('focus', load);
+  q.addEventListener('input', function(){
+    var t=(q.value||'').trim().toUpperCase();
+    if(!t){ list.style.display='none'; list.innerHTML=''; return; }
+    var hits=[], i;
+    for(i=0;i<ALL.length && hits.length<=MAX;i++){
+      var r=ALL[i];
+      if(r.s.toUpperCase().indexOf(t)>=0 || r.co.toUpperCase().indexOf(t)>=0) hits.push(r);
+    }
+    // count the rest without building them: the reader needs to know the list is TRUNCATED, not that
+    // these six are everything.
+    var more=0;
+    if(hits.length>MAX){ for(;i<ALL.length;i++){ var x=ALL[i];
+        if(x.s.toUpperCase().indexOf(t)>=0 || x.co.toUpperCase().indexOf(t)>=0) more++; }
+      more+=hits.length-MAX; hits=hits.slice(0,MAX); }
+    if(!hits.length){
+      list.innerHTML='<div class="cosmore">'+(loadErr || 'No match.')+'</div>';
+      list.style.display='block'; return;
+    }
+    list.innerHTML=hits.map(function(r){
+      return '<div class="cosr" role="option" data-cos="'+r.s+'"><span class="co">'+
+             r.co.replace(/[&<>]/g,'')+'</span><span class="sy">'+r.s+'</span></div>';
+    }).join('')+(more?'<div class="cosmore">+'+more+' more &mdash; keep typing</div>':'');
+    list.style.display='block';
+  });
+  function go(sym){ if(sym) location.href='./?sym='+encodeURIComponent(sym); }
+  list.addEventListener('click', function(e){
+    var row=e.target&&e.target.closest?e.target.closest('[data-cos]'):null;
+    if(row) go(row.getAttribute('data-cos'));
+  });
+  // Enter picks the first match, which is what a keyboard user expects after typing a ticker.
+  q.addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ var first=list.querySelector('[data-cos]');
+      if(first){ e.preventDefault(); go(first.getAttribute('data-cos')); } }
+    if(e.key==='Escape'){ list.style.display='none'; }
+  });
+  document.addEventListener('click', function(e){
+    if(!document.getElementById('cosearch').contains(e.target)) list.style.display='none';
+  });
+})();
+</script><script id="co-js">
+(function(){
+  var D=window.M2D;
+  var box=document.getElementById('co-sec-stage');
+  function die(msg){ if(box) box.innerHTML='<div class="co-miss">'+msg+'</div>'; }
+  if(!D){ die('The shared detail renderers did not load.'); return; }
+
+  // THE SYMBOL COMES FROM THE URL, and the URL is kept in step with what is on screen. Both
+  // directions matter (owner): a link lands directly on its company, and editing the symbol in the
+  // address bar navigates. `popstate` covers the back button, which would otherwise leave the
+  // address bar and the page disagreeing.
+  function symFromUrl(){
+    var m=/[?&]sym=([^&#]+)/.exec(location.search||'');
+    return m ? decodeURIComponent(m[1]).trim().toUpperCase() : '';
+  }
+  D.init({stocks:[], meta:{hist_sessions:130}, datadir:'../data'});
+
+  // THE SUB-NAV IS BUILT FROM WHAT ACTUALLY RENDERED, never from a fixed list. Only 136 of 2,202
+  // companies carry deep-dive research, so a fixed bar would offer six empty sections to 19 out of
+  // 20 visitors — and an empty section is indistinguishable from a fetch that failed. Absence has to
+  // read as absence. Same rule the Deep-Dive tab already uses for its own zone nav.
+  // ONE ROW OF TABS (owner 2026-08-16): Stage analysis sits beside the deep-dive's OWN sections
+  // rather than behind a "Research" tab. The nesting was a level the reader had to learn — click
+  // Research, then pick a section — for no gain. The deep-dive sections are still discovered rather
+  // than listed: DDV.buildNav() writes one button per zone it ACTUALLY rendered into #dd-nav, and
+  // those are hoisted here verbatim, so a company missing a zone simply has no tab for it.
+  function ddTabs(){
+    var n=document.getElementById('dd-nav');
+    return n ? Array.prototype.slice.call(n.querySelectorAll('[data-dda]')) : [];
+  }
+  function hoistHero(){
+    var hero=document.getElementById('dd-a-summary');
+    var slot=document.getElementById('co-hero');
+    if(!hero||!slot||hero.parentNode===slot) return;
+    slot.appendChild(hero);
+    // The momentum head repeats what the hero already says — symbol and market cap — but it also
+    // carries two things the hero does NOT: the stage chip and the accumulation category. Move
+    // those into the hero's chip row and drop the rest, rather than hiding a head that holds the
+    // only copy of something.
+    var head=document.getElementById('m2-head');
+    if(head){
+      // Move the two chips the hero does NOT carry (stage, accumulation category) into its chip row,
+      // then hide the head unconditionally. It used to be hidden only if that move succeeded, so a
+      // hero without a .dd-idchips row left the head on screen — repeating "HFCL  mcap ₹34,149 cr"
+      // a few pixels under the hero that already says both (owner 2026-08-17). Identity belongs in
+      // ONE place on the page, and the hero is it; the chips are moved rather than dropped because
+      // the hero never carried them.
+      var chips=hero.querySelector ? hero.querySelector('.dd-idchips') : null;
+      if(chips && head.querySelectorAll){
+        var keep=head.querySelectorAll('.stg, .chip');
+        for(var i=keep.length-1;i>=0;i--) chips.insertBefore(keep[i], chips.firstChild);
+      }
+      head.hidden=true;
+      head.style.display='none';     // `hidden` alone loses to a display rule; belt and braces
+    }
+  }
+
+  function watchZones(){
+    var nav=document.getElementById('dd-nav'); if(!nav) return;
+    var done=false;
+    var settle=function(){ if(done) return; if(!ddTabs().length) return; done=true; hoistHero(); buildSubnav('stage'); };
+    if(window.MutationObserver){
+      var mo=new MutationObserver(function(){ settle(); if(done) mo.disconnect(); });
+      mo.observe(nav, {childList:true, subtree:true});
+      setTimeout(function(){ settle(); mo.disconnect(); }, 8000);   // never observe forever
+    }
+    // poll as well: a renderer that writes the nav in one go before the observer attaches would
+    // otherwise leave the row permanently one tab short.
+    var tries=0;
+    var iv=setInterval(function(){ settle(); if(done || ++tries>40) clearInterval(iv); }, 150);
+    settle();
+  }
+
+  function buildSubnav(active){
+    var nav=document.getElementById('co-sub'); if(!nav) return;
+    var research=document.getElementById('co-sec-research');
+    var hasRes = research && research.getAttribute('data-co-live')==='1';
+    var tabs=[{go:'stage', label:'Stage analysis'}];
+    if(hasRes) ddTabs().forEach(function(b){
+      tabs.push({dda:b.getAttribute('data-dda'), label:b.textContent||'Section'});
+    });
+    // one tab is not a choice — draw nothing rather than a bar the reader cannot use
+    nav.innerHTML = tabs.length<2 ? '' : tabs.map(function(t){
+      var on=(t.go && t.go===active)||(t.dda && t.dda===active);
+      return '<button '+(t.go?'data-co-go="'+t.go+'"':'data-co-dd="'+t.dda+'"')+
+             (on?' class="on"':'')+'>'+t.label+'</button>';
+    }).join('');
+    // ONE RUNNING PAGE (owner 2026-08-17): every section stays on screen, stacked, and the tabs are
+    // ANCHORS into it — not a switcher. Nothing is hidden, so a reader can scroll straight from the
+    // chart into the research without going back to a tab bar, and Ctrl+F finds the whole company.
+    var stage=document.getElementById('co-sec-stage');
+    if(stage) stage.hidden=false;
+    if(research) research.hidden = !hasRes;
+  }
+  document.getElementById('co-sub').onclick=function(e){
+    var t=e.target&&e.target.closest?e.target.closest('[data-co-go],[data-co-dd]'):null;
+    if(!t) return;
+    var go=t.getAttribute('data-co-go'), dda=t.getAttribute('data-co-dd');
+    buildSubnav(go||dda);
+    if(go==='stage'){
+      var st=document.getElementById('co-sec-stage');
+      if(st && st.scrollIntoView) st.scrollIntoView({behavior:'smooth', block:'start'});
+      return;
+    }
+    // the deep-dive's own nav owns where its zones are — reuse its scroll rather than re-deriving it
+    var src=ddTabs().filter(function(b){return b.getAttribute('data-dda')===dda;})[0];
+    if(src && src.click) src.click();
+  };
+
+  function show(sym, push){
+    if(!sym){ die('No company selected. Search for one above.'); return; }
+    document.title=sym+' — Arth Insight';
+    D.select(sym);
+    document.getElementById('co-sec-stage').setAttribute('data-co-live','1');
+
+    // Research renders only when this company HAS it. window.DDV is the Deep-Dive tab's own
+    // renderer, exported rather than copied, so a zone looks the same on both surfaces.
+    var res=document.getElementById('co-sec-research');
+    var live = !!(window.DDV && window.DDV.has(sym));
+    res.setAttribute('data-co-live', live?'1':'0');
+    res.hidden = !live;
+    if(live){ window.DDV.setBase('../data'); window.DDV.render(sym); }
+    buildSubnav('stage');
+
+    // THE ZONES ARRIVE LATER. DDV.render() fetches the company file, so #dd-nav is still empty when
+    // the line above runs — the row was therefore built with ONE tab (Stage analysis), and one tab
+    // draws no bar at all. The deep-dive tabs then appeared only if something else rebuilt it.
+    // Watch for the zone buttons and rebuild the row once they land. My own probe seeded #dd-nav
+    // synchronously, which is exactly why it never caught this: the harness removed the race it was
+    // meant to test.
+    if(live) watchZones();
+
+    if(push && window.history && history.pushState){
+      history.pushState({sym:sym}, '', '?sym='+encodeURIComponent(sym));
+    }
+  }
+  window.coShow=function(sym){ show(String(sym||'').trim().toUpperCase(), true); };
+  window.addEventListener('popstate', function(){ show(symFromUrl(), false); });
+
+  // timeframe buttons drive the shared chart
+  var tfs=document.querySelectorAll('#m2-tf button');
+  Array.prototype.forEach.call(tfs,function(b){
+    b.onclick=function(){
+      Array.prototype.forEach.call(tfs,function(x){x.classList.toggle('active',x===b);});
+      D.setTf(+b.dataset.tf);
+    };
+  });
+  // volume analysis is collapsible here too, and needs its bulk file
+  var vh=document.getElementById('m2-vol-h');
+  if(vh) vh.onclick=function(){
+    var c=document.getElementById('m2-vol-collapse'), open=c.classList.toggle('open');
+    var t=document.getElementById('m2-vol-tw'); if(t) t.textContent=open?'−':'+';
+    var b=document.getElementById('m2-vol-body'); if(b) b.style.display=open?'block':'none';
+  };
+  D.loadDelVol();
+
+  show(symFromUrl(), false);
+})();
+</script>
+<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
+</div>
+</body>
+</html>
