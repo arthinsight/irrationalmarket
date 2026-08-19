@@ -144,6 +144,20 @@ body{margin:0;background:var(--bg);color:var(--txt);
 .wrap.wide .sitenav,.wrap:has(.co-page) .sitenav{padding-bottom:0;border-bottom:none;margin-bottom:0}
 .wrap.wide .sitenav-a{height:40px;line-height:20px;display:inline-flex;align-items:center}
 
+/* MOVED HERE FROM NAV_STICKY_CSS 2026-08-19, in the same pass that renamed it from `.note`. It had
+   been sitting in a constant the reading pages do not load: `page_shell` composes TOKENS_CSS +
+   BASE_ROOT_CSS + SHELL_CSS, so /about/ carried `class="note"` with no rule defining it and its
+   disclaimer — the one block on the page that is meant to stand out — rendered as plain prose. It
+   went unnoticed because the class WAS defined, just in the stylesheet the dashboard loads and this
+   page does not; nothing was missing anywhere a grep would look.
+   A reading-page component belongs in the reading-page shell. Leaving prose and component rules in
+   NAV_STICKY_CSS is what produced the six inheritance defects of 2026-08-19 in the other direction,
+   where panels moved onto a page and picked up rules meant for prose. */
+.callout{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--hl);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:var(--sp-4) var(--sp-5);margin:var(--sp-6) 0;
+  box-shadow:var(--sh-1)}
+.callout h2{margin-top:0}
+
 
 </style>
 <style id="annc-css">
@@ -174,6 +188,31 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #annc .annc-body > :first-child{margin-top:0}
 #annc .annc-body > :last-child{margin-bottom:0}
 #annc .annc-star{color:var(--warn);font-weight:700}
+/* THE FILTER BLOCK MUST NOT OUTWEIGH WHAT IT FILTERS. On a 375px phone this bar measured 365px of
+   a 772px screen — 47%, so the reader met a screen of controls and had to scroll to reach the first
+   announcement (owner 2026-08-19: "the filter at the top floating unsystematic and taking half the
+   screen its very unorganized"). It is a desktop layout meeting a phone, in three ways, and each
+   needs its own answer:
+     * `justify-content:space-between` on a wrapped flex row puts the lede and the picker on separate
+       lines with the gap between them still applied — the "floating" look. On one column, stack;
+     * `.annc-pick` is a nowrap row, so the mcap group was crushed to 190px and its label, two inputs
+       and the word "to" stacked four deep (271px for two number boxes). Let it wrap, and give the
+       mcap group its own full-width line, where all four parts fit side by side;
+     * `.annc-pick` measured 382px wide inside a 335px wrap — a nowrap row cannot shrink below its
+       contents, so it silently overhung the card edge.
+   The build timestamp stays: it is the one thing on the bar a reader cannot get anywhere else. */
+@media (max-width:760px){
+  #annc .annc-bar{display:block;margin-bottom:var(--sp-3)}
+  #annc .annc-bar > div + div{margin-top:var(--sp-3)}
+  #annc .annc-lede{font-size:var(--fs-sm)}
+  #annc .annc-pick{flex-wrap:wrap;gap:var(--sp-2) var(--sp-3)}
+  #annc .annc-pick > select{flex:1 1 auto;min-width:0;min-height:40px}
+  #annc .annc-pick > #annc-mcap{flex:1 1 100%}
+  #annc .annc-when{text-align:left;margin-top:var(--sp-2)}
+  /* the fold button was 23px tall — see the tap-target note in circulars_dashboard */
+  #annc .annc-fold{min-height:32px;padding-left:var(--sp-3);padding-right:var(--sp-3)}
+}
+
 /* the theme line's filing: a LEADING marker, deliberately NOT an underline on the sentence — one
    line can name several companies and the link is only ever about one of them. It sits before the
    text (owner 2026-08-16) so every link starts on the same left edge and the eye finds them by
@@ -344,6 +383,46 @@ body{margin:0;background:var(--bg);color:var(--txt);
 @media (max-width:760px){
   .circ-symcol{display:none}
   .circ-syminline{display:inline;font-weight:700}
+  /* A CONTROL YOU CANNOT HIT is not a control. Measured on a phone: filter chips 27px, the fold
+     button 23px, the date select 39px — all under a fingertip, which is ~40px (Apple 44, Google 48).
+     Two tiers on purpose: anything a reader types into or picks from gets the full 40, while the
+     dense chip rows get 32. Giving 15 theme chips 40px each would have pushed the filter block
+     further down the screen to fix a smaller problem than the one that creates — and a chip sits in
+     a grid of its own kind, where a missed tap hits a neighbour rather than nothing. */
+  .circ-chip{min-height:32px;padding-left:var(--sp-3);padding-right:var(--sp-3)}
+  .circ-srch,.circ-date{min-height:40px}
+  /* `min-width:190px` is a desktop floor: inside a 335px card it forces the search box to claim a
+     whole row and then overflow it. On a phone it should simply take the row it is already on. */
+  .circ-srch{min-width:0;flex:1 1 100%}
+  /* All four parts on ONE line: label 108 + input 162 + "to" 57 filled the row and pushed the second
+     input onto its own, so a two-number range cost 147px of a 720px screen. A fixed 84px basis is
+     enough for a market cap in crore, and the labels stop wrapping mid-phrase. */
+  .circ-mcap{flex:0 1 84px;min-width:0;width:auto}
+  .circ-filters .note{white-space:nowrap}
+}
+/* NARROW LAYOUT for the FORWARD CALENDAR (`circ-stack`): stop being a grid, become a list.
+   Measured at 375px: the row was 438px wide inside a 333px card, so the table scrolled sideways, and
+   the Event cell — squeezed to 135px by three fixed columns — wrapped every row into a 135px-tall
+   block (owner 2026-08-19: "table 3 coming up in mobile have 4 col, which needs a fix"). 100/104/64
+   plus the rest is a DESKTOP budget. On a phone the fourth column IS the content and the first three
+   are its label, so the row becomes one block: ticker, date and countdown on a header line, the event
+   underneath at full width.
+
+   Same markup, both layouts, CSS picks — the house pattern above (.circ-symcol/.circ-syminline), so
+   nothing re-renders on resize. `thead` goes because the values are self-describing once stacked: a
+   bold ticker, a date, an "in 3d" pill, then a tagged event. Column headers over a stacked list label
+   nothing and cost a row. */
+@media (max-width:760px){
+  .circ-stack thead{display:none}
+  .circ-stack,.circ-stack tbody,.circ-stack tr{display:block;width:100%}
+  .circ-stack tr{padding:var(--sp-3) 0;border-bottom:1px solid var(--line)}
+  .circ-stack tr:last-child{border-bottom:0}
+  .circ-stack td{display:inline;border:0;padding:0}
+  .circ-stack td.circ-tick{font-weight:700;margin-right:var(--sp-2)}
+  .circ-stack td.circ-num{color:var(--mut);margin-right:var(--sp-2)}
+  .circ-stack .circ-tag{margin-right:var(--sp-2)}
+  .circ-stack td:last-child{display:block;margin-top:var(--sp-2)}
+  .circ-stack td.circ-empty{text-align:center;padding:var(--sp-6) var(--sp-4)}
 }
 .circ-free{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap}
 .circ-pct{color:var(--mut)}
@@ -417,25 +496,59 @@ body{padding-top:0}
    The STICKY-TOP rules are explicitly undone here: an element cannot be sticky at the top and fixed
    at the bottom, and leaving both in place is how one of them silently wins. */
 @media (max-width:700px){
+  /* ── PHONE LAYOUT (owner 2026-08-19) ─────────────────────────────────────────────────────────
+     Three parts, in the order a thumb meets them:
+       1. the BRAND sits in a fixed header at the TOP — it is identity, not navigation, and it was
+          riding in the bottom bar taking 127px of a 375px screen (measured), which is most of why
+          that bar scrolled sideways at all;
+       2. the SECTIONS sit in a fixed bar at the BOTTOM, app-style, with the SEARCH BUTTON in the
+          middle of them;
+       3. nothing scrolls sideways: the items share the width instead (`flex:1 1 0` + `min-width:0`),
+          because a nav you have to swipe hides its own options.
+     Content is padded clear of both bars — a fixed bar without that padding hides content and
+     nothing looks broken. */
   .tabbar-buckets,.sitenav{
     position:fixed;top:auto;bottom:0;left:0;right:0;z-index:60;
-    /* `margin:0` is not enough on the standalone shell: SHELL_CSS sets `.sitenav{margin:0 0
-       var(--sp-3)}` and `.wrap.wide .sitenav` (specificity 0,2,0) outranks this rule's 0,1,0,
-       so the 12px bottom margin survived — and a FIXED box with bottom:0 sits exactly its
-       bottom margin above the edge. Measured: nav bottom 708 against a 720 viewport. */
-    margin:0;padding:4px 8px;background:var(--card,#fff);
+    margin:0;padding:2px 4px;background:var(--card,#fff);
     border-top:1px solid var(--line);border-bottom:none;
     box-shadow:0 -2px 10px rgba(15,23,42,.08);
-    flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  /* row 2 (the dashboard's tab row) stays in the flow at the top - it is a sub-nav of whichever
-     section is open, and two fixed bars would take a third of the screen. */
-  .tabbar{position:static;top:auto}
-  body{padding-bottom:56px}
-  .wrap.wide{padding-bottom:56px}
-  /* the bar's own items keep the 40px tap target the desktop rules give them */
+    display:flex;flex-wrap:nowrap;overflow:visible;gap:0;align-items:stretch}
+  /* the brand leaves the bar and becomes the top header */
+  .tabbar-buckets .sitenav-logo,.sitenav .sitenav-logo,
+  .tabbar-buckets>a:first-child,.sitenav>a:first-child{
+    position:fixed;top:0;left:0;right:0;height:44px;z-index:61;
+    display:flex;align-items:center;gap:8px;margin:0;padding:0 12px;
+    background:var(--card,#fff);border-bottom:1px solid var(--line);border-right:none;
+    box-shadow:0 1px 6px rgba(15,23,42,.06)}
+  /* every remaining item shares the bar equally, so nothing overflows */
+  .tabbar-buckets .bkbtn,.tabbar-buckets .pagelink,.sitenav-a,.cosearch{
+    flex:1 1 0;min-width:0;height:44px;padding:0 2px;
+    font-size:var(--fs-xs,12px);text-align:center;justify-content:center;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  /* SEARCH IN THE MIDDLE: DOM order is [brand, section, section, ..., search], and `order` puts the
+     search between the second and third section without changing the markup either shell emits. */
+  .tabbar-buckets>*:nth-child(2),.sitenav>*:nth-child(2){order:10}
+  .tabbar-buckets>*:nth-child(3),.sitenav>*:nth-child(3){order:20}
+  /* specificity: the nth-child rules below are (0,2,0) and a bare `.cosearch` is (0,1,0), so the
+     search kept landing at the END with order:50. Matched depth, so the middle wins. */
+  .tabbar-buckets .cosearch,.sitenav .cosearch{order:25;flex:0 0 56px}
+  /* EVERY site-nav link is a fingertip target, not only the ones on `.wide` pages. SHELL_CSS states
+     `height:40px` under `.wrap.wide .sitenav-a` — settled after three attempts to make a button and
+     a link agree — so /about/, which is a reading page and not `.wide`, kept 17px links in the
+     bottom bar. Stated here, inside the phone media query, so the desktop geometry that took those
+     three attempts is left exactly as it is. */
+  .sitenav-a{min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+  .tabbar-buckets>*:nth-child(4),.sitenav>*:nth-child(4){order:30}
+  .tabbar-buckets>*:nth-child(5),.sitenav>*:nth-child(5){order:40}
+  .tabbar-buckets>*:nth-child(6),.sitenav>*:nth-child(6){order:50}
+  /* row 2 (the dashboard's tab row) sits DIRECTLY BELOW the top header, and content below that.
+     Before this the page started at y=0 and text ran underneath the header. */
+  .tabbar{position:sticky;top:44px;z-index:55;background:var(--bg);margin:0}
+  body{padding-top:44px;padding-bottom:52px}
+  .wrap.wide{padding-top:44px;padding-bottom:52px}
   .wrap.wide .sitenav,.wrap .sitenav{margin:0}
-  .tabbar-buckets .bkbtn,.tabbar-buckets .pagelink,.sitenav-a{height:40px;flex:0 0 auto}
 }
+
 h1,h2{font-family:'Outfit',sans-serif;color:var(--txt);margin:0}
 header{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-8)}
 header img{width:44px;height:44px;object-fit:contain;border-radius:var(--r-sm)}
@@ -446,10 +559,15 @@ p{margin:0 0 var(--sp-3);max-width:68ch;color:var(--g700)}
 ul{margin:0 0 var(--sp-3);padding-left:var(--sp-5)}
 li{margin-bottom:var(--sp-2);max-width:68ch;color:var(--g700)}
 strong{color:var(--txt);font-weight:600}
-.note{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--hl);
-  border-radius:0 var(--r-md) var(--r-md) 0;padding:var(--sp-4) var(--sp-5);margin:var(--sp-6) 0;
-  box-shadow:var(--sh-1)}
-.note h2{margin-top:0}
+/* RENAMED FROM `.note` 2026-08-19. This is the reading-page CALLOUT — a bordered, padded box with
+   a shadow — and the panels use `.note` for the opposite thing: a small muted inline label. That
+   collision is invisible on the dashboard, which never loads this stylesheet, and lands the moment a
+   panel moves to a standalone page: on /announcements/ the two-word label "Mcap RScr" rendered as a
+   callout box, 108x51px with 16px/20px of padding, and the pair of market-cap inputs it sits with
+   cost 147px of a 720px phone screen. Same root cause as the six bare-tag defects of 2026-08-19,
+   one level up: a CLASS name, so the pending `.prose` scoping would not have caught it either.
+   Renaming rather than scoping because the callout had exactly ONE user in the repo (the About
+   page's disclaimer) against seven for the label — the rare meaning is the one that should move. */
 footer{margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);
   font-size:var(--fs-sm);color:var(--mut)}
 a{color:var(--hl)}
@@ -486,7 +604,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 </head>
 <body>
 <div class="wrap wide">
-<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../index.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../announcements/">Announcements</a><a class="sitenav-a" href="../ipo/">IPO</a><a class="sitenav-a" href="../index.html?tab=tab-momentum2">Screens</a><!--NAVINT-END--><!--COS-START--><div class="cosearch" id="cosearch"><button class="cosbtn" id="cos-open" type="button" aria-label="Search for company" aria-expanded="false">&#9906;</button><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company" aria-label="Search for company"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
+<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../index.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../announcements/">Announcements</a><a class="sitenav-a" href="../ipo/">IPO</a><a class="sitenav-a" href="../index.html?tab=tab-momentum2">Screens</a><!--NAVINT-END--><!--COS-START--><div class="cosearch" id="cosearch"><button class="cosbtn" id="cos-open" type="button" aria-label="Search for company or IPO" aria-expanded="false">&#9906;</button><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company or IPO" aria-label="Search for company or IPO"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
 
 <!--ANNC-PANEL-START-->
 <div id="tab-annc" class="tabpanel active">
@@ -534,7 +652,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
                aria-label="Filter circulars">
       </div>
     </div>
-    <div class="circ-scroll"><table>
+    <div class="circ-scroll"><table class="circ-stack">
       <thead><tr><th id="annc-th-date" style="width:96px;display:none">Date</th>
         <th style="width:126px">Type</th><th class="circ-symcol" style="width:104px">Symbol</th>
         <th>Subject</th></tr></thead>
@@ -549,7 +667,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
     </div>
     <div class="circ-head"><div class="note" id="annc-unote"></div>
       <div class="circ-filters" id="annc-ctypes"></div></div>
-    <div class="circ-scroll"><table>
+    <div class="circ-scroll"><table class="circ-stack">
       <thead><tr><th style="width:100px">Symbol</th><th style="width:104px">Event date</th>
         <th style="width:64px">In</th>
         <th>Event</th></tr></thead>
