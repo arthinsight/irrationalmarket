@@ -20,6 +20,15 @@
     return 'Home';
   }
   function links(active) { return nav.map(function (item) { return '<a' + (item[0] === active ? ' class="active"' : '') + ' href="' + relative(item[1]) + '">' + item[0] + '</a>'; }).join(''); }
+  var mobileIcons = {
+    'Home':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9M9.5 19v-5h5v5"/></svg>',
+    'Big Picture':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg>',
+    'Feed':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"/></svg>',
+    'IPO Intelligence':'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M6 20V9h12v11M9 13h2m2 0h2M9 17h2m2 0h2M5 9l7-5 7 5"/></svg>',
+    'Screens':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>'
+  };
+  var mobileLabels = {'Big Picture':'Picture','IPO Intelligence':'IPO'};
+  function mobileLinks(active) { return nav.map(function (item) { var selected=item[0]===active;return '<a' + (selected ? ' class="active" aria-current="page"' : '') + ' aria-label="' + item[0] + '" href="' + relative(item[1]) + '">' + mobileIcons[item[0]] + '<span>' + (mobileLabels[item[0]] || item[0]) + '</span></a>'; }).join(''); }
 
   var style = document.createElement('style');
   style.id = 'public-shared-header-css';
@@ -29,9 +38,13 @@
   /* One computed header, regardless of whether the host page is a marketing template,
      standalone Company shell, or the padded dashboard used by Screens. */
   style.textContent += '.site-header{display:block!important;margin:0!important;padding:0!important;background:rgba(248,250,252,.94)!important;border-bottom-color:rgba(15,23,42,.08)!important}.site-header .nav{justify-content:space-between!important}.site-header .brand{font-family:Outfit,sans-serif!important;font-size:15px!important;font-weight:600!important;text-decoration:none!important}.site-header .nav-links{display:flex!important;align-items:center!important;gap:16px!important}.site-header .nav-links a{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;text-decoration:none!important;white-space:nowrap!important}.public-header-search input{height:34px!important;min-height:34px!important;box-sizing:border-box!important;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}.dashboard-public-header{margin-left:calc(50% - 50vw)!important;margin-right:calc(50% - 50vw)!important}.dashboard-public-header .wrap{width:min(calc(100% - 40px),1440px)!important;max-width:1440px!important;padding-left:0!important;padding-right:0!important}@media(max-width:700px){.dashboard-public-header .wrap{width:min(calc(100% - 28px),1440px)!important;padding-left:14px!important;padding-right:14px!important}.site-header .nav-links{gap:12px!important}}';
+  style.textContent += '.public-mobile-nav{display:none}@media(max-width:700px){html{scroll-padding-bottom:calc(72px + env(safe-area-inset-bottom))}body{padding-bottom:calc(68px + env(safe-area-inset-bottom))!important}.site-header .nav-links{display:none!important}.public-mobile-nav{position:fixed;left:0;right:0;bottom:0;z-index:140;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));min-height:62px;padding:5px max(6px,env(safe-area-inset-left)) calc(5px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-right));border-top:1px solid rgba(15,23,42,.12);background:rgba(255,255,255,.96);box-shadow:0 -7px 22px rgba(15,23,42,.09);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}.public-mobile-nav a{min-width:0;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:8px;color:#64748b;text-decoration:none;font:600 10px/1.15 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}.public-mobile-nav a.active{background:#eff6ff;color:#2563eb}.public-mobile-nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.public-mobile-nav span{overflow:hidden;max-width:100%;text-overflow:ellipsis;white-space:nowrap}.explorer-open{bottom:calc(76px + env(safe-area-inset-bottom))!important}.stock-explorer.open{bottom:calc(72px + env(safe-area-inset-bottom))!important}}';
   document.head.appendChild(style);
 
   var active = activePage(), marketingNav = document.querySelector('.site-header .nav-links');
+  if (window.self === window.top && !document.querySelector('.public-mobile-nav')) {
+    var mobileNav=document.createElement('nav');mobileNav.className='public-mobile-nav';mobileNav.setAttribute('aria-label','Primary mobile navigation');mobileNav.innerHTML=mobileLinks(active);document.body.appendChild(mobileNav);
+  }
   if (marketingNav) {
     marketingNav.innerHTML = links(active);
     var marketingBrand = document.querySelector('.site-header .brand');
