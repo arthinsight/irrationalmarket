@@ -10,7 +10,23 @@ const concall=q=>{let s=callStore.sections||{},k=Object.keys(s).find(k=>k.includ
 const callBody=q=>concall(q).map(x=>'<p>'+E(x)+'</p>').join('');
 const creditRatingCard=()=>{let c=P.credit;if(!c||!c.rating)return '';return card('Credit rating & solvency','<div class="analysis-strip"><div><span>Agency</span><b>'+E(c.agency)+'</b></div><div><span>Instrument</span><b>'+E(c.instrument)+'</b></div><div><span>Rating</span><b>'+E(c.rating)+' ('+E(c.outlook||'Stable')+')</b></div><div><span>Prior rating</span><b>'+E(c.prior_rating||'—')+'</b></div><div><span>Action date</span><b>'+E(c.action_date)+'</b></div></div>'+(c.rationale?'<p><strong>Rationale:</strong> '+E(c.rationale)+'</p>':''))};
 const ddBlocks=g=>A(D.sections?.[g]), ddBlock=(g,q)=>ddBlocks(g).find(x=>(x.title||'').toLowerCase().includes(q))||{};
-const prose=v=>{let s=E(v||'').replace(/^[-•]\s*/gm,'').replace(/\n+/g,'<br>');return s.includes('| Challenge |')?'':s};
+const prose=v=>{
+    if(!v) return '';
+    if(v.includes('|---')) {
+        let parts=v.split(/(?=\|[^\n]+\n\|[\-\s|]+)/);
+        return parts.map(p=>{
+            if(p.trim().startsWith('|')) {
+                let lines=p.trim().split('\n').filter(Boolean);
+                let header=lines[0].split('|').map(x=>x.trim()).filter((_,i,a)=>i>0&&i<a.length-1);
+                let data=lines.slice(2).map(l=>l.split('|').map(x=>x.trim()).filter((_,i,a)=>i>0&&i<a.length-1).map(E));
+                return table(header, data);
+            }
+            return E(p).replace(/^[-•]\s*/gm,'').replace(/\n+/g,'<br>');
+        }).join('');
+    }
+    let s=E(v||'').replace(/^[-•]\s*/gm,'').replace(/\n+/g,'<br>');
+    return s.includes('| Challenge |')?'':s
+};
 const status=s=>'<span class="status '+E(String(s||'open').toLowerCase())+'">'+E(s||'open')+'</span>';
 const kpiLabel=v=>String(v||'').replace(/\s*\(Q\dFY\d+\)/gi,'').replace(/^Revenue$/i,'Latest revenue').replace(/^EBITDA Margin$/i,'Latest EBITDA margin');
 const kpis=v=>A(v).length?'<div class="kpi-grid">'+A(v).map(x=>'<div class="kpi"><span>'+E(kpiLabel(x.label))+'</span><b>'+E(x.value)+'</b></div>').join('')+'</div>':'';
@@ -84,15 +100,51 @@ function coverageOwnership(){let g=sec('governance'),c=sec('capital_ownership'),
 function coverageRisks(){let source=R.risks||{},all=[...A(source.internal_operational),...A(source.financial_valuation),...A(source.compliance_legal),...A(source.strategy_growth),...A(Q.risks),...A(C.risks)];return'<div class="risk-grid">'+unique(all).slice(0,16).map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title||x.risk||value(x))+'</h3><p>'+E(x.detail||x.note||'')+'</p></div></article>').join('')+'</div>'}
 function coverageVerdict(){if(R.verdict||R.intellisense)return inVerdictDrhp();let g=Q.grades||{};return'<div class="stack">'+card('Stored assessment',kpis([{label:'Relative grade',value:g.rel||'—'},{label:'Weighted momentum',value:g.wm90||'—'}]))+card('Coverage limits','<p class="muted">This filing has no full analytical verdict domain. Stored grades remain separately labelled and are not treated as Stage Analysis.</p>')+'</div>'}
 function coverageListing(){let o=sec('objects_execution'),c=sec('capital_ownership'),s=P.ipo?.summary||{},objects=o.objects||Q.objects||[],anchors=Q.anchor_allotment||{},uses=table(['Use of proceeds','₹cr'],A(objects).map(x=>[E(x.purpose||value(x)),x.amount_lakhs==null?E(x.amount||'—'):N(x.amount_lakhs/100,0)]));let discovery=s.Symbol?table(['Issue price','Listing open','Listing gain'],[['₹'+N(s['Issue Price']),'₹'+N(s['Listing Open Price']),N(s['Listing Gain %'],1)+'%']]):'';return'<div class="stack">'+card('Offer objects',uses)+card('Offer structure',list([c.dilution,c.lock_in,c.pledging].filter(Boolean),8))+card('Anchor allocation',kpis([{label:'Anchor investors',value:anchors.n||'—'},{label:'Allocation',value:anchors.total_amount?'₹'+N(anchors.total_amount/10000000,1)+'cr':'—'}]))+card('Price discovery',discovery)+'</div>'}
+function opInvestment(){
+    let sc=P.scorecard||{},ob=ddBlock('outlook','order book'),opt=ddBlock('outlook','growth vertical'),non=ddBlock('bull_bear','non-obvious'),margin=ddBlock('latest_quarter','margin');
+    let core=ddBlock('business','segment')||ddBlock('business','what they do');
+    return kpis(D.keynums)+'<div class="layout-2">'+card('Business quality',sc.symbol?'<div class="scoreline"><strong>'+E(sc.bq_total)+'</strong><span>/100</span></div><p>'+E(sc.verdict||'')+'</p>':'','positive')+card('Core operating engine',prose(core.body),'positive')+card('Order-book visibility',prose(ob.body),'positive')+card('Margin architecture',prose(margin.body),'positive')+card('Growth optionality',prose(opt.body),'inference-card')+card('Non-obvious read',badge('Analytical inference','inference')+prose(non.body),'inference-card')+'</div>'
+}
+function opBusiness(){
+    let p=D.profile||{},products=Array.isArray(P.products)?P.products:[],markets=Array.isArray(P.endMarkets)?P.endMarkets:[];
+    let certs=ddBlock('business','certifications');
+    let oems=ddBlock('business','oem')||ddBlock('business','partners');
+    let cap=ddBlock('business','capacity');
+    return'<div class="profile-band"><div><span>Operating entities</span><b>'+E(p.entities||'—')+'</b></div><div><span>Business lines</span><b>'+E(p.subseg||'—')+'</b></div><div><span>Structural themes</span><b>'+E(p.themes||'—')+'</b></div></div><div class="layout-2">'+ddCards('business',['challenges','certifications','oem','partners','capacity'])+(cap.body?card(cap.title,prose(cap.body)):'')+(oems.body?card(oems.title,prose(oems.body)):'')+(certs.body?card(certs.title,prose(certs.body)):'')+(products.length?card('Products and platforms',list(products,12)):'')+(markets.length?card('End markets',list(markets,12)):'')+'</div>'
+}
+function opFinancials(){
+    let actual=table(['Quarter','Revenue ₹cr','YoY','Operating profit ₹cr','OPM','PAT ₹cr','YoY','EPS'],A(D.actuals).map(x=>[E(x.q),N(x.revenue,0),N(x.rev_yoy,1)+'%',N(x.op,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.pat_yoy,1)+'%',N(x.eps,2)]));
+    let model=P.projection?.projection||[],est=table(['Period','Revenue ₹cr','OPM','PAT ₹cr','EPS'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.eps,2)]));
+    let val=table(['Year','Market cap ₹cr','P/E','ROE','OPM','D/E'],A(D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.roe,1)+'%',N(x.opm,1)+'%',N(x.de,2)+'x']));
+    let last=A(D.actuals).at(-1)||{},prior=A(D.actuals).at(-5)||{},rat=Object.fromEntries(A(D.ratios).map(x=>[x.label,x.value]));
+    let read='<div class="analysis-strip"><div><span>Recovery shape</span><b>DI Pipe expansion and stable order book execution</b></div><div><span>Profit inflection</span><b>Operating profit ₹'+N(prior.op,0)+'cr → ₹'+N(last.op,0)+'cr; PAT ₹'+N(prior.pat,0)+'cr → ₹'+N(last.pat,0)+'cr</b></div><div><span>Cash-cycle watch</span><b>'+E(rat['Receivable d']||'—')+' debtor days · '+E(rat['Inventory d']||'—')+' inventory days</b></div></div>';
+    return'<div class="stack">'+badge('Analytical inference','inference')+read+card('Eight-quarter operating trajectory',badge('Reported fact')+actual)+card('Latest quarter comparison',pnlPanel(D.pnl?.quarter))+card('Full-year comparison',pnlPanel(D.pnl?.year))+(model.length?card('Forward model',badge('Model estimate','estimate')+est,'estimate-card'):'')+(A(P.projection?.assumptions).length?card('Model assumptions',list(P.projection?.assumptions,10)):'')+card('Financial quality & working capital',kpis(D.ratios))+card('Five-year valuation and quality history',val)+creditRatingCard()+'</div>'
+}
+function opExecution(){
+    let w=D.wtt||{},track=D.track||{},cap=table(['Milestone','Target','Promise','State'],A(D.capex).map(x=>[E(x.item),E(x.timeline||'—'),E(x.pv||'—'),status(x.status)]));
+    let verdict=table(['Commitment','Made','Checked','Outcome'],A(track.verdicts).map(x=>[E(x.item)+'<small class="row-note">'+E(x.note||'')+'</small>',E(x.made||'—'),E(x.checked||'—'),status(x.status)]));
+    let open=table(['Forward commitment','Horizon','Category'],A(track.open).filter(x=>/FY27|Q[1-4]FY27|CY2026/i.test(x.horizon||'')).map(x=>[E(x.item),E(x.horizon),E((x.category||'').replaceAll('_',' '))]));
+    let guidance=ddBlock('outlook','guidance');
+    let capexPlan=ddBlock('outlook','capex');
+    let orderBook=ddBlock('outlook','order book');
+    return'<div class="stack"><div class="credibility"><div class="grade">'+E(w.credibility_grade||'—')+'</div><div><h3>Walk the Talk</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.guidance_hit_rate||'—')+'%</b> guidance hit</span><span><b>'+E(w.projects_ontime||'—')+'/'+(Number(w.projects_ontime||0)+Number(w.projects_slipped||0))+'</b> projects on time</span><span><b>'+E(w.reconciled_n||track.verdicts_total||'—')+'</b> commitments reconciled</span></div></div>'+(orderBook.body?card(orderBook.title,prose(orderBook.body),'positive'):'')+(capexPlan.body?card(capexPlan.title,prose(capexPlan.body)):'')+card('Milestones & project execution ledger',cap)+(guidance.body?card(guidance.title,badge('Management guidance','guide')+prose(guidance.body),'guide-card'):'')+card('Commitment outcomes',verdict)+card('Management tone — latest assessment',prose(w.tone_latest),'inference-card')+'</div>'
+}
+function opRisks(){
+    let concallRisk=ddBlock('bull_bear','risks')||ddBlock('bull_bear','bear'),ar=unique(C.risks),rows=[{risk:'Concall watchlist',note:concallRisk.body},...ar];
+    return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.risk||x.title||value(x))+'</h3><p>'+E(x.note||x.detail||'')+'</p></div></article>').join('')+'</div>'
+}
+const opPeers=peers;
+
 const inVerdictDrhp=inVerdict;inVerdict=()=>I.symbol==='CUMMINSIND'?cuVerdict():inVerdictDrhp();
-const allTabs=[['case','Investment Case',()=>I.symbol==='HFCL'?hfInvestment():I.symbol==='INDOMIM'?inInvestment():I.symbol==='EXIDEIND'?exInvestmentNoDup():I.symbol==='CUMMINSIND'?cuInvestment():investment()],['business','Business',()=>I.symbol==='HFCL'?hfBusiness():I.symbol==='INDOMIM'?inBusiness():I.symbol==='EXIDEIND'?exBusinessNoDup():I.symbol==='CUMMINSIND'?cuBusiness():business()],['financials','Financials',()=>I.symbol==='HFCL'?hfFinancialsRich():I.symbol==='INDOMIM'?inFinancialsReconciled():I.symbol==='EXIDEIND'?exFinancials():I.symbol==='CUMMINSIND'?cuFinancials():financials()],['execution','Execution',()=>I.symbol==='HFCL'?hfExecution():I.symbol==='INDOMIM'?inExecution():I.symbol==='EXIDEIND'?exExecutionDedup():I.symbol==='CUMMINSIND'?cuExecution():execution()],['ownership',I.symbol==='INDOMIM'?'Ownership & Governance':'Ownership',()=>I.symbol==='INDOMIM'?inOwnership():I.symbol==='EXIDEIND'?exOwnershipNoDup():I.symbol==='CUMMINSIND'?cuOwnership():ownership()],['risks','Risks',()=>I.symbol==='HFCL'?hfRisks():I.symbol==='INDOMIM'?inRisks():I.symbol==='EXIDEIND'?exRisksNoDup():I.symbol==='CUMMINSIND'?cuRisks():risks()],['peers',I.symbol==='INDOMIM'?'Industry & Peers':I.symbol==='CUMMINSIND'?'Industry & Valuation':'Peers',()=>I.symbol==='HFCL'?hfPeers():I.symbol==='INDOMIM'?inPeers():I.symbol==='EXIDEIND'?exPeers():I.symbol==='CUMMINSIND'?cuPeers():peers()],['listing','Offer & Listing',()=>I.symbol==='INDOMIM'?inListing():listing()],['verdict','Verdict',inVerdict],['stage','Stage Analysis',stage]];
+const allTabs=[['case','Investment Case',()=>I.symbol==='HFCL'?hfInvestment():I.symbol==='INDOMIM'?inInvestment():I.symbol==='EXIDEIND'?exInvestmentNoDup():I.symbol==='CUMMINSIND'?cuInvestment():I.symbol==='WELCORP'?opInvestment():investment()],['business','Business',()=>I.symbol==='HFCL'?hfBusiness():I.symbol==='INDOMIM'?inBusiness():I.symbol==='EXIDEIND'?exBusinessNoDup():I.symbol==='CUMMINSIND'?cuBusiness():I.symbol==='WELCORP'?opBusiness():business()],['financials','Financials',()=>I.symbol==='HFCL'?hfFinancialsRich():I.symbol==='INDOMIM'?inFinancialsReconciled():I.symbol==='EXIDEIND'?exFinancials():I.symbol==='CUMMINSIND'?cuFinancials():I.symbol==='WELCORP'?opFinancials():financials()],['execution','Execution',()=>I.symbol==='HFCL'?hfExecution():I.symbol==='INDOMIM'?inExecution():I.symbol==='EXIDEIND'?exExecutionDedup():I.symbol==='CUMMINSIND'?cuExecution():I.symbol==='WELCORP'?opExecution():execution()],['ownership',I.symbol==='INDOMIM'?'Ownership & Governance':'Ownership',()=>I.symbol==='INDOMIM'?inOwnership():I.symbol==='EXIDEIND'?exOwnershipNoDup():I.symbol==='CUMMINSIND'?cuOwnership():ownership()],['risks','Risks',()=>I.symbol==='HFCL'?hfRisks():I.symbol==='INDOMIM'?inRisks():I.symbol==='EXIDEIND'?exRisksNoDup():I.symbol==='CUMMINSIND'?cuRisks():I.symbol==='WELCORP'?opRisks():risks()],['peers',I.symbol==='INDOMIM'?'Industry & Peers':I.symbol==='CUMMINSIND'?'Industry & Valuation':'Peers',()=>I.symbol==='HFCL'?hfPeers():I.symbol==='INDOMIM'?inPeers():I.symbol==='EXIDEIND'?exPeers():I.symbol==='CUMMINSIND'?cuPeers():I.symbol==='WELCORP'?opPeers():peers()],['listing','Offer & Listing',()=>I.symbol==='INDOMIM'?inListing():listing()],['verdict','Verdict',inVerdict],['stage','Stage Analysis',stage]];
 const HANDLERS={
 case:coverageCase,business,financials:coverageFinancials,execution:coverageExecution,ownership:coverageOwnership,risks:coverageRisks,peers,listing:coverageListing,verdict:coverageVerdict,stage,themes:themeIntelligence,concallHighlights,
 deepDiveCase:coverageCase,deepDiveBusiness:hfBusiness,deepDiveFinancials:hfFinancialsRich,deepDiveExecution:hfExecution,deepDiveRisks:hfRisks,deepDivePeers:peers,
 deepDiveTelecomCase:hfInvestment,deepDiveTelecomBusiness:hfBusiness,deepDiveTelecomFinancials:hfFinancialsRich,deepDiveTelecomExecution:hfExecution,deepDiveTelecomRisks:hfRisks,deepDiveTelecomPeers:hfPeers,
 transitionCase:exInvestmentNoDup,transitionBusiness:exBusinessNoDup,transitionFinancials:exFinancials,transitionExecution:exExecutionDedup,transitionOwnership:exOwnershipNoDup,transitionRisks:exRisksNoDup,transitionPeers:exPeers,
 segmentCase:cuInvestment,segmentBusiness:cuBusiness,segmentFinancials:cuFinancials,segmentExecution:cuExecution,segmentOwnership:cuOwnership,segmentRisks:cuRisks,segmentPeers:cuPeers,segmentVerdict:cuVerdict,
-drhpCase:inInvestment,drhpBusiness:inBusiness,drhpFinancials:inFinancialsReconciled,drhpExecution:inExecution,drhpOwnership:inOwnership,drhpRisks:inRisks,drhpPeers:inPeers,drhpListing:inListing,drhpVerdict:inVerdictDrhp
+drhpCase:inInvestment,drhpBusiness:inBusiness,drhpFinancials:inFinancialsReconciled,drhpExecution:inExecution,drhpOwnership:inOwnership,drhpRisks:inRisks,drhpPeers:inPeers,drhpListing:inListing,drhpVerdict:inVerdictDrhp,
+opInvestment,opBusiness,opFinancials,opExecution,opRisks,opPeers
 };
 const legacyTabs=allTabs.filter(t=>t[0]!=='listing'||(!M.stock&&P.ipo?.summary?.Symbol)).filter(t=>t[0]!=='ownership'||P.coverage.drhp||['EXIDEIND','CUMMINSIND'].includes(I.symbol)).filter(t=>t[0]!=='verdict'||R.verdict||I.symbol==='CUMMINSIND');
 const tabs=PM?A(PM.sections).map(s=>[s.id,s.label,HANDLERS[s.renderer]||HANDLERS[s.id]||(()=>'<div class="empty">This module has no compatible renderer.</div>')]):legacyTabs;
