@@ -29,7 +29,10 @@
       riskRows[i].children[1].innerHTML = '<span class="badge ' + (row.fired ? 'warn' : 'good') + '">' + (row.fired ? 'Triggered' : 'Clear') + '</span>';
     });
   }
-  fetch('dashboard.html').then(function (r) { return r.text(); }).then(function (html) {
+  fetch('../screens/index.html').then(function (r) {
+    if (!r.ok) throw new Error('Could not load the current market snapshot');
+    return r.text();
+  }).then(function (html) {
     var match = html.match(/<script id="intel-data" type="application\/json">([\s\S]*?)<\/script>/);
     if (match) update(JSON.parse(match[1]));
   }).catch(function () { /* Static snapshot remains available for file:// review. */ });
