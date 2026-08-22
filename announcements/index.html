@@ -1355,7 +1355,8 @@ function anncMain(P, BASE){
   /* Publish row 1's REAL height as --nav1-h so row 2 pins exactly under it. Measured, not assumed:
      the bucket row wraps at narrow widths and the standalone nav carries a logo the dashboard does
      not, so one hard-coded number is wrong on at least one of the two shells at any time. */
-  var row1=document.querySelector('.tabbar-buckets')||document.querySelector('.sitenav');
+  var row1=document.querySelector('.tabbar-buckets')||document.querySelector('.sitenav')||
+           document.querySelector('.site-header');
   if(!row1) return;
   var apply=function(){
     var h=Math.round(row1.getBoundingClientRect().height);
@@ -1372,5 +1373,5 @@ function anncMain(P, BASE){
 </script>
 <footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
 </div>
-<script src="/public_nav.js?v=20260821d"></script></body>
+<script src="/public_nav.js?v=20260822b"></script></body>
 </html>
