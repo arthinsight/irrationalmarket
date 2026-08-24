@@ -798,11 +798,31 @@ if(!window.CIRC){window.CIRC=(function(){
      tables asking one question — what lands next, and how much stock it involves. The `type` chip
      carries the distinction the separate tables used to, and the ratio events come from the COMPANY's
      own announcement, which states a record date days before any exchange records an ex-date. */
+  /* `days` is computed when the digest is BUILT, so a page read two days later says "2d" for
+     something happening today. The row carries its own `date`, so recompute at view time. Anchored
+     on IST because these are Indian record dates: at 21:00 in New York it is already tomorrow in
+     Mumbai, and the reader wants the Indian calendar either way. Falls back to the stored value
+     when a row has no parseable date. */
+  function istMidnight(){
+    var n=new Date(), ist=new Date(n.getTime()+5.5*3600000);
+    return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate());
+  }
+  function daysNow(r){
+    if(!r||!r.date) return (r&&r.days!=null)?r.days:null;
+    var t=Date.parse(String(r.date).slice(0,10)+'T00:00:00Z');
+    if(isNaN(t)) return r.days!=null?r.days:null;
+    return Math.round((t-istMidnight())/86400000);
+  }
   function comingRows(rows){
+    /* Rows whose date has PASSED are dropped: the payload is a build-time window, so a stale page
+       would otherwise keep listing events that already happened as if they were upcoming. Rows the
+       window never contained cannot be recovered here - that needs a wider stored window. */
+    rows=(rows||[]).filter(function(r){var d=daysNow(r);return d===null||d>=0;});
     if(!rows.length) return '<tr><td colspan="4" class="circ-empty">'+
       'Nothing scheduled in this window.</td></tr>';
     return rows.map(function(r){
-      var cls=r.days<=1?"d0":(r.days<=7?"d1":"");
+      var dn=daysNow(r);
+      var cls=(dn!=null&&dn<=1)?"d0":((dn!=null&&dn<=7)?"d1":"");
       /* symbol ONLY. Falling back to `company` printed "Rights Entitlements pursuant to Rights
          Issue of Sunrest Lifescience Limited" in a 100px symbol column — that string is the
          EVENT, not a name, and it belongs in the event cell (owner 2026-08-15). */
@@ -833,7 +853,7 @@ if(!window.CIRC){window.CIRC=(function(){
       var co=r.company?'<span class="circ-co">'+esc(r.company)+'</span>':"";
       return '<tr><td class="circ-tick">'+who+'</td>'+
         '<td class="circ-num">'+esc(dmy(r.date))+'</td>'+
-        '<td><span class="circ-days '+cls+'">'+(r.days===0?"today":r.days+"d")+'</span></td>'+
+        '<td><span class="circ-days '+cls+'">'+(dn===null?"&mdash;":dn===0?"today":dn===1?"tomorrow":dn+"d")+'</span></td>'+
         '<td>'+body+co+'</td></tr>';}).join("");
   }
   /* Table 2. `In` is the column that earns this table its place: the same row read "12 Aug" in the
@@ -1013,6 +1033,18 @@ function anncMain(P, BASE){
     return {text:t, url:url};
   }
 
+  /* "Rs 112.42 cr reduction; ~7.1% of mcap (our arithmetic)" -> "Rs 112.42 cr reduction; ~7.1%".
+     Only the qualifier after a percentage is removed; every figure survives untouched, and a
+     quantum that never mentions mcap is returned unchanged. */
+  function qshort(s){
+    return String(s==null?'':s)
+      .replace(/\s*[([]\s*(?:on\s+)?our arithmetic[^)\]]*[)\]]/gi,'')
+      .replace(/\s*[,;]?\s*(?:on\s+)?our arithmetic\b[^.;]*/gi,'')
+      .replace(/(%)\s*of\s+(?:the\s+)?m(?:arket\s*)?cap(?:italisation|italization)?\b/gi,'$1')
+      .replace(/[;,]\s*$/,'')
+      .replace(/\s{2,}/g,' ')
+      .trim();
+  }
   function md(s){
     /* Shield `code` spans before the italic pass. The digest writes things like
        "_(typed `warrant_conversion_past`)_", where the underscores INSIDE the code span break the
@@ -1067,7 +1099,11 @@ function anncMain(P, BASE){
                    'title="open the filing"><span class="circ-tick">'+
                    C.esc(m.symbol||m.company||"")+'</span></a>'
                  :'<span class="circ-tick">'+C.esc(m.symbol||m.company||"")+'</span>')+
-            (m.quantum?'<span class="annc-q">'+C.esc(m.quantum)+'</span>':'')+'</div>'+
+            /* The quantum line carried its own working: "Rs 112.42 cr reduction; ~7.1% of mcap
+               (our arithmetic)". Owner 2026-08-24: show the number, drop the qualifier - the feed
+               is a scan surface and the phrase costs more width than it earns. The percentage
+               itself is unchanged; only the words after it go. */
+            (m.quantum?'<span class="annc-q">'+C.esc(qshort(m.quantum))+'</span>':'')+'</div>'+
             '<div class="annc-txt">'+md(m.headline)+'</div>'+
             (m.marquee?'<span class="annc-mqn">&#9733; '+stat+C.esc(m.marquee)+'</span>':'')+
             '</div></div>';
@@ -1373,5 +1409,5 @@ function anncMain(P, BASE){
 </script>
 <footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
 </div>
-<script src="/public_nav.js?v=20260822b"></script></body>
+<script src="/public_nav.js?v=72f5b741f1"></script></body>
 </html>

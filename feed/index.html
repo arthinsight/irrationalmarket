@@ -33,7 +33,7 @@
   <header class="site-header">
     <nav class="wrap nav" aria-label="Primary navigation">
       <a class="brand" href="index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a>
-      <div class="nav-links"><a href="index.html">Home</a><a href="bigpicture/">Big Picture</a><a class="active" href="#announcements">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div>
+      <div class="nav-links"><a href="index.html">Home</a><a href="bigpicture/">Big Picture</a><a class="active" href="#announcements">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div><div class="public-header-search"><input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div></div>
     </nav>
   </header>
   <main class="wrap" id="announcements">
@@ -72,7 +72,16 @@
       if(nav)nav.style.display='none';if(foot)foot.style.display='none';
       var lede=d.querySelector('.annc-lede'), count=d.getElementById('annc-c1'), built=d.getElementById('annc-built'), when=d.querySelector('.annc-when');
       if(lede)lede.textContent='';
-      if(when&&built){when.textContent='Updated ';when.appendChild(built);}
+      /* The as-of belongs at the BOTTOM of the page (owner 2026-08-24), not above the first item.
+         The built date lives inside the frame; lift its text into the feed's own footer and hide
+         the in-frame slot. If the date is missing the footer is left exactly as it was. */
+      if(when)when.style.display='none';
+      var builtTxt=built?(built.textContent||'').trim():'';
+      var feedFoot=document.querySelector('.feed-footer');
+      if(builtTxt&&feedFoot&&feedFoot.dataset.asof!=='1'){
+        feedFoot.dataset.asof='1';
+        feedFoot.textContent=feedFoot.textContent.replace(/\s*$/,'')+' · Updated '+builtTxt;
+      }
       var fold=d.querySelector('#annc-s1 .annc-fold');if(fold)fold.style.display='none';
       var style=d.createElement('style');style.id='feed-v2-theme';style.textContent='body{background:#f8fafc!important;color:#0f172a!important}.wrap.wide{max-width:none!important;padding:0!important}#tab-annc{max-width:none!important}#annc .annc-bar{padding:12px 16px!important;margin:0 0 10px!important;border:1px solid rgba(15,23,42,.08);border-radius:8px;background:linear-gradient(120deg,#fff,#eff6ff);box-shadow:0 1px 2px rgba(15,23,42,.06)}#annc .annc-when{line-height:1.35}#annc .circ-card{border-color:rgba(15,23,42,.08)!important;border-radius:8px!important;background:rgba(255,255,255,.96)!important;box-shadow:0 1px 2px rgba(15,23,42,.06)!important}#annc .circ-head{padding:11px 16px!important}#annc .circ-head:first-child{background:#fff}#annc .circ-head h2{font-family:Outfit,Inter,sans-serif!important;font-size:18px!important;letter-spacing:-.02em!important}#annc .annc-n{display:none!important}#annc .annc-body{padding:16px!important}#annc .annc-cov{padding-bottom:10px;border-bottom:1px solid rgba(15,23,42,.08)}#annc .annc-h3{margin:16px 0 8px!important;color:#2563eb!important}#annc .annc-card{padding:12px 14px!important;border-color:rgba(15,23,42,.08)!important;border-left:3px solid #2563eb!important}#annc .annc-card.mq{border-left-color:#d97706!important;background:linear-gradient(90deg,rgba(217,119,6,.035),#fff 28%)!important}#annc .annc-rank{font-size:11px!important}#annc .circ-tick{font-size:14px!important;letter-spacing:.01em}#annc .annc-q{background:#eef2ff!important;color:#3730a3!important;font-weight:700!important}#annc .annc-txt{font-size:13px!important;color:#334155!important}#annc .annc-tt{font-family:Outfit,Inter,sans-serif!important;font-size:15px!important}#annc .annc-tl{gap:8px!important}#annc .annc-tl li{padding-bottom:8px;border-bottom:1px solid rgba(15,23,42,.06)}#annc .annc-tl li:last-child{border-bottom:0}#annc .circ-chip{border-radius:999px!important}#annc .circ-chip[aria-pressed=true],#annc .toggle.active{background:#eff6ff!important;color:#2563eb!important;border-color:#bfdbfe!important}#annc a{color:#2563eb!important}#annc .annc-doc{display:inline-flex!important;align-items:center!important;width:auto!important;margin-right:7px!important;padding:2px 7px!important;border:1px solid #bfdbfe!important;border-radius:999px!important;color:#2563eb!important;font-size:0!important}#annc .annc-doc:after{content:"Filing";font-size:10px;font-weight:700;letter-spacing:.02em}#annc .source-action{margin-left:8px;color:#64748b;font-size:10px;font-weight:600} @media(max-width:760px){#annc .annc-bar{padding:10px 12px!important}#annc .annc-lede{display:none}#annc .circ-head{padding:10px 12px!important}#annc .annc-body{padding:12px!important}#annc .annc-card{grid-template-columns:20px 1fr!important;padding:10px!important;gap:8px!important}#annc .annc-tl li{font-size:12.5px!important}}';d.head.appendChild(style);
       var compact=d.createElement('style');compact.textContent='#annc .annc-sec>.circ-head:first-child{display:none!important}#annc .annc-lede{color:#334155!important;font-weight:600}#annc .annc-lede .count{color:#0f172a!important} @media(max-width:760px){#annc .annc-bar{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}#annc .annc-bar>div+div{margin-top:0!important}#annc .annc-pick{display:grid!important;grid-template-columns:auto minmax(0,1fr)!important;align-items:center!important}#annc .annc-pick>#annc-mcap{grid-column:1/-1!important}#annc .annc-when{margin-top:4px!important}#annc .annc-sec>.circ-head:nth-child(2){display:grid!important;gap:8px!important}#annc .circ-srch{width:100%!important;min-height:42px!important}#annc .circ-chip{min-height:34px!important;display:inline-flex!important;align-items:center!important}}';d.head.appendChild(compact);
@@ -98,5 +107,5 @@
     window.addEventListener('resize',fit);
   }());
   </script>
-<script src="/public_nav.js?v=20260822b"></script></body>
+<script src="/public_nav.js?v=72f5b741f1"></script></body>
 </html>
