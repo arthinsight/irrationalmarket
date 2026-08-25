@@ -930,7 +930,13 @@ if(!window.CIRC){window.CIRC=(function(){
   // copy of this script — one renderer, two surfaces, so they cannot drift apart.
   var host=document.getElementById('annc');
   var BASE=(host && host.getAttribute('data-annc-base')) || 'data';
-  fetch(BASE+'/annc/index.json')
+  // CACHE-BUST THE INDEX, EVERY LOAD. GitHub Pages serves data/*.json with a long max-age, so a
+  // reader who visited yesterday keeps yesterday's index and never sees today's announcements --
+  // the deploy succeeds and the page still looks stale. A stamp baked in at BUILD time would not
+  // fix it: the HTML carrying that stamp is cached too, so an old page keeps asking for the old
+  // version. A per-LOAD value is the only one that cannot itself go stale. The index is ~12 KB.
+  var FRESH='?v='+Date.now();
+  fetch(BASE+'/annc/index.json'+FRESH)
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status+' on '+BASE+'/annc/index.json'); return r.json(); })
     .then(function(idx){ try{ anncMain(idx, BASE); }catch(e){ anncDie((e && e.message) || e); throw e; } })
     .catch(function(e){
@@ -952,7 +958,11 @@ function anncMain(P, BASE){
     if(!want.length){ cb(); return; }
     var left=want.length;
     want.forEach(function(d){
-      var p=PEND[d] || (PEND[d]=fetch(BASE+'/annc/'+d+'.json')
+      // Past dates keep their cache DELIBERATELY (see the note above) -- only TODAY's file is still
+      // being written, so only that one is busted, and it is keyed to the index's own `generated`
+      // stamp rather than the clock: it re-fetches when the BUILD changed, not on every render.
+      var bust=(P.today && d>=P.today) ? ('?v='+encodeURIComponent(P.generated||'')) : '';
+      var p=PEND[d] || (PEND[d]=fetch(BASE+'/annc/'+d+'.json'+bust)
         .then(function(r){ return r.ok ? r.json() : {}; })
         .then(function(j){ DAY[d]=j||{}; return DAY[d]; })
         .catch(function(){ DAY[d]={}; return DAY[d]; }));
