@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  var nav = [['Home','index.html'],['Big Picture','bigpicture/'],['Feed','feed/'],['IPO Intelligence','ipo/'],['Screens','screens/?tab=tab-momentum2']];
+  var nav = [['Home','index.html'],['Big Picture','bigpicture/'],['Feed','feed/'],['IPO Intelligence','ipo/'],['Screens','screens/']];
   function relative(path) {
     var pathname = location.pathname || '/';
     var segments = pathname.split('/').filter(Boolean);

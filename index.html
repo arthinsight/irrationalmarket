@@ -37,7 +37,9 @@
     .brand-mark { display:grid; place-items:center; width:30px; height:30px; border-radius:var(--r-sm); background:var(--g900); color:white; font-size:var(--fs-sm); font-weight:700; }
     .nav-links { display:flex; align-items:center; gap:var(--sp-4); color:var(--mut); font-size:var(--fs-sm); font-weight:600; }
     .nav-links a:hover { color:var(--txt); }
-    .hero { padding:clamp(72px,11vw,152px) 0 clamp(64px,9vw,120px); overflow:hidden; }
+    /* Owner 2026-08-25: less air between the shared nav and the title. Was clamp(72,11vw,152) —
+   152px at a 1440 viewport, which put the first words a fifth of the screen below the nav. */
+.hero { padding:clamp(36px,5vw,84px) 0 clamp(48px,7vw,96px); overflow:hidden; }
     .hero-grid { position:relative; }
     .hero-grid:after { content:""; position:absolute; z-index:-1; top:-140px; right:-220px; width:520px; height:520px; border:1px solid var(--g200); border-radius:50%; box-shadow:0 0 0 52px rgba(37,99,235,.035),0 0 0 105px rgba(37,99,235,.025); }
     .hero p { max-width:650px; margin:var(--sp-5) 0 0; font-size:clamp(17px,2vw,21px); color:var(--g700); line-height:1.55; }
@@ -130,7 +132,7 @@
   <main id="top">
     <section class="hero" style="border-top:0">
       <div class="wrap hero-grid">
-        <p class="eyebrow">Indian Market Intelligence</p>
+        <p class="eyebrow">Indian Stock Market Data and Intelligence</p>
         <h1>See the market.<br>Understand the business.<br>Find the signal.</h1>
         <p>Arth Insight brings market structure, business quality and post-listing behaviour into one clear view—so you can spend less time filtering noise.</p>
         <div class="hero-search home-company-search"><!--COS-START--><div class="cosearch" id="cosearch"><button class="cosbtn" id="cos-open" type="button" aria-label="Search for a company or IPO" aria-expanded="false">&#9906;</button><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a company or IPO" aria-label="Search for a company or IPO"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></div>
@@ -170,7 +172,7 @@
       <div class="wrap" style="margin-top:var(--sp-6)"><div class="callout"><strong>Signal over noise.</strong>Arth Insight is an educational, informational platform—not investment advice or a source of buy/sell calls.</div></div>
     </section>
   </main>
-  <footer><div class="wrap footer-row"><span>ARTH INSIGHT · Indian Market Intelligence</span><span>Public market and company intelligence · For information and education only.</span></div></footer>
+  <footer><div class="wrap footer-row"><span>ARTH INSIGHT · Indian Stock Market Data and Intelligence</span><span>Public market and company intelligence · For information and education only.</span></div></footer>
 <script id="co-search-js">
 (function(){
   // SHOWING IS `display:block`, NOT `display:''`. The stylesheet's default for .cosl is display:none,
@@ -271,5 +273,5 @@
     if(!document.getElementById('cosearch').contains(e.target)){ list.style.display='none'; closeSheet(); }
   });
 })();
-</script><script src="/public_nav.js?v=72f5b741f1"></script></body>
+</script><script src="/public_nav.js?v=e8a42cc64f"></script></body>
 </html>

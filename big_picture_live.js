@@ -29,7 +29,18 @@
       riskRows[i].children[1].innerHTML = '<span class="badge ' + (row.fired ? 'warn' : 'good') + '">' + (row.fired ? 'Triggered' : 'Clear') + '</span>';
     });
   }
-  fetch('../screens/index.html').then(function (r) {
+  (function(){
+    /* Prefer the published payload; fall back to scraping the old screens page.
+       The scrape is why `screens/index.html` (a 546 KB copy of the dashboard) could not be retired:
+       this page depended on it. `publish._export_public` now writes the SAME public-sanitised
+       payload to data/intel.json, so the fetch below is the primary path and the scrape is only a
+       bridge for a cached page. Remove the fallback once no built page carries `intel-data`. */
+    return fetch('../data/intel.json').then(function(r){
+      if(!r.ok) throw new Error('no intel.json');
+      return r.text().then(function(t){ return {text:function(){return Promise.resolve(
+        '<script id="intel-data" type="application/json">'+t+'<\/script>');}}; });
+    }).catch(function(){ return fetch('../screens/index.html'); });
+  })().then(function (r) {
     if (!r.ok) throw new Error('Could not load the current market snapshot');
     return r.text();
   }).then(function (html) {

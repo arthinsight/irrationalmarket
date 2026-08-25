@@ -319,6 +319,52 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
 .use-unit{color:#64748b;font-weight:400}
 @media(max-width:760px){.use-bar{grid-template-columns:1fr auto;gap:6px}.use-track{grid-column:1/-1}}
 
+/* PHONE LEGIBILITY AND REACH (qa/mobile_audit M5/M7/M10, 2026-08-25).
+   Desktop sizes are unchanged - every rule here is inside the phone breakpoint.
+
+   M7 - nothing below 11px. `.eyebrow` shipped 10px and `.evidence` badges 9px, which is below the
+   audit's own legibility floor and below what most people can read on a bus.
+   M5 - 40px is a fingertip. `.show-more-btn` was 24px and the chart timeframe buttons 23px; both
+   are ordinary buttons, not dense chips among their own kind, so they get the full floor.
+   M10 - a table that overflows WHILE crushing a column to 11-15 wrapped lines is unreadable in
+   both directions. Giving cells a real minimum lets the row take the width it needs and the
+   wrapper scroll, which is what `.table-wrap{overflow:auto}` is already there for. */
+@media(max-width:760px){
+  /* Every sub-11px size in this stylesheet, raised to the floor. Listed one by one rather than with
+     a blanket rule because each is a deliberate label style on desktop; only the phone size moves. */
+  .eyebrow,.evidence,.title-row span,.decision-strip span,th,.kpi span,.profile-band span,
+  .status,.cred-metrics span,.analysis-strip span,.call-context span,.verdict-banner span,
+  .explorer-title span,.explorer-stock span,.explorer-stock small,small.row-note,
+  .theme-parent,.theme-pill,.theme-pill.long,.src-title span,
+  .prototype-bar b{font-size:11px}
+  /* These are declared as `<parent> span{font-size:9px}` descendant rules, which outrank a
+     flat `span` in this block - so match them the same way. */
+  .analysis-strip span,
+  .call-context span,
+  .cred-metrics span,
+  .decision-strip span,
+  .explorer-stock span,
+  .explorer-title span,
+  .kpi span,
+  .profile-band span,
+  .theme-intel span,
+  .verdict-banner span{font-size:11px}
+  .evidence{padding:3px 8px}
+  /* Ordinary buttons and form controls get the full 40px fingertip - they are not dense chips. */
+  .show-more-btn{min-height:40px;padding:8px 14px}
+  #m2-tf button,.m2tf button{min-height:40px;padding:8px 12px}
+  .explorer-open{min-height:40px}
+  .screen-filters input,.screen-filters select{min-height:40px}
+  /* M10: a table that overflows WHILE crushing a column to 14 wrapped lines is unreadable both
+     ways. `!important` because the shared mobile rules set `white-space:normal` on these same
+     cells, which is what produced the wrapping; the wrapper already scrolls (`overflow:auto`), so
+     letting the row take its natural width is the readable outcome. */
+  .data-table th,.data-table td,.table-wrap th,.table-wrap td{
+    min-width:104px;white-space:nowrap!important}
+  .data-table th:first-child,.data-table td:first-child,
+  .table-wrap th:first-child,.table-wrap td:first-child{min-width:150px}
+}
+
 
 /* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
    top nav goes away"). Row 1 pins to the viewport top; row 2 pins directly beneath it at --nav1-h,
@@ -810,7 +856,7 @@ function fail(message){app.innerHTML='<div class="pending"><b>Company unavailabl
 var selected=sym();if(!selected){fail('Choose a company from Search or Company Explorer.');return;}
 Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),get('../data/company_page/'+encodeURIComponent(selected)+'.json',true)])
 .then(function(seed){var index=seed[0],row=(index.companies||[]).filter(function(x){return x.s===selected;})[0];if(!row)throw new Error('Symbol not found');var file=row.file||selected+'.json',vol=String(file).replace(/\.json$/,'.v.json');return Promise.all([get('../data/company/'+encodeURIComponent(file)),get('../data/company/'+encodeURIComponent(vol),true)]).then(function(parts){return[merge(parts[0]||{},parts[1]||{}),seed[1]||{},seed[2]||{},row];});})
-.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:selected,name:row.co||selected,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:{momentum:explorer.momentum||[],investing:explorer.investing||[],new:explorer.new||[],peers:peers}};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=7152d7e016';document.body.appendChild(script);})
+.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:selected,name:row.co||selected,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:Object.assign({},explorer,{peers:peers})};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=7ebec1937c';document.body.appendChild(script);})
 .catch(function(e){fail(e&&e.message==='Symbol not found'?'That symbol is not available in the public company store.':'Company data could not load. Please try again.');});
 })();
 </script><script id="nav-sticky-js">
@@ -834,7 +880,7 @@ Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),get(
   if(window.ResizeObserver) new ResizeObserver(apply).observe(row1);
 })();
 </script>
-<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
+<footer>ARTH INSIGHT · <a href="https://arthinsight.com/">arthinsight.com</a> · For information and education only.</footer>
 </div>
-<script src="/public_nav.js?v=72f5b741f1"></script></body>
+<script src="/public_nav.js?v=e8a42cc64f"></script></body>
 </html>

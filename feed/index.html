@@ -28,7 +28,149 @@
     @media(max-width:760px){.nav-links a:not(.active){display:inline}}
     @media(max-width:560px){.nav-links a:not(:last-child){display:none}.nav-links a:last-child{display:inline}}
   </style>
-</head>
+<style>
+/* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
+   top nav goes away"). Row 1 pins to the viewport top; row 2 pins directly beneath it at --nav1-h,
+   which NAV_STICKY_JS measures off the real row. A hard-coded offset is wrong the moment the row
+   wraps, the type scale changes or a phone narrows it, and it fails as a gap or an overlap rather
+   than as an error. The background is load-bearing, not decoration: a transparent sticky row lets
+   the content scroll straight through it. */
+:root{--nav1-h:44px}
+.tabbar-buckets,.sitenav{position:sticky;top:0;z-index:41;background:var(--bg)}
+.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}
+/* LESS AIR ABOVE AND BETWEEN (owner 2026-08-18: "lot of space above and in between second nav").
+   The dashboard put 24px of body padding above row 1, each row then carried its own margin, and the
+   reader met three gaps before the first word of content. The padding moves ONTO the sticky rows so
+   the frozen strip keeps its breathing room while the page starts higher. */
+body{padding-top:0}
+.tabbar-buckets{padding-top:var(--sp-2)}
+.tabbar{margin-bottom:var(--sp-3)}
+.sitenav{padding-top:var(--sp-2);margin-bottom:0}
+.co-sub{margin-top:0}
+.wrap:has(.co-page){padding-top:0}
+/* ── PHONE: THE NAV GOES TO THE BOTTOM (owner 2026-08-19) ─────────────────────────────────────────
+   A thumb reaches the bottom of a phone; the top of a 6" screen is the hardest place to tap. The bar
+   is fixed there, scrolls horizontally rather than wrapping (five sections will not fit across
+   375px), and the page gets bottom padding equal to the bar so the last row of content is not
+   sitting underneath it — a fixed bar without that padding hides content and nothing looks broken.
+   The STICKY-TOP rules are explicitly undone here: an element cannot be sticky at the top and fixed
+   at the bottom, and leaving both in place is how one of them silently wins. */
+@media (max-width:700px){
+  /* ── PHONE LAYOUT (owner 2026-08-19) ─────────────────────────────────────────────────────────
+     Three parts, in the order a thumb meets them:
+       1. the BRAND sits in a fixed header at the TOP — it is identity, not navigation, and it was
+          riding in the bottom bar taking 127px of a 375px screen (measured), which is most of why
+          that bar scrolled sideways at all;
+       2. the SECTIONS sit in a fixed bar at the BOTTOM, app-style, with the SEARCH BUTTON in the
+          middle of them;
+       3. nothing scrolls sideways: the items share the width instead (`flex:1 1 0` + `min-width:0`),
+          because a nav you have to swipe hides its own options.
+     Content is padded clear of both bars — a fixed bar without that padding hides content and
+     nothing looks broken. */
+  .tabbar-buckets,.sitenav{
+    position:fixed;top:auto;bottom:0;left:0;right:0;z-index:60;
+    margin:0;padding:2px 4px;background:var(--card,#fff);
+    border-top:1px solid var(--line);border-bottom:none;
+    box-shadow:0 -2px 10px rgba(15,23,42,.08);
+    display:flex;flex-wrap:nowrap;overflow:visible;gap:0;align-items:stretch}
+  /* the brand leaves the bar and becomes the top header */
+  .tabbar-buckets .sitenav-logo,.sitenav .sitenav-logo,
+  .tabbar-buckets>a:first-child,.sitenav>a:first-child{
+    position:fixed;top:0;left:0;right:0;height:44px;z-index:61;
+    display:flex;align-items:center;gap:8px;margin:0;padding:0 12px;
+    background:var(--card,#fff);border-bottom:1px solid var(--line);border-right:none;
+    box-shadow:0 1px 6px rgba(15,23,42,.06)}
+  /* every remaining item shares the bar equally, so nothing overflows */
+  .tabbar-buckets .bkbtn,.tabbar-buckets .pagelink,.sitenav-a,.cosearch{
+    flex:1 1 0;min-width:0;height:44px;padding:0 2px;
+    font-size:var(--fs-xs,12px);text-align:center;justify-content:center;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  /* SEARCH IN THE MIDDLE: DOM order is [brand, section, section, ..., search], and `order` puts the
+     search between the second and third section without changing the markup either shell emits. */
+  .tabbar-buckets>*:nth-child(2),.sitenav>*:nth-child(2){order:10}
+  .tabbar-buckets>*:nth-child(3),.sitenav>*:nth-child(3){order:20}
+  /* specificity: the nth-child rules below are (0,2,0) and a bare `.cosearch` is (0,1,0), so the
+     search kept landing at the END with order:50. Matched depth, so the middle wins. */
+  .tabbar-buckets .cosearch,.sitenav .cosearch{order:25;flex:0 0 56px}
+  /* EVERY site-nav link is a fingertip target, not only the ones on `.wide` pages. SHELL_CSS states
+     `height:40px` under `.wrap.wide .sitenav-a` — settled after three attempts to make a button and
+     a link agree — so /about/, which is a reading page and not `.wide`, kept 17px links in the
+     bottom bar. Stated here, inside the phone media query, so the desktop geometry that took those
+     three attempts is left exactly as it is. */
+  .sitenav-a{min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+  .tabbar-buckets>*:nth-child(4),.sitenav>*:nth-child(4){order:30}
+  .tabbar-buckets>*:nth-child(5),.sitenav>*:nth-child(5){order:40}
+  .tabbar-buckets>*:nth-child(6),.sitenav>*:nth-child(6){order:50}
+  /* row 2 (the dashboard's tab row) sits DIRECTLY BELOW the top header, and content below that.
+     Before this the page started at y=0 and text ran underneath the header. */
+  .tabbar{position:sticky;top:44px;z-index:55;background:var(--bg);margin:0}
+  body{padding-top:44px;padding-bottom:52px}
+  .wrap.wide{padding-top:44px;padding-bottom:52px}
+  .wrap.wide .sitenav,.wrap .sitenav{margin:0}
+}
+
+h1,h2{font-family:'Outfit',sans-serif;color:var(--txt);margin:0}
+header{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-8)}
+header img{width:44px;height:44px;object-fit:contain;border-radius:var(--r-sm)}
+h1{font-size:var(--fs-2xl);line-height:var(--lh-tight);font-weight:600;letter-spacing:-.01em}
+.sub{font-size:var(--fs-md);color:var(--mut);margin:var(--sp-1) 0 0}
+h2{font-size:var(--fs-lg);font-weight:600;margin:var(--sp-6) 0 var(--sp-2)}
+p{margin:0 0 var(--sp-3);max-width:68ch;color:var(--g700)}
+ul{margin:0 0 var(--sp-3);padding-left:var(--sp-5)}
+li{margin-bottom:var(--sp-2);max-width:68ch;color:var(--g700)}
+strong{color:var(--txt);font-weight:600}
+/* RENAMED FROM `.note` 2026-08-19. This is the reading-page CALLOUT — a bordered, padded box with
+   a shadow — and the panels use `.note` for the opposite thing: a small muted inline label. That
+   collision is invisible on the dashboard, which never loads this stylesheet, and lands the moment a
+   panel moves to a standalone page: on /announcements/ the two-word label "Mcap RScr" rendered as a
+   callout box, 108x51px with 16px/20px of padding, and the pair of market-cap inputs it sits with
+   cost 147px of a 720px phone screen. Same root cause as the six bare-tag defects of 2026-08-19,
+   one level up: a CLASS name, so the pending `.prose` scoping would not have caught it either.
+   Renaming rather than scoping because the callout had exactly ONE user in the repo (the About
+   page's disclaimer) against seven for the label — the rare meaning is the one that should move. */
+footer{margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);
+  font-size:var(--fs-sm);color:var(--mut)}
+a{color:var(--hl)}
+a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* the site nav — links back into the dashboard from a standalone page. Defined HERE, with the rest
+   of the shell, because standalone pages never load the dashboard's bucket stylesheet: putting it
+   there rendered a correct nav as unstyled links, which the presence check happily passed. */
+.sitenav{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);margin:0 0 var(--sp-3);
+  padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.sitenav-logo{display:flex;align-items:center;gap:var(--sp-2);text-decoration:none;
+  padding:0 var(--sp-3) 0 0;margin-right:var(--sp-2);border-right:1px solid var(--line)}
+/* the brand name is an <h1> on public pages (it carries the page's entity name for search), so it
+   must be reset out of the shell's h1 sizing and sit inline in the bar */
+.sitenav-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:var(--fs-md);
+  color:var(--txt);white-space:nowrap;margin:0;line-height:1;letter-spacing:0}
+.sitenav-logo img{width:28px;height:28px;object-fit:contain;border-radius:var(--r-sm);display:block}
+.sitenav-a{font-size:var(--fs-base);font-weight:600;color:var(--mut);text-decoration:none;
+  padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent}
+.sitenav-a:hover{color:var(--txt)}
+.sitenav-a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* PHONE: the nav is chrome, not content. Five sections plus a search box wrapped onto FOUR rows and
+   took 130px of a 844px screen before a reader saw anything (measured 2026-08-17). One row that
+   scrolls sideways instead — the sections stay reachable, the page starts near the top. Placed here,
+   after `.sitenav`'s own `flex-wrap:wrap`, because an equal-specificity rule emitted earlier loses. */
+@media (max-width:700px){
+  .sitenav{flex-wrap:nowrap;overflow-x:auto;gap:0;-webkit-overflow-scrolling:touch}
+  .sitenav-a{padding:var(--sp-2);white-space:nowrap}
+  .sitenav-logo{padding-right:var(--sp-2);margin-right:var(--sp-1)}
+  .cosearch{flex:0 0 auto;margin-left:var(--sp-2)}
+  .cosearch input{width:8.5rem}
+}
+
+</style><style>
+@media(max-width:760px){
+  /* qa/mobile_audit M5/M7, 2026-08-25. Ordinary buttons and inputs get the 40px fingertip; the
+     `.chip` filters are dense (many to a row, each among its own kind) so they take the 32px
+     floor the audit allows. Nothing below 11px. */
+  .tabs button,.feed-tab{min-height:40px}
+  #cal-q,#tr-q,.ipo-search input{min-height:40px}
+  .chip{min-height:32px}
+  th,#entity-col,.ipo-card b,.offer-fact b{font-size:11px}
+}
+</style></head>
 <body>
   <header class="site-header">
     <nav class="wrap nav" aria-label="Primary navigation">
@@ -40,7 +182,7 @@
     <header class="mast">
       <div><p class="eyebrow">Market activity</p><h1>Feed</h1></div>
     </header>
-    <nav class="feed-tabs" aria-label="Feed sections" role="tablist">
+    <nav class="feed-tabs co-sub" aria-label="Feed sections" role="tablist">
       <button class="feed-tab active" type="button" role="tab" aria-selected="true" data-section="annc-s1">Announcements</button>
       <button class="feed-tab" type="button" role="tab" aria-selected="false" data-section="annc-s2">Circulars</button>
       <button class="feed-tab" type="button" role="tab" aria-selected="false" data-section="annc-s3">Upcoming</button>
@@ -107,5 +249,25 @@
     window.addEventListener('resize',fit);
   }());
   </script>
-<script src="/public_nav.js?v=72f5b741f1"></script></body>
+<script src="/public_nav.js?v=e8a42cc64f"></script><script id="nav-sticky-js">
+(function(){
+  /* Publish row 1's REAL height as --nav1-h so row 2 pins exactly under it. Measured, not assumed:
+     the bucket row wraps at narrow widths and the standalone nav carries a logo the dashboard does
+     not, so one hard-coded number is wrong on at least one of the two shells at any time. */
+  var row1=document.querySelector('.tabbar-buckets')||document.querySelector('.sitenav')||
+           document.querySelector('.site-header');
+  if(!row1) return;
+  var apply=function(){
+    var h=Math.round(row1.getBoundingClientRect().height);
+    if(h>0) document.documentElement.style.setProperty('--nav1-h', h+'px');
+  };
+  apply();
+  window.addEventListener('load', apply);
+  window.addEventListener('resize', apply);
+  /* The rows are REBUILT at runtime - the bucket row swaps its tab group on every bucket click, and
+     the company page writes its section ribbon only once the data lands. A height measured once is
+     the height of the page before any of that. */
+  if(window.ResizeObserver) new ResizeObserver(apply).observe(row1);
+})();
+</script></body>
 </html>
