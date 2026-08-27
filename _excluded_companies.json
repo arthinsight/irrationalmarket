@@ -1,6 +1,6 @@
 {
  "reason": "hollow extraction (qa.health_check C8) \u2014 excluded until repaired",
- "n": 7,
+ "n": 12,
  "symbols": [
   "BONDADA",
   "GANDHITUBE",
@@ -8,6 +8,11 @@
   "JINDALSAW",
   "KOLTEPATIL",
   "MEGATHERM",
-  "RAJRATAN"
+  "RAJRATAN",
+  "SHANTIGEAR",
+  "UEL",
+  "VINYLINDIA",
+  "VIRAT",
+  "VISHAL"
  ]
 }

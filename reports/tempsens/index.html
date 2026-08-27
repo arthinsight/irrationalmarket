@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempsens Instruments — Arth Insight</title>
+<link rel="canonical" href="https://arthinsight.com/reports/tempsens/">
+<meta name="description" content="India&#x27;s largest temperature-sensor maker priced at ₹300 with no listed peer to compare it against — the accounts, the anchor book, and the four years of acquisitions inside the growth rate.">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="icon" type="image/png" sizes="180x180" href="../../icon-180.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../../icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Arth Insight">
+<meta property="og:title" content="Tempsens Instruments — Arth Insight">
+<meta property="og:description" content="India&#x27;s largest temperature-sensor maker priced at ₹300 with no listed peer to compare it against — the accounts, the anchor book, and the four years of acquisitions inside the growth rate.">
+<meta property="og:url" content="https://arthinsight.com/reports/tempsens/">
+<meta property="og:image" content="https://arthinsight.com/og-1200x630.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tempsens Instruments — Arth Insight">
+<meta name="twitter:description" content="India&#x27;s largest temperature-sensor maker priced at ₹300 with no listed peer to compare it against — the accounts, the anchor book, and the four years of acquisitions inside the growth rate.">
+<meta name="twitter:image" content="https://arthinsight.com/og-1200x630.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== ui_tokens.py — design system tokens (UI_STANDARD.md) ===== */
+:root {
+  --g50: #f8fafc;
+  --g100: #f1f5f9;
+  --g200: #e2e8f0;
+  --g300: #cbd5e1;
+  --g400: #94a3b8;
+  --g500: #64748b;
+  --g600: #475569;
+  --g700: #334155;
+  --g800: #1e293b;
+  --g900: #0f172a;
+  --good: #059669;
+  --good-bg: rgba(5,150,105,.08);
+  --warn: #d97706;
+  --warn-bg: rgba(217,119,6,.09);
+  --bad: #dc2626;
+  --bad-bg: rgba(220,38,38,.07);
+  --info: #2563eb;
+  --info-bg: rgba(37,99,235,.07);
+  --hover: rgba(15,23,42,.04);
+  --chip-bg: #eef2f8;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(15,23,42,.06);
+  --sh-2: 0 4px 14px rgba(15,23,42,.08);
+  --page-max: 1440px;
+}
+
+/* shared sub-tab ribbon — underline tabs, one component for every tab (UI_STANDARD P3) */
+.u-subnav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:var(--sp-1);
+  margin:0 0 var(--sp-4);padding:var(--sp-2) 0 0;background:var(--bg);
+  border-bottom:1px solid var(--line)}
+.u-subnav button{appearance:none;border:none;background:none;font-family:'Inter',-apple-system,
+  Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);font-weight:600;color:var(--mut);
+  cursor:pointer;padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent;
+  transition:var(--transition)}
+.u-subnav button:hover{color:var(--txt)}
+.u-subnav button.on{color:var(--hl);border-bottom-color:var(--hl)}
+.u-subnav button:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+
+@media (max-width: 700px) {
+  .co-page table { display: block; width: max-content; max-width: 100%; overflow-x: auto; }
+}
+/* A COLLAPSED COLUMN THAT STILL DOES NOT FIT. `dashboard.py` has collapsed .col-2/.col-3/.col-25 to a
+   single `1fr` track below 1200px for a long time, and the public build repeats it — yet Big Picture
+   still dragged the page sideways on a phone (public index measured 555 wide in a 360 viewport,
+   2026-08-17). The collapse was working: the track was ONE column. It was 429px wide inside a 262px
+   container, because a `1fr` track cannot shrink below its item's AUTOMATIC MINIMUM SIZE, and a grid
+   item's default `min-width:auto` resolves to its min-content — here a wide table's. So the fix is not
+   another breakpoint or a narrower font; it is telling the track it may shrink. `minmax(0, 1fr)` plus
+   `min-width:0` on the items is the whole of it, and the `.scroll` wrappers already present then do
+   what they were written to do. */
+@media (max-width: 1200px) {
+  .col-2, .col-25, .col-3 { grid-template-columns: minmax(0, 1fr) !important; }
+  .col-2 > *, .col-25 > *, .col-3 > * { min-width: 0; }
+}
+
+:root{--bg:#f8fafc;--card:rgba(255,255,255,.95);--line:rgba(15,23,42,.08);--bull:#059669;--bear:#dc2626;--side:#475569;--conflict:#d97706;--txt:#0f172a;--mut:#475569;--hl:#2563eb;}
+
+/* shared standalone-page shell — header (name/logo, top-left), body rhythm, footer */
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:'Inter',-apple-system,Segoe UI,Roboto,sans-serif;font-size:var(--fs-base);
+  line-height:var(--lh-base);-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:var(--sp-8) var(--sp-5) 72px}
+/* WIDE PAGES. 820px is a READING measure — right for about/, wrong for a view that was a dashboard
+   tab an hour ago. Measured 2026-08-19 when Announcements moved out of index.html: the same three
+   sections went from 1392px wide to 780px and ~60% taller, because a `.tabpanel` is capped at
+   --page-max (1440) and `.wrap` at 820. Content identical, layout squeezed - which only a
+   before/after comparison catches, since every render check still passed.
+   Opt-in per page (`page_shell(..., wide=True)`) rather than widening `.wrap` for everyone: about/
+   and the other prose pages want the reading measure they have. */
+.wrap.wide{max-width:calc(var(--page-max) + var(--sp-5) * 2)}
+/* ...AND THE PROSE DEFAULTS STOP AT THE DOOR. SHELL_CSS styles `p`/`li`/`ul` for READING pages
+   (about/): 68ch measure, 8px between list items, muted colour. A panel transplanted off the
+   dashboard is not prose — it is a component that already sizes itself — and those rules silently
+   restyled it: measured 2026-08-19, the Announcements digest's theme list came out 355px instead of
+   186px and section 1 grew from 1,989px to 2,957px on IDENTICAL text (7,147 characters both sides).
+   Every render check passed; only a before/after against the pre-split page showed it.
+   Scoped to `.wrap.wide` because that flag marks exactly the pages that carry app panels. */
+.wrap.wide p,.wrap.wide li{max-width:none;color:inherit}
+.wrap.wide li{margin-bottom:0}
+.wrap.wide ul{margin:0;padding-left:0}
+/* ...and the panel's FIRST child starts flush with the nav. SHELL_CSS gives `h2` a 24px top margin
+   for reading pages; the IPO panel opens with an <h2> and the Announcements panel with a <div>, so
+   one page sat 24px lower than the other under the same nav (measured 2026-08-19: content top 112 vs
+   88). Scoped to the first child so headings BETWEEN sections keep their spacing — the gap is only
+   wrong where it is the first thing under the nav. */
+.wrap.wide .tabpanel > :first-child{margin-top:0}
+/* THE NAV IS THE SAME NAV ON EVERY SURFACE (owner 2026-08-19: "the top nav height increases and
+   white space above name is more as compared when I was on Big Picture"). Measured before this rule:
+   dashboard nav top=0 h=48 item=40; /ipo/ and /announcements/ top=32 h=56 item=39 — because a
+   standalone page wraps its content in `.wrap`, whose 32px reading-page padding sits ABOVE the nav,
+   and `.sitenav` adds a bottom pad + rule the dashboard's bucket row does not have.
+   Three declarations, one per difference, so a reader moving between pages sees one bar that does
+   not move. Reading pages (about/) are untouched — they are not `.wide`. */
+.wrap.wide{padding-top:0}
+/* margin AND padding. SHELL_CSS gives `.sitenav` a 12px bottom margin for reading pages; leaving
+   it here pushed app-page content to y=60 against the dashboard's 48, and on the Company page
+   it opened a 12px hole between the site nav and the section ribbon that pins under it. The
+   Company page is not `.wide` (it has its own wrapper rule), so it is named explicitly rather
+   than left to inherit a fix that does not reach it. */
+.wrap.wide .sitenav,.wrap:has(.co-page) .sitenav{padding-bottom:0;border-bottom:none;margin-bottom:0}
+.wrap.wide .sitenav-a{height:40px;line-height:20px;display:inline-flex;align-items:center}
+
+/* MOVED HERE FROM NAV_STICKY_CSS 2026-08-19, in the same pass that renamed it from `.note`. It had
+   been sitting in a constant the reading pages do not load: `page_shell` composes TOKENS_CSS +
+   BASE_ROOT_CSS + SHELL_CSS, so /about/ carried `class="note"` with no rule defining it and its
+   disclaimer — the one block on the page that is meant to stand out — rendered as plain prose. It
+   went unnoticed because the class WAS defined, just in the stylesheet the dashboard loads and this
+   page does not; nothing was missing anywhere a grep would look.
+   A reading-page component belongs in the reading-page shell. Leaving prose and component rules in
+   NAV_STICKY_CSS is what produced the six inheritance defects of 2026-08-19 in the other direction,
+   where panels moved onto a page and picked up rules meant for prose. */
+.callout{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--hl);
+  border-radius:0 var(--r-md) var(--r-md) 0;padding:var(--sp-4) var(--sp-5);margin:var(--sp-6) 0;
+  box-shadow:var(--sh-1)}
+.callout h2{margin-top:0}
+
+
+</style>
+<style>*{box-sizing:border-box}body{margin:0;background:#f8fafc;color:#0f172a;font:14px/1.55 Inter,sans-serif}.wrap{width:min(calc(100% - 40px),1320px);margin:auto}.site-header{position:sticky;top:0;z-index:100;border-bottom:1px solid #e2e8f0;background:rgba(248,250,252,.95);backdrop-filter:blur(12px)}.topnav{min-height:60px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:8px;color:#0f172a;text-decoration:none;font:600 16px Outfit}.brand span{display:grid;place-items:center;width:30px;height:30px;border-radius:6px;background:#0f172a;color:#fff}.site-links{display:flex;gap:20px}.site-links a{color:#64748b;text-decoration:none;font-size:12px;font-weight:600}.prototype-bar{border-bottom:1px solid #e2e8f0;background:#fff}.prototype-bar .wrap{display:flex;align-items:center;gap:8px;min-height:42px;overflow:auto}.prototype-bar b{margin-right:8px;white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.1em}.prototype-bar a{padding:5px 9px;border-radius:999px;background:#f1f5f9;color:#334155;text-decoration:none;white-space:nowrap;font-size:11px;font-weight:700}.prototype-bar a.active{background:#0f172a;color:#fff}main{padding:34px 0 80px}.company-hero{padding:30px;border:1px solid #dbe4ef;border-radius:10px;background:linear-gradient(125deg,#fff 60%,#eff6ff);box-shadow:0 8px 28px rgba(15,23,42,.05)}.eyebrow{margin:0 0 7px;color:#2563eb;font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}.title-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.title-row h1{margin:0;font:600 clamp(31px,4vw,48px)/1.05 Outfit}.title-row>span{color:#64748b;font-weight:700}.thesis{max-width:950px;margin:14px 0 0;color:#334155;font-size:16px}.decision-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:25px;overflow:hidden;border:1px solid #e2e8f0;border-radius:8px;background:#e2e8f0}.decision-strip>div{padding:12px;background:#fff}.decision-strip span{display:block;color:#64748b;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}.decision-strip b{display:block;margin-top:4px}.legend{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}.evidence{display:inline-block;margin:0 6px 7px 0;padding:3px 7px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.evidence.guide{background:#dcfce7;color:#166534}.evidence.estimate{background:#fef3c7;color:#92400e}.evidence.inference{background:#ede9fe;color:#6d28d9}.research-shell{margin-top:18px}.tabbar{position:sticky;top:60px;z-index:70;display:flex;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;background:#fff}.tabbar button{padding:13px 15px;border:0;border-bottom:3px solid transparent;background:none;color:#64748b;white-space:nowrap;font:700 11px Inter;cursor:pointer}.tabbar button[aria-selected=true]{border-bottom-color:#2563eb;color:#0f172a;background:#f8fafc}.tab-panel{padding:30px 0}.section-head{margin-bottom:15px}.section-head h2{margin:0;font:600 24px Outfit}.layout-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.stack{display:grid;gap:14px}.card{min-width:0;padding:20px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.card h3,.risk h3{margin:0 0 10px;font:600 15px Outfit}.card p,.card li{font-size:13px}.intel-list{margin:0;padding-left:19px}.intel-list li+li{margin-top:7px}.positive{border-top:3px solid #059669}.caution{border-top:3px solid #d97706}.inference-card{border-top:3px solid #7c3aed}.guide-card{border-left:4px solid #059669}.estimate-card{border-left:4px solid #d97706}.grade{font:600 34px Outfit;color:#d97706}.muted,.method-note{color:#64748b}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:18ch}th{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.06em}.risk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.risk{display:flex;gap:13px;padding:17px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}.risk>span{display:grid;flex:0 0 26px;height:26px;place-items:center;border-radius:50%;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:800}.risk h3{margin-bottom:5px}.risk p{margin:0;color:#334155;font-size:12px}.risk small{display:block;margin-top:8px;color:#64748b}.pending,.empty{padding:18px;border-left:4px solid #d97706;border-radius:6px;background:#fffbeb}.pending p{margin:5px 0 0}.market-chart{margin-top:14px;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}.market-chart svg{display:block;width:100%}.market-chart rect{fill:#cbd5e1}.market-chart polyline{fill:none;stroke:#059669;stroke-width:2}.market-chart>div{display:flex;justify-content:space-between;color:#64748b;font-size:11px}.market-chart b{color:#0f172a;font-size:14px}#tab-momentum2 .m2card{margin-bottom:14px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-bottom:14px}.kpi{padding:13px;border:1px solid #dbe4ef;border-radius:7px;background:#fff}.kpi span{display:block;color:#64748b;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.kpi b{display:block;margin-top:4px;font:600 16px Outfit}.scoreline strong{font:600 42px Outfit;color:#059669}.scoreline span{color:#64748b}.profile-band{display:grid;grid-template-columns:1.05fr 1.5fr 1.5fr;gap:1px;margin-bottom:14px;overflow:hidden;border:1px solid #e2e8f0;border-radius:8px;background:#e2e8f0}.profile-band>div{padding:15px;background:#fff}.profile-band span{display:block;color:#64748b;font-size:9px;font-weight:800;text-transform:uppercase}.profile-band b{display:block;margin-top:5px;font-size:12px;line-height:1.5}.compare-head{display:flex;justify-content:space-between;align-items:center;margin:3px 0 9px}.compare-head span{color:#64748b;font-size:11px}.status{display:inline-block;padding:3px 7px;border-radius:999px;background:#e2e8f0;color:#475569;font-size:9px;font-weight:800;text-transform:uppercase}.status.delivered{background:#dcfce7;color:#166534}.status.slipped,.status.partial{background:#fef3c7;color:#92400e}.status.missed,.status.expired{background:#fee2e2;color:#991b1b}.row-note{display:block;max-width:600px;margin-top:4px;color:#64748b;white-space:normal}.credibility{display:grid;grid-template-columns:auto minmax(220px,1fr) auto;align-items:center;gap:16px;margin-bottom:14px;padding:20px;border:1px solid #f1d5a8;border-radius:8px;background:#fffbeb}.credibility h3,.credibility p{margin:0}.credibility p{margin-top:4px;color:#64748b;font-size:12px}.cred-metrics{display:flex;gap:18px}.cred-metrics span{color:#64748b;font-size:10px;text-align:center}.cred-metrics b{display:block;color:#0f172a;font:600 18px Outfit}
+.analysis-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;overflow:hidden;border:1px solid #ddd6fe;border-radius:8px;background:#ddd6fe}.analysis-strip>div{padding:14px;background:#faf5ff}.analysis-strip span{display:block;color:#7c3aed;font-size:9px;font-weight:800;text-transform:uppercase}.analysis-strip b{display:block;margin-top:5px;font-size:12px;line-height:1.5}
+.call-context{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;padding:11px 14px;border:1px solid #dbeafe;border-radius:8px;background:#eff6ff}.call-context span{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.call-context b{font:600 13px Outfit;color:#1d4ed8}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.product-card{min-width:0;max-width:100%;padding:15px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;overflow-wrap:anywhere}.product-card h3{margin:0 0 6px;font:600 13px Outfit}.product-card p{margin:0;color:#334155;font-size:12px;white-space:normal}.product-card small{display:block;margin-top:7px;color:#64748b}.tab-panel,.stack,.product-grid{min-width:0;max-width:100%}
+.verdict-stack{gap:20px}.verdict-group{display:grid;gap:14px;padding:20px;border:1px solid #dbe4ef;border-radius:10px;background:#f8fafc}.verdict-group-head{display:flex;align-items:center;gap:12px}.verdict-group-head>span{display:grid;width:34px;height:34px;place-items:center;border-radius:50%;background:#0f172a;color:#fff;font:700 11px Outfit}.verdict-group-head h3{margin:0;font:600 21px Outfit}.verdict-group-head .eyebrow{margin:0}.verdict-banner{display:grid;grid-template-columns:180px 1fr;gap:20px;align-items:center;padding:20px;border:1px solid #c4b5fd;border-radius:8px;background:#faf5ff}.verdict-banner span{display:block;color:#7c3aed;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.verdict-banner b{display:block;margin-top:4px;font:600 28px Outfit}.verdict-banner p{margin:0;color:#334155}.analytical-scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}.analytical-score{min-width:0}.score-head{display:flex;justify-content:space-between;gap:12px}.score-head b{font-size:12px}.score-head strong{white-space:nowrap;font:600 13px Outfit}.score-track{height:7px;margin-top:7px;overflow:hidden;border-radius:99px;background:#e2e8f0}.score-track i{display:block;height:100%;border-radius:inherit}.score-track i.strong{background:#059669}.score-track i.watch{background:#d97706}.score-track i.weak{background:#dc2626}.analytical-score p{margin:6px 0 0;color:#64748b;font-size:11px;line-height:1.45}
+@media(min-width:761px){.decision-strip{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}}
+@media(max-width:760px){html,body{overflow-x:clip}.wrap{width:min(calc(100% - 24px),1320px)}.site-links a:not(:last-child){display:none}.company-hero{padding:20px}.decision-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.layout-2,.risk-grid,.profile-band,.analysis-strip,.analytical-scores{grid-template-columns:1fr}.credibility{grid-template-columns:auto 1fr}.cred-metrics{grid-column:1/-1;justify-content:space-around}.tab-panel{padding-top:22px}.verdict-group{padding:14px}.verdict-banner{grid-template-columns:1fr;gap:8px}th,td{white-space:normal;min-width:82px}th:first-child,td:first-child{min-width:135px}}
+
+/* Isolated vertical reading-flow prototype. */
+html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);max-width:1440px;padding-inline:0}body>.wrap.wide>main.company-shell{width:100%}main.company-shell{width:100%;margin:0 auto;padding:34px 0 80px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start}.company-content{min-width:0}.vertical-nav a{padding:13px 15px;border-bottom:3px solid transparent;color:#64748b;white-space:nowrap;text-decoration:none;font:700 11px Inter}.vertical-nav a:hover,.vertical-nav a.active{border-bottom-color:#2563eb;color:#0f172a;background:#f8fafc}.vertical-section{scroll-margin-top:calc(var(--nav1-h) + 54px);padding:30px 0;border-bottom:1px solid #dbe4ef}.vertical-section:last-child{border-bottom:0}.vertical-section>.section-head{margin-bottom:15px}
+.stock-explorer{position:sticky;top:76px;max-height:calc(100vh - 92px);display:flex;flex-direction:column;padding:14px;background:#fff;border:1px solid #dce3ec;border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.06)}.explorer-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.explorer-title span{display:block;color:#64748b;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.explorer-title b{display:block;margin-top:2px;font-size:15px}.explorer-title button{display:none;border:0;background:none;font-size:22px;color:#64748b}.stock-explorer select,.stock-explorer input{width:100%;margin-bottom:8px;padding:9px 10px;border:1px solid #dce3ec;border-radius:7px;background:#fff;color:#172033;font:600 12px Inter,system-ui}.stock-explorer input{font-weight:400}.stock-explorer #explorer-list{min-height:0;overflow:auto}.explorer-stock{display:grid;grid-template-columns:72px minmax(0,1fr);gap:2px 7px;padding:9px 7px;border-bottom:1px solid #edf0f4;text-decoration:none;color:#172033}.explorer-stock:hover,.explorer-stock.selected{background:#f0f5ff}.explorer-stock b{grid-row:1/3;font-size:11px}.explorer-stock span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px}.explorer-stock small{color:#7b8797;font-size:9px}.explorer-open{display:none;position:fixed;right:14px;bottom:18px;z-index:90;padding:10px 14px;border:0;border-radius:999px;background:#172033;color:#fff;font-weight:800;box-shadow:0 8px 24px rgba(15,23,42,.24)}
+.theme-stack{display:grid;gap:14px}.theme-card{padding:22px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.theme-card-head{display:flex;align-items:start;justify-content:space-between;gap:18px}.theme-parent{margin:0 0 5px;color:#64748b;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.theme-card h3{margin:0;font:600 19px Outfit}.theme-pills{display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap}.theme-pill{padding:4px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:9px;font-weight:800;white-space:nowrap}.theme-pill.tier{background:#0f172a;color:#fff}.theme-pill.sharp{background:#dcfce7;color:#166534}.theme-pill.long{background:#ede9fe;color:#6d28d9}.theme-relevance{margin:14px 0 0;padding:11px 13px;border-left:3px solid #2563eb;background:#f8fafc;color:#334155;font-weight:600}.theme-intel{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:18px;margin-top:16px}.theme-intel div{min-width:0}.theme-intel span{display:block;margin-bottom:5px;color:#64748b;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.theme-intel p{margin:0;color:#334155;font-size:12px;line-height:1.62}
+.vertical-section,.vertical-section .stack,.vertical-section .layout-2,.vertical-section #tab-momentum2{min-width:0;max-width:100%}.vertical-section .table-wrap{max-width:100%;contain:inline-size}.vertical-section #m2-vol-table,.vertical-section #m2-hist,.vertical-section #m2-data,.vertical-section #m2-data-ext{max-width:100%;overflow-x:auto}
+@media(max-width:1000px){main.company-shell{display:block}.stock-explorer{display:none;position:fixed;inset:70px 10px 10px auto;z-index:150;width:min(330px,calc(100% - 20px));max-height:none}.stock-explorer.open{display:flex}.explorer-title button,.explorer-open{display:block}}
+@media(max-width:760px){body>.wrap.wide{width:min(calc(100% - 28px),1440px);padding-inline:0}body>.wrap.wide>main.company-shell{width:100%}main.company-shell{padding-top:18px}.vertical-section{scroll-margin-top:calc(var(--nav1-h) + 52px);padding:24px 0}.vertical-section .card,.vertical-section .m2card{overflow:hidden}.theme-card{padding:16px}.theme-card-head{display:block}.theme-pills{justify-content:flex-start;margin-top:10px}.theme-intel{grid-template-columns:1fr}.vertical-nav a{padding-inline:12px}.call-context{align-items:flex-start;flex-direction:column;gap:2px}}
+
+/* Custom Redesigned Risks row styling */
+.risk-stack { display: flex; flex-direction: column; gap: 12px; }
+.risk-row { display: flex; align-items: flex-start; gap: 16px; padding: 16px; background: #fafafa; border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 6px; transition: transform 0.2s, box-shadow 0.2s; }
+.risk-row:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,0.05); }
+.risk-row-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #fee2e2; color: #dc2626; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.risk-row-body h3 { font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
+.risk-row-body p { font-size: 13px; color: #475569; margin: 0; line-height: 1.5; }
+
+/* Where the money goes — proportional use-of-proceeds bars. The internal DRHP dashboard uses
+   .ipg-bar/.track/.fill; those classes are not in the public stylesheet, so the card carries
+   its own rather than importing internal chrome. */
+.use-bar{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(90px,1fr) auto;align-items:center;gap:10px;padding:6px 0;font-size:12.5px}
+.use-n{min-width:0;overflow-wrap:anywhere;color:#334155}
+.use-track{height:8px;overflow:hidden;border-radius:999px;background:#f1f5f9}
+.use-fill{display:block;height:100%;border-radius:inherit;background:#2563eb}
+.use-amt{white-space:nowrap;color:#64748b;font-size:11.5px;font-weight:700}
+.use-unit{color:#64748b;font-weight:400}
+@media(max-width:760px){.use-bar{grid-template-columns:1fr auto;gap:6px}.use-track{grid-column:1/-1}}
+
+/* PHONE LEGIBILITY AND REACH (qa/mobile_audit M5/M7/M10, 2026-08-25).
+   Desktop sizes are unchanged - every rule here is inside the phone breakpoint.
+
+   M7 - nothing below 11px. `.eyebrow` shipped 10px and `.evidence` badges 9px, which is below the
+   audit's own legibility floor and below what most people can read on a bus.
+   M5 - 40px is a fingertip. `.show-more-btn` was 24px and the chart timeframe buttons 23px; both
+   are ordinary buttons, not dense chips among their own kind, so they get the full floor.
+   M10 - a table that overflows WHILE crushing a column to 11-15 wrapped lines is unreadable in
+   both directions. Giving cells a real minimum lets the row take the width it needs and the
+   wrapper scroll, which is what `.table-wrap{overflow:auto}` is already there for. */
+@media(max-width:760px){
+  /* Every sub-11px size in this stylesheet, raised to the floor. Listed one by one rather than with
+     a blanket rule because each is a deliberate label style on desktop; only the phone size moves. */
+  .eyebrow,.evidence,.title-row span,.decision-strip span,th,.kpi span,.profile-band span,
+  .status,.cred-metrics span,.analysis-strip span,.call-context span,.verdict-banner span,
+  .explorer-title span,.explorer-stock span,.explorer-stock small,small.row-note,
+  .theme-parent,.theme-pill,.theme-pill.long,.src-title span,
+  .prototype-bar b{font-size:11px}
+  /* These are declared as `<parent> span{font-size:9px}` descendant rules, which outrank a
+     flat `span` in this block - so match them the same way. */
+  .analysis-strip span,
+  .call-context span,
+  .cred-metrics span,
+  .decision-strip span,
+  .explorer-stock span,
+  .explorer-title span,
+  .kpi span,
+  .profile-band span,
+  .theme-intel span,
+  .verdict-banner span{font-size:11px}
+  .evidence{padding:3px 8px}
+  /* Ordinary buttons and form controls get the full 40px fingertip - they are not dense chips. */
+  .show-more-btn{min-height:40px;padding:8px 14px}
+  #m2-tf button,.m2tf button{min-height:40px;padding:8px 12px}
+  .explorer-open{min-height:40px}
+  .screen-filters input,.screen-filters select{min-height:40px}
+  /* M10: a table that overflows WHILE crushing a column to 14 wrapped lines is unreadable both
+     ways. `!important` because the shared mobile rules set `white-space:normal` on these same
+     cells, which is what produced the wrapping; the wrapper already scrolls (`overflow:auto`), so
+     letting the row take its natural width is the readable outcome. */
+  .data-table th,.data-table td,.table-wrap th,.table-wrap td{
+    min-width:104px;white-space:nowrap!important}
+  .data-table th:first-child,.data-table td:first-child,
+  .table-wrap th:first-child,.table-wrap td:first-child{min-width:150px}
+}
+
+/* Recent developments - CARD CHROME ONLY. The LIST rules (.dev-list/.dev-row/.dev-date/
+   .dev-text/.dev-quant/.dev-src/.dev-more) are injected by the shared M2D library that also
+   renders the rows, so both consumers get one definition. They lived here as well until
+   2026-08-27 and `.dev-row` was defined FOUR times in the shipped page - harmless only while
+   the two copies agreed, which is exactly the drift a shared renderer is meant to remove. */
+.dev-block{margin-top:18px;padding:18px 20px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.dev-head{margin:0 0 12px;font:600 15px Outfit;color:#0f172a}@media(max-width:760px){.dev-block{padding:14px 15px}}
+
+
+/* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
+   top nav goes away"). Row 1 pins to the viewport top; row 2 pins directly beneath it at --nav1-h,
+   which NAV_STICKY_JS measures off the real row. A hard-coded offset is wrong the moment the row
+   wraps, the type scale changes or a phone narrows it, and it fails as a gap or an overlap rather
+   than as an error. The background is load-bearing, not decoration: a transparent sticky row lets
+   the content scroll straight through it. */
+:root{--nav1-h:44px}
+.tabbar-buckets,.sitenav{position:sticky;top:0;z-index:41;background:var(--bg)}
+.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}
+/* LESS AIR ABOVE AND BETWEEN (owner 2026-08-18: "lot of space above and in between second nav").
+   The dashboard put 24px of body padding above row 1, each row then carried its own margin, and the
+   reader met three gaps before the first word of content. The padding moves ONTO the sticky rows so
+   the frozen strip keeps its breathing room while the page starts higher. */
+body{padding-top:0}
+.tabbar-buckets{padding-top:var(--sp-2)}
+.tabbar{margin-bottom:var(--sp-3)}
+.sitenav{padding-top:var(--sp-2);margin-bottom:0}
+.co-sub{margin-top:0}
+.wrap:has(.co-page){padding-top:0}
+/* ── PHONE: THE NAV GOES TO THE BOTTOM (owner 2026-08-19) ─────────────────────────────────────────
+   A thumb reaches the bottom of a phone; the top of a 6" screen is the hardest place to tap. The bar
+   is fixed there, scrolls horizontally rather than wrapping (five sections will not fit across
+   375px), and the page gets bottom padding equal to the bar so the last row of content is not
+   sitting underneath it — a fixed bar without that padding hides content and nothing looks broken.
+   The STICKY-TOP rules are explicitly undone here: an element cannot be sticky at the top and fixed
+   at the bottom, and leaving both in place is how one of them silently wins. */
+@media (max-width:700px){
+  /* ── PHONE LAYOUT (owner 2026-08-19) ─────────────────────────────────────────────────────────
+     Three parts, in the order a thumb meets them:
+       1. the BRAND sits in a fixed header at the TOP — it is identity, not navigation, and it was
+          riding in the bottom bar taking 127px of a 375px screen (measured), which is most of why
+          that bar scrolled sideways at all;
+       2. the SECTIONS sit in a fixed bar at the BOTTOM, app-style, with the SEARCH BUTTON in the
+          middle of them;
+       3. nothing scrolls sideways: the items share the width instead (`flex:1 1 0` + `min-width:0`),
+          because a nav you have to swipe hides its own options.
+     Content is padded clear of both bars — a fixed bar without that padding hides content and
+     nothing looks broken. */
+  .tabbar-buckets,.sitenav{
+    position:fixed;top:auto;bottom:0;left:0;right:0;z-index:60;
+    margin:0;padding:2px 4px;background:var(--card,#fff);
+    border-top:1px solid var(--line);border-bottom:none;
+    box-shadow:0 -2px 10px rgba(15,23,42,.08);
+    display:flex;flex-wrap:nowrap;overflow:visible;gap:0;align-items:stretch}
+  /* the brand leaves the bar and becomes the top header */
+  .tabbar-buckets .sitenav-logo,.sitenav .sitenav-logo,
+  .tabbar-buckets>a:first-child,.sitenav>a:first-child{
+    position:fixed;top:0;left:0;right:0;height:44px;z-index:61;
+    display:flex;align-items:center;gap:8px;margin:0;padding:0 12px;
+    background:var(--card,#fff);border-bottom:1px solid var(--line);border-right:none;
+    box-shadow:0 1px 6px rgba(15,23,42,.06)}
+  /* every remaining item shares the bar equally, so nothing overflows */
+  .tabbar-buckets .bkbtn,.tabbar-buckets .pagelink,.sitenav-a,.cosearch{
+    flex:1 1 0;min-width:0;height:44px;padding:0 2px;
+    font-size:var(--fs-xs,12px);text-align:center;justify-content:center;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  /* SEARCH IN THE MIDDLE: DOM order is [brand, section, section, ..., search], and `order` puts the
+     search between the second and third section without changing the markup either shell emits. */
+  .tabbar-buckets>*:nth-child(2),.sitenav>*:nth-child(2){order:10}
+  .tabbar-buckets>*:nth-child(3),.sitenav>*:nth-child(3){order:20}
+  /* specificity: the nth-child rules below are (0,2,0) and a bare `.cosearch` is (0,1,0), so the
+     search kept landing at the END with order:50. Matched depth, so the middle wins. */
+  .tabbar-buckets .cosearch,.sitenav .cosearch{order:25;flex:0 0 56px}
+  /* EVERY site-nav link is a fingertip target, not only the ones on `.wide` pages. SHELL_CSS states
+     `height:40px` under `.wrap.wide .sitenav-a` — settled after three attempts to make a button and
+     a link agree — so /about/, which is a reading page and not `.wide`, kept 17px links in the
+     bottom bar. Stated here, inside the phone media query, so the desktop geometry that took those
+     three attempts is left exactly as it is. */
+  .sitenav-a{min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+  .tabbar-buckets>*:nth-child(4),.sitenav>*:nth-child(4){order:30}
+  .tabbar-buckets>*:nth-child(5),.sitenav>*:nth-child(5){order:40}
+  .tabbar-buckets>*:nth-child(6),.sitenav>*:nth-child(6){order:50}
+  /* row 2 (the dashboard's tab row) sits DIRECTLY BELOW the top header, and content below that.
+     Before this the page started at y=0 and text ran underneath the header. */
+  .tabbar{position:sticky;top:44px;z-index:55;background:var(--bg);margin:0}
+  body{padding-top:44px;padding-bottom:52px}
+  .wrap.wide{padding-top:44px;padding-bottom:52px}
+  .wrap.wide .sitenav,.wrap .sitenav{margin:0}
+}
+
+h1,h2{font-family:'Outfit',sans-serif;color:var(--txt);margin:0}
+header{display:flex;align-items:center;gap:var(--sp-3);margin-bottom:var(--sp-8)}
+header img{width:44px;height:44px;object-fit:contain;border-radius:var(--r-sm)}
+h1{font-size:var(--fs-2xl);line-height:var(--lh-tight);font-weight:600;letter-spacing:-.01em}
+.sub{font-size:var(--fs-md);color:var(--mut);margin:var(--sp-1) 0 0}
+h2{font-size:var(--fs-lg);font-weight:600;margin:var(--sp-6) 0 var(--sp-2)}
+p{margin:0 0 var(--sp-3);max-width:68ch;color:var(--g700)}
+ul{margin:0 0 var(--sp-3);padding-left:var(--sp-5)}
+li{margin-bottom:var(--sp-2);max-width:68ch;color:var(--g700)}
+strong{color:var(--txt);font-weight:600}
+/* RENAMED FROM `.note` 2026-08-19. This is the reading-page CALLOUT — a bordered, padded box with
+   a shadow — and the panels use `.note` for the opposite thing: a small muted inline label. That
+   collision is invisible on the dashboard, which never loads this stylesheet, and lands the moment a
+   panel moves to a standalone page: on /announcements/ the two-word label "Mcap RScr" rendered as a
+   callout box, 108x51px with 16px/20px of padding, and the pair of market-cap inputs it sits with
+   cost 147px of a 720px phone screen. Same root cause as the six bare-tag defects of 2026-08-19,
+   one level up: a CLASS name, so the pending `.prose` scoping would not have caught it either.
+   Renaming rather than scoping because the callout had exactly ONE user in the repo (the About
+   page's disclaimer) against seven for the label — the rare meaning is the one that should move. */
+footer{margin-top:var(--sp-8);padding-top:var(--sp-4);border-top:1px solid var(--line);
+  font-size:var(--fs-sm);color:var(--mut)}
+a{color:var(--hl)}
+a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* the site nav — links back into the dashboard from a standalone page. Defined HERE, with the rest
+   of the shell, because standalone pages never load the dashboard's bucket stylesheet: putting it
+   there rendered a correct nav as unstyled links, which the presence check happily passed. */
+.sitenav{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-1);margin:0 0 var(--sp-3);
+  padding-bottom:var(--sp-2);border-bottom:1px solid var(--line)}
+.sitenav-logo{display:flex;align-items:center;gap:var(--sp-2);text-decoration:none;
+  padding:0 var(--sp-3) 0 0;margin-right:var(--sp-2);border-right:1px solid var(--line)}
+/* the brand name is an <h1> on public pages (it carries the page's entity name for search), so it
+   must be reset out of the shell's h1 sizing and sit inline in the bar */
+.sitenav-name{font-family:'Outfit',sans-serif;font-weight:600;font-size:var(--fs-md);
+  color:var(--txt);white-space:nowrap;margin:0;line-height:1;letter-spacing:0}
+.sitenav-logo img{width:28px;height:28px;object-fit:contain;border-radius:var(--r-sm);display:block}
+.sitenav-a{font-size:var(--fs-base);font-weight:600;color:var(--mut);text-decoration:none;
+  padding:var(--sp-2) var(--sp-3);border-bottom:2px solid transparent}
+.sitenav-a:hover{color:var(--txt)}
+.sitenav-a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var(--r-sm)}
+/* PHONE: the nav is chrome, not content. Five sections plus a search box wrapped onto FOUR rows and
+   took 130px of a 844px screen before a reader saw anything (measured 2026-08-17). One row that
+   scrolls sideways instead — the sections stay reachable, the page starts near the top. Placed here,
+   after `.sitenav`'s own `flex-wrap:wrap`, because an equal-specificity rule emitted earlier loses. */
+@media (max-width:700px){
+  .sitenav{flex-wrap:nowrap;overflow-x:auto;gap:0;-webkit-overflow-scrolling:touch}
+  .sitenav-a{padding:var(--sp-2);white-space:nowrap}
+  .sitenav-logo{padding-right:var(--sp-2);margin-right:var(--sp-1)}
+  .cosearch{flex:0 0 auto;margin-left:var(--sp-2)}
+  .cosearch input{width:8.5rem}
+}
+
+
+
+.site-header{background:rgba(248,250,252,.94);border-bottom-color:rgba(15,23,42,.08)}
+.public-company-nav{width:min(calc(100% - 40px),1440px);margin:0 auto}
+.site-header .brand{font-family:Outfit,sans-serif;font-size:15px;font-weight:600}
+.site-header .brand .brand-mark{display:grid;width:30px;height:30px;place-items:center;
+  border-radius:6px;background:#0f172a;color:#fff}
+.site-header .brand>span:last-child{display:inline;width:auto;height:auto;background:transparent;
+  color:#0f172a}
+.site-header .nav-links a{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+@media(max-width:700px){.public-company-nav{width:min(calc(100% - 28px),1440px)}}
+
+
+.co-sub{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:6px 0}
+.co-sub-a{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;
+  font-size:var(--fs-sm,12.5px);font-weight:600;color:var(--muted,#64748b);text-decoration:none;
+  white-space:nowrap}
+.co-sub-a:hover{color:var(--txt,#172033);background:rgba(29,78,216,.07)}
+.co-sub-a.active{background:#1d4ed8;color:#fff}
+
+
+.op header,.op footer,.op section,.op article,.op nav,.op aside{
+  display:block;position:static;top:auto;left:auto;right:auto;z-index:auto;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  align-items:normal;justify-content:normal;gap:normal;
+  margin:0;padding:0;border:0;background:none;box-shadow:none}
+
+
+.op{
+  --ground:#EDF0EC; --surface:#FFFFFF; --surface-2:#F4F6F2;
+  --ink:#12160F; --ink-2:#3C453A; --ink-3:#6B7566;
+  --rule:#D6DBD1; --rule-2:#E6EAE1;
+  --accent:#0F7A4A; --accent-soft:#E2F0E7;
+  --hot:#B8481A; --hot-soft:#F7E7DF;
+  --steel:#2E6F8E; --steel-soft:#E3EDF2;
+  --shadow:0 1px 2px rgba(18,22,15,.05), 0 8px 24px -12px rgba(18,22,15,.14);
+  --fs-xs:11px; --fs-sm:13px; --fs-base:15px; --fs-md:17px;
+  --sp:clamp(20px,4vw,40px);
+}
+.op *{box-sizing:border-box}
+.op{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Newsreader",Georgia,serif; font-size:var(--fs-md); line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.op .wrap{max-width:1120px; margin:0 auto; padding:0 var(--sp)}
+.op h1,.op h2,.op h3,.op .disp{font-family:"Archivo","Helvetica Neue",Arial,sans-serif; text-wrap:balance; margin:0}
+.op .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums}
+.op .lbl{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:var(--fs-xs);
+  letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3); font-weight:500}
+.op .mast{border-bottom:1px solid var(--rule); background:var(--surface)}
+.op .mast-in{padding:clamp(28px,5vw,48px) 0 0}
+.op .kicker{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:18px}
+.op .tag{font-family:"IBM Plex Mono",monospace; font-size:var(--fs-xs); letter-spacing:.1em;
+  text-transform:uppercase; padding:4px 9px; border:1px solid var(--rule); border-radius:2px; color:var(--ink-2)}
+.op .tag.live{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+.op h1{font-size:clamp(30px,5.2vw,50px); font-weight:700; letter-spacing:-.022em; line-height:1.05}
+.op h1 .sub{display:block; font-size:.42em; font-weight:500; letter-spacing:.01em; color:var(--ink-3); margin-top:10px}
+.op .thesis{font-size:clamp(17px,2.1vw,21px); line-height:1.5; color:var(--ink-2);
+  max-width:63ch; margin:20px 0 0}
+.op .readout{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr));
+  border-top:1px solid var(--rule); margin-top:clamp(26px,4vw,38px)}
+.op .ro{padding:16px 18px 18px; border-right:1px solid var(--rule-2)}
+.op .ro:last-child{border-right:0}
+.op .ro .v{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600;
+  font-variant-numeric:tabular-nums; margin-top:5px; letter-spacing:-.01em}
+.op .ro .n{font-family:"Newsreader",serif; font-size:var(--fs-sm); color:var(--ink-3); margin-top:2px; line-height:1.35}
+.op .gauges{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1px;
+  background:var(--rule-2); border:1px solid var(--rule-2); margin:clamp(30px,5vw,44px) 0}
+.op .g{background:var(--surface); padding:20px}
+.op .g .v{font-family:"IBM Plex Mono",monospace; font-size:clamp(26px,3.4vw,34px); font-weight:600;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1; margin:8px 0 6px}
+.op .g .d{font-size:var(--fs-sm); color:var(--ink-2); line-height:1.4}
+.op .up{color:var(--accent)}
+.op .dn{color:var(--hot)}
+.op .cols{display:grid; grid-template-columns:1.35fr .95fr; gap:clamp(28px,4vw,52px);
+  align-items:start; padding:clamp(30px,5vw,46px) 0}
+@media(max-width:900px){.op .cols{grid-template-columns:1fr}}
+.op section{margin-bottom:clamp(30px,4.5vw,44px)}
+.op section:last-child{margin-bottom:0}
+.op h2{font-size:clamp(19px,2.4vw,24px); font-weight:600; letter-spacing:-.015em; margin-bottom:6px}
+.op h2 + .sublede{color:var(--ink-3); font-size:var(--fs-base); margin:0 0 18px; max-width:60ch}
+.op p{margin:0 0 15px; max-width:65ch}
+.op .card{background:var(--surface); border:1px solid var(--rule-2); padding:22px; box-shadow:var(--shadow)}
+.op .card + .card{margin-top:18px}
+.op .scale-head{display:flex; justify-content:space-between; margin-bottom:12px}
+.op .param{padding:13px 0; border-top:1px solid var(--rule-2)}
+.op .param:first-of-type{border-top:0}
+.op .param-top{display:flex; justify-content:space-between; align-items:baseline; gap:14px; margin-bottom:8px}
+.op .param-name{font-family:"Archivo",sans-serif; font-size:var(--fs-base); font-weight:500; line-height:1.3}
+.op .param-score{font-family:"IBM Plex Mono",monospace; font-size:var(--fs-sm); font-weight:600;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+.op .track{position:relative; height:9px; background:var(--surface-2); border:1px solid var(--rule-2)}
+.op .track::after{content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(to right,transparent 0,transparent calc(10% - 1px),var(--rule) calc(10% - 1px),var(--rule) 10%)}
+.op .fill{height:100%; background:var(--steel)}
+.op .fill.s-low{background:var(--hot)}
+.op .fill.s-high{background:var(--accent)}
+.op .param-note{font-size:var(--fs-sm); color:var(--ink-3); margin:8px 0 0; line-height:1.5; max-width:none}
+.op .tbl-wrap{overflow-x:auto; margin:0 -2px}
+.op table{width:100%; border-collapse:collapse; font-family:"IBM Plex Mono",monospace;
+  font-size:var(--fs-sm); font-variant-numeric:tabular-nums}
+.op th,.op td{padding:9px 10px; text-align:right; border-bottom:1px solid var(--rule-2); white-space:nowrap}
+.op th:first-child,.op td:first-child{text-align:left; white-space:normal}
+.op thead th{font-size:var(--fs-xs); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:500; border-bottom:1px solid var(--rule)}
+.op tbody tr:last-child td{border-bottom:0}
+.op td.hi{color:var(--ink); font-weight:600}
+.op .mix{margin-top:4px}
+.op .mix-row{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:9px 0;
+  border-bottom:1px solid var(--rule-2)}
+.op .mix-row:last-child{border-bottom:0}
+.op .mix-name{font-size:var(--fs-base); line-height:1.3}
+.op .mix-bar{height:6px; background:var(--surface-2); margin-top:7px}
+.op .mix-bar i{display:block; height:100%; background:var(--accent)}
+.op .mix-bar.b2 i{background:var(--steel)}
+.op .mix-bar.b3 i{background:var(--hot)}
+.op .mix-val{font-family:"IBM Plex Mono",monospace; font-size:var(--fs-sm); font-weight:600;
+  font-variant-numeric:tabular-nums}
+.op .mix-val small{display:block; font-weight:400; color:var(--ink-3); font-size:var(--fs-xs)}
+.op .points{list-style:none; padding:0; margin:0}
+.op .points li{position:relative; padding:11px 0 11px 22px; border-bottom:1px solid var(--rule-2);
+  font-size:var(--fs-base); line-height:1.55; max-width:64ch}
+.op .points li:last-child{border-bottom:0}
+.op .points li::before{content:""; position:absolute; left:0; top:20px; width:11px; height:1px; background:var(--accent)}
+.op .points.warn li::before{background:var(--hot)}
+.op .points b{font-weight:500; font-family:"Archivo",sans-serif}
+.op .ladder{display:flex; flex-direction:column; gap:1px; background:var(--rule-2);
+  border:1px solid var(--rule-2)}
+.op .rung{background:var(--surface); padding:14px 16px; display:grid;
+  grid-template-columns:1fr auto; gap:12px; align-items:baseline}
+.op .rung .lab{font-size:var(--fs-base); line-height:1.35}
+.op .rung .lab small{display:block; color:var(--ink-3); font-size:var(--fs-sm); margin-top:2px}
+.op .rung .num{font-family:"IBM Plex Mono",monospace; font-size:21px; font-weight:600;
+  font-variant-numeric:tabular-nums}
+.op .rung.mark{background:var(--accent-soft)}
+.op .rung.mark .num{color:var(--accent)}
+.op .cal{list-style:none; padding:0; margin:0}
+.op .cal li{display:grid; grid-template-columns:96px 1fr auto; gap:14px; align-items:baseline;
+  padding:11px 0; border-bottom:1px solid var(--rule-2)}
+.op .cal li:last-child{border-bottom:0}
+.op .cal .dt{font-family:"IBM Plex Mono",monospace; font-size:var(--fs-sm); color:var(--ink-2); font-weight:500}
+.op .cal .ev{font-size:var(--fs-base); line-height:1.35}
+.op .cal .pc{font-family:"IBM Plex Mono",monospace; font-size:var(--fs-sm); font-weight:600;
+  font-variant-numeric:tabular-nums; white-space:nowrap}
+.op .cal.anch li{grid-template-columns:58px 1fr auto}
+.op .cal.anch .pc{color:var(--accent)}
+.op .cal.anch .dt{text-align:right; color:var(--ink-3)}
+.op .cal.anch .ev small{font-size:var(--fs-xs)}
+.op .note{background:var(--surface-2); border-left:2px solid var(--accent); padding:15px 18px;
+  font-size:var(--fs-base); line-height:1.55; color:var(--ink-2)}
+.op .note.hotn{border-left-color:var(--hot)}
+.op .note b{font-family:"Archivo",sans-serif; font-weight:600; color:var(--ink)}
+.op footer{border-top:1px solid var(--rule); background:var(--surface); padding:26px 0 40px; margin-top:clamp(30px,5vw,50px)}
+.op .foot-grid{display:flex; flex-wrap:wrap; gap:18px 40px; justify-content:space-between; align-items:flex-start}
+.op .disc{font-size:var(--fs-sm); color:var(--ink-3); line-height:1.55; max-width:62ch}
+.op .disc b{color:var(--ink-2); font-family:"Archivo",sans-serif; font-weight:600}
+
+.op .colink{margin:18px 0 0}.op .colink a{color:var(--accent);font-family:"Archivo",sans-serif;font-weight:600;font-size:var(--fs-base);text-decoration:none;border-bottom:1px solid currentColor}</style>
+</head>
+<body>
+<header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="../../index.html">Home</a><a href="../../bigpicture/">Big Picture</a><a href="../../feed/">Feed</a><a href="../../ipo/">IPO Intelligence</a><a href="../../screens/">Screens</a></div></nav></header>
+<div class="wrap wide"><nav class="co-sub" aria-label="Screens"><a class="co-sub-a" href="../../screens/momentum/">Momentum</a><a class="co-sub-a" href="../../screens/investing/">Investing</a><a class="co-sub-a" href="../../screens/new-listing/">New Listing</a><a class="co-sub-a active" href="../../screens/reports/" aria-current="page">One Pager Report</a></nav>
+
+<article class="op"><!-- Report body for /reports/tempsens/. AUTHORED, not generated: these one-pagers are ad-hoc.
+     CSS is scoped under `.op` because SHELL_CSS also defines `.wrap` and `.note` - see
+     `reports.py` for why the scope exists and how the page is assembled. Light-only, to match
+     the rest of the public site (BASE_ROOT_CSS ships no dark tokens). -->
+
+<header class="mast">
+  <div class="wrap mast-in">
+    <div class="kicker">
+      <span class="tag live">Listing 28 Aug 2026</span>
+      <span class="tag">Mainboard · NSE + BSE</span>
+      <span class="tag">RHP dated 14 Aug 2026</span>
+    </div>
+    <h1>Tempsens Instruments
+      <span class="sub">Temperature sensing, electrical heating and specialised cables · Udaipur</span>
+    </h1>
+    <p class="thesis">India's largest maker of contact and non-contact temperature sensors comes to
+      market at ₹300 a share, the top of its band. The offer document names no listed peer to compare
+      it against, states that its three reported years are not comparable, and shows ₹555 crore of the
+      ₹650 crore offer going to selling shareholders rather than the company.</p><p class="colink"><a href="../../company/?sym=TEMPSENS">Follow Tempsens Instruments after listing →</a></p>
+  </div>
+  <div class="wrap">
+    <div class="readout">
+      <div class="ro"><div class="lbl">Issue price</div><div class="v">₹300</div><div class="n">Band ₹285–300 · FV ₹4</div></div>
+      <div class="ro"><div class="lbl">Offer size</div><div class="v">₹650 cr</div><div class="n">₹95 cr fresh + ₹555 cr OFS</div></div>
+      <div class="ro"><div class="lbl">Market cap</div><div class="v">₹2,648 cr</div><div class="n">8.83 cr shares post-issue</div></div>
+      <div class="ro"><div class="lbl">Trailing P/E</div><div class="v">35.9×</div><div class="n">On FY26 EPS of ₹8.35</div></div>
+      <div class="ro"><div class="lbl">Anchors</div><div class="v">₹194 cr</div><div class="n">29 investors</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap opmain">
+
+  <div class="gauges">
+    <div class="g"><div class="lbl">FY26 revenue</div><div class="v">₹444.9<span style="font-size:.5em"> cr</span></div>
+      <div class="d"><span class="up">+17.5%</span> over FY25 · 27.2% three-year CAGR</div></div>
+    <div class="g"><div class="lbl">FY26 PAT</div><div class="v">₹71.1<span style="font-size:.5em"> cr</span></div>
+      <div class="d">15.6% margin · <span class="up">83rd percentile</span> of 103 filings we hold</div></div>
+    <div class="g"><div class="lbl">Return on equity</div><div class="v">13.5<span style="font-size:.5em">%</span></div>
+      <div class="d"><span class="dn">Down from 20.0%</span> in FY24 as acquisitions were absorbed</div></div>
+    <div class="g"><div class="lbl">Cash conversion</div><div class="v">59<span style="font-size:.5em">%</span></div>
+      <div class="d"><span class="dn">₹42.0 cr operating cash</span> against ₹71.1 cr of profit</div></div>
+  </div>
+
+  <div class="cols">
+    <!-- ============ LEFT: narrative ============ -->
+    <div>
+      <section>
+        <h2>What the company does</h2>
+        <p class="sublede">Engineered-to-order thermal products for heavy industry — sold into metal,
+          petrochemical, power, defence and glass plants.</p>
+        <p>Tempsens designs and manufactures customised temperature sensors, electrical heating elements
+          and specialised cables. Per the Frost &amp; Sullivan report the company commissioned, it is the
+          largest Indian manufacturer of contact and non-contact temperature sensors by revenue, with
+          roughly <b>10.5%</b> of the temperature-sensor segment and about <b>21.3%</b> of non-contact
+          sensors in FY26 — where it says it is the only Indian manufacturer.</p>
+        <p>The business traces to a partnership firm set up in Udaipur in 1984. It now runs
+          <b>15 manufacturing units</b> with its joint ventures — ten in Udaipur, five overseas in the UAE,
+          Korea, Indonesia, Germany and Poland — employs 814 people, and has shipped to more than
+          80 countries over the last three years. Roughly two-thirds of revenue comes from project and
+          OEM orders; the rest is replacement supply.</p>
+
+        <div class="card">
+          <div class="lbl" style="margin-bottom:12px">FY26 revenue by product</div>
+          <div class="mix">
+            <div class="mix-row"><div><div class="mix-name">Temperature sensing solutions</div>
+              <div class="mix-bar"><i style="width:44.59%"></i></div></div>
+              <div class="mix-val">44.6%<small>₹196.7 cr</small></div></div>
+            <div class="mix-row"><div><div class="mix-name">Specialised cables</div>
+              <div class="mix-bar b2"><i style="width:34.71%"></i></div></div>
+              <div class="mix-val">34.7%<small>₹153.1 cr</small></div></div>
+            <div class="mix-row"><div><div class="mix-name">Electrical heating solutions</div>
+              <div class="mix-bar b3"><i style="width:20.7%"></i></div></div>
+              <div class="mix-val">20.7%<small>₹91.3 cr</small></div></div>
+          </div>
+          <p class="param-note">Heating grew from 3.9% of revenue in FY24 to 20.7% in FY26 — almost
+            entirely through the Marathon Heater amalgamation, not organic build-out.
+            Exports are 28.5% of revenue, up from 21.5% in FY24.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Reading the offer document</h2>
+        <p class="sublede">Nine parameters, scored on what the RHP itself discloses. This measures the
+          quality of the disclosure and the business it describes — it is not a view on the share price.</p>
+
+        <div class="card">
+          <div class="scale-head"><span class="lbl">Parameter</span><span class="lbl">Score / 10</span></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Market position and product franchise</span>
+            <span class="param-score">7</span></div>
+            <div class="track"><div class="fill s-high" style="width:70%"></div></div>
+            <p class="param-note">Quantified niche, 12 Indian patents, ASME “U” stamp, NABL-accredited
+              calibration lab. Discounted because the market-share figures come from a report the
+              issuer commissioned and paid for.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Balance-sheet strength</span>
+            <span class="param-score">6</span></div>
+            <div class="track"><div class="fill" style="width:60%"></div></div>
+            <p class="param-note">₹78.0 cr of debt against ₹496.9 cr of net worth, debt/EBITDA 0.69×,
+              contingent liabilities 0.35% of net worth, rated [ICRA]A. Held back because working-capital
+              lines are 82.6% of borrowings and the FX book is explicitly unhedged.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Quality of growth</span>
+            <span class="param-score">4</span></div>
+            <div class="track"><div class="fill" style="width:40%"></div></div>
+            <p class="param-note">Revenue rose from ₹274.8 cr to ₹444.9 cr in two years, but FY25 absorbed
+              Marathon Heater and FY26 absorbed the German, Polish and Measurement &amp; Control businesses.
+              The issuer states the three years are not comparable, so the organic rate is not readable.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Return profile</span>
+            <span class="param-score">4</span></div>
+            <div class="track"><div class="fill" style="width:40%"></div></div>
+            <p class="param-note">RoE 20.0% → 14.1% → 13.5% as the acquired asset base landed. The
+              flattering 20.7% “adjusted” RoE is struck on equity that excludes the goodwill and
+              intangibles those acquisitions created.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Disclosure completeness</span>
+            <span class="param-score">4</span></div>
+            <div class="track"><div class="fill" style="width:40%"></div></div>
+            <p class="param-note">Operational disclosure is unusually granular — capacity by unit,
+              supplier bands, litigation, related parties. But no order book is quantified anywhere, and
+              no top-1 or top-5 customer share is given.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Cash conversion</span>
+            <span class="param-score">3</span></div>
+            <div class="track"><div class="fill s-low" style="width:30%"></div></div>
+            <p class="param-note">Operating cash flow has fallen behind profit for three straight years —
+              ₹42.0 cr against ₹71.1 cr in FY26. Working-capital days went 152 → 193 → 210; inventory days
+              125 → 170.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Objects and execution readiness</span>
+            <span class="param-score">3</span></div>
+            <div class="track"><div class="fill s-low" style="width:30%"></div></div>
+            <p class="param-note">₹18.1 cr of capex with no definitive agreements — firm purchase orders
+              cover only part of it, the rest rests on quotations, several expiring around listing.
+              No monitoring agency is required and no object has been appraised.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Governance and disclosure</span>
+            <span class="param-score">3</span></div>
+            <div class="track"><div class="fill s-low" style="width:30%"></div></div>
+            <p class="param-note">A ₹11.0 cr claim against a subsidiary bought four months before filing;
+              50% of the German subsidiary bought from the managing director; group companies free to
+              compete with no non-compete; untraceable statutory filings from 2004 and 1990.</p></div>
+
+          <div class="param"><div class="param-top"><span class="param-name">Selling-shareholder alignment</span>
+            <span class="param-score">2</span></div>
+            <div class="track"><div class="fill s-low" style="width:20%"></div></div>
+            <p class="param-note">Every one of the 1.85 crore shares on offer comes from holders whose
+              acquisition cost is nil to ₹0.06 a share. The two promoters who paid real money — ₹55.63
+              and ₹37.43 — sell nothing.</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>What stands up</h2>
+        <ul class="points">
+          <li><b>Low leverage.</b> ₹78.0 cr of borrowings against ₹496.9 cr of net worth. ICRA upgraded
+            the rating to [ICRA]A in August 2024 and reaffirmed it in November 2025.</li>
+          <li><b>Exports compounding.</b> Revenue from outside India went ₹58.6 cr → ₹125.8 cr across
+            FY24–FY26, a 46.5% CAGR, now 28.5% of the top line.</li>
+          <li><b>Little customer concentration.</b> The top ten customers are 18.6% of FY26 revenue,
+            down from 24.7% in FY24 — unusual for an industrial business this size.</li>
+          <li><b>Real qualification barriers.</b> ASME “U” stamp, NABL ISO/IEC 17025 calibration lab,
+            ATEX, IECEx, UL, CE and PESO approvals, 12 granted Indian patents, and in-house alloy melting,
+            hot rolling and machining.</li>
+          <li><b>Cross-selling is measured, not asserted.</b> ₹266.8 cr — 60.0% of FY26 revenue — came
+            from customers buying across more than one product line. The top twenty customers average
+            ten years of association.</li>
+          <li><b>Clean operating record.</b> No shutdowns, fires, material warranty claims, guarantee
+            invocations, order cancellations, covenant breaches or lost accreditations across FY24–FY26.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What to watch</h2>
+        <ul class="points warn">
+          <li><b>Profit is not becoming cash.</b> Operating cash flow covered 91% of profit in FY24, 87%
+            in FY25 and 59% in FY26. Inventory reached ₹111.9 cr on a ₹444.9 cr revenue base.</li>
+          <li><b>Most of the fresh money is not new capacity.</b> Of ₹95 cr raised, ₹55 cr repays
+            working-capital lines and ₹18.1 cr funds capex. That capex adds 7.6% to heating capacity and
+            11.8% to cable capacity.</li>
+          <li><b>Growth was bought.</b> ₹190.2 cr of FY25's ₹250.0 cr increase in net worth came from the
+            Marathon Heater amalgamation, which also created ₹106.1 cr of goodwill.</li>
+          <li><b>New capacity is barely running.</b> FY26 utilisation was 18.5% in Poland, 20.6% in
+            Germany, 21.9% in Korea and 41–42% at Units V and VI. Unit I fell from 80.6% to 58.1%.</li>
+          <li><b>A related-party acquisition inside the accounts.</b> Half of the German subsidiary was
+            bought from promoter and managing director Vinay Rathi for €763,500 — and it had been a
+            top-ten customer before the purchase.</li>
+          <li><b>One large unquantified legal exposure.</b> A ₹11.0 cr interim-relief claim before the
+            Bombay High Court against a subsidiary acquired on 30 March 2026, against which all other
+            litigation totals ₹1.8 cr.</li>
+        </ul>
+      </section>
+    </div>
+
+    <!-- ============ RIGHT: data rail ============ -->
+    <aside>
+      <section>
+        <h2>Three years</h2>
+        <div class="card">
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>₹ crore</th><th>FY24</th><th>FY25</th><th>FY26</th></tr></thead>
+              <tbody>
+                <tr><td>Revenue</td><td>274.8</td><td>378.5</td><td class="hi">444.9</td></tr>
+                <tr><td>EBITDA</td><td>61.1</td><td>97.3</td><td class="hi">113.2</td></tr>
+                <tr><td>EBITDA margin</td><td>22.0%</td><td>25.5%</td><td class="hi">24.8%</td></tr>
+                <tr><td>Profit after tax</td><td>40.9</td><td>62.6</td><td class="hi">71.1</td></tr>
+                <tr><td>PAT margin</td><td>14.7%</td><td>16.4%</td><td class="hi">15.6%</td></tr>
+                <tr><td>Earnings per share</td><td>₹8.06</td><td>₹7.51</td><td class="hi">₹8.35</td></tr>
+                <tr><td>Operating cash flow</td><td>37.1</td><td>54.2</td><td class="hi">42.0</td></tr>
+                <tr><td>Return on equity</td><td>20.0%</td><td>14.1%</td><td class="hi">13.5%</td></tr>
+                <tr><td>Return on capital</td><td>22.8%</td><td>23.1%</td><td class="hi">21.6%</td></tr>
+                <tr><td>Working-capital days</td><td>152</td><td>193</td><td class="hi">210</td></tr>
+                <tr><td>Net worth</td><td>180.6</td><td>430.6</td><td class="hi">496.9</td></tr>
+                <tr><td>Total debt</td><td>30.1</td><td>71.8</td><td class="hi">78.0</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="param-note">Restated consolidated. FY25 includes Marathon Heater; FY26 includes the
+            German, Polish and Measurement &amp; Control businesses. The issuer states the three years
+            are not comparable.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>What ₹300 buys</h2>
+        <div class="ladder">
+          <div class="rung"><div class="lab">Trailing P/E<small>On reported FY26 EPS of ₹8.35</small></div>
+            <div class="num">35.9×</div></div>
+          <div class="rung"><div class="lab">Normalised P/E<small>Three-year average margin, one-offs stripped</small></div>
+            <div class="num">38.3×</div></div>
+          <div class="rung mark"><div class="lab">Forward P/E, FY27<small>Trailing growth held, debt repayment credited</small></div>
+            <div class="num">28.8×</div></div>
+          <div class="rung"><div class="lab">Price to book<small>NAV ₹61.66 as at 31 Mar 2026</small></div>
+            <div class="num">4.9×</div></div>
+          <div class="rung"><div class="lab">Market cap to sales<small>On FY26 revenue</small></div>
+            <div class="num">6.0×</div></div>
+        </div>
+        <div class="note" style="margin-top:16px"><b>No listed peer exists.</b> The RHP states four
+          separate times that no company listed in India operates in the same line of business, and no
+          listed entity anywhere spans all three of its product categories. There is no peer P/E, RoNW
+          or NAV in the document to price this against.</div>
+        <div class="note hotn" style="margin-top:12px"><b>The only outside mark.</b> WhiteOak Capital
+          bought 2.5% of the company at <b>₹247.94</b> a share in December 2025 — entirely from existing
+          holders, eight months before this offer priced at ₹300.</div>
+      </section>
+
+      <section>
+        <h2>Where the money goes</h2>
+        <div class="card">
+          <div class="mix">
+            <div class="mix-row"><div><div class="mix-name">Repaying working-capital borrowings</div>
+              <div class="mix-bar b3"><i style="width:57.9%"></i></div></div>
+              <div class="mix-val">₹55.0 cr<small>57.9% of fresh issue</small></div></div>
+            <div class="mix-row"><div><div class="mix-name">General corporate purposes</div>
+              <div class="mix-bar b2"><i style="width:23.0%"></i></div></div>
+              <div class="mix-val">₹21.9 cr<small>23.0%</small></div></div>
+            <div class="mix-row"><div><div class="mix-name">Capital expenditure</div>
+              <div class="mix-bar"><i style="width:19.1%"></i></div></div>
+              <div class="mix-val">₹18.1 cr<small>19.1%</small></div></div>
+          </div>
+          <p class="param-note">The ₹555 cr offer for sale does not reach the company at all — it goes to
+            the selling shareholders. Only the ₹95 cr fresh issue is company money.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Who anchored it</h2>
+        <p class="sublede">29 institutions took ₹194.5 cr — 64.85 lakh shares — the day before the
+          issue opened. Share of the anchor book:</p>
+        <div class="card">
+          <ul class="cal anch">
+            <li><span class="pc">8.55%</span><span class="ev">Aranda Investments <small style="color:var(--ink-3)">(Temasek)</small></span><span class="dt">5,54,300</span></li>
+            <li><span class="pc">8.55%</span><span class="ev">SBI Resurgent India Opportunities</span><span class="dt">5,54,300</span></li>
+            <li><span class="pc">8.55%</span><span class="ev">Nippon India Small Cap</span><span class="dt">5,54,300</span></li>
+            <li><span class="pc">8.55%</span><span class="ev">Goldman Sachs India Equity</span><span class="dt">5,54,300</span></li>
+            <li><span class="pc">8.55%</span><span class="ev">Ashoka WhiteOak Emerging Markets</span><span class="dt">5,54,300</span></li>
+            <li><span class="pc">8.01%</span><span class="ev">Aditya Birla Sun Life MF</span><span class="dt">5,19,650</span></li>
+            <li><span class="pc">7.72%</span><span class="ev">Kotak Infrastructure &amp; Economic Reform</span><span class="dt">5,00,850</span></li>
+            <li><span class="pc">4.88%</span><span class="ev">Motilal Oswal Contra Fund</span><span class="dt">3,16,700</span></li>
+            <li><span class="pc">4.88%</span><span class="ev">360 ONE Equity Opportunity, Series 4</span><span class="dt">3,16,700</span></li>
+            <li><span class="pc">4.88%</span><span class="ev">ValueQuest India GIFT Fund</span><span class="dt">3,16,700</span></li>
+          </ul>
+          <p class="param-note">The ten above are 73.1% of the anchor book; 19 more institutions hold
+            the rest, including HDFC Manufacturing Fund and Kotak Mahindra Life.</p>
+        </div>
+        <div class="note" style="margin-top:16px"><b>The same house on both sides.</b> WhiteOak bought
+          2.5% of the company at ₹247.94 in December 2025, and came back through Ashoka WhiteOak for
+          8.55% of the anchor book at ₹300 eight months later.</div>
+      </section>
+
+      <section>
+        <h2>When shares unlock</h2>
+        <p class="sublede">Lock-in expiries as disclosed in the RHP, as a share of post-issue equity.</p>
+        <div class="card">
+          <ul class="cal">
+            <li><span class="dt">19 Sep 2026</span><span class="ev">Anchor lock-in, first half</span><span class="pc">3.67%</span></li>
+            <li><span class="dt">18 Nov 2026</span><span class="ev">Anchor lock-in, second half</span><span class="pc">3.67%</span></li>
+            <li><span class="dt">20 Feb 2027</span><span class="ev">Promoter holding above the minimum</span><span class="pc">32.04%</span></li>
+            <li><span class="dt">20 Feb 2027</span><span class="ev">Other pre-issue shareholders</span><span class="pc">23.42%</span></li>
+            <li><span class="dt">20 Feb 2028</span><span class="ev">Promoter minimum contribution</span><span class="pc">20.00%</span></li>
+          </ul>
+          <p class="param-note">Promoter and promoter group held 46.13% before the offer. The post-offer
+            figure is left blank in the RHP.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2>The offer</h2>
+        <div class="card">
+          <div class="tbl-wrap">
+            <table>
+              <tbody>
+                <tr><td>Issue opened</td><td>20 Aug 2026</td></tr>
+                <tr><td>Issue closed</td><td>24 Aug 2026</td></tr>
+                <tr><td>Listing</td><td class="hi">28 Aug 2026</td></tr>
+                <tr><td>Exchanges</td><td>NSE + BSE</td></tr>
+                <tr><td>Fresh issue</td><td>₹95.0 cr</td></tr>
+                <tr><td>Offer for sale</td><td>1.85 cr shares</td></tr>
+                <tr><td>Lead managers</td><td>ICICI Securities,<br>JM Financial</td></tr>
+                <tr><td>Incorporated</td><td>14 Sep 1990</td></tr>
+                <tr><td>Employees</td><td>814</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <section>
+    <h2>Questions the document leaves open</h2>
+    <p class="sublede">Each of these is answerable from the company's first post-listing disclosures.</p>
+    <ul class="points">
+      <li>How much of the ₹111.9 cr inventory build is stock consolidated from the four acquired
+        businesses, and how much is organic stocking against undelivered orders?</li>
+      <li>On what independent valuation was half of the German subsidiary acquired from the managing
+        director, and why does control rest on a voting agreement rather than a majority stake?</li>
+      <li>Excluding the FY26 consolidation of Germany and Poland, what was organic revenue growth and
+        organic export growth?</li>
+      <li>With working-capital lines at 82.6% of borrowings and a 210-day cycle, what stops the ₹55 cr
+        being repaid from the offer from simply being redrawn within a year?</li>
+      <li>No order book is quantified anywhere in the RHP, on a business where two-thirds of revenue is
+        project and OEM work. What is it?</li>
+    </ul>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div class="disc">
+      <b>Source.</b> Every figure on this page is drawn from the Red Herring Prospectus dated
+      14 August 2026 and the final issue price of ₹300, except where marked as computed. Amounts are
+      converted to ₹ crore from the ₹ million the document prints. Market capitalisation uses
+      8.83 crore post-issue shares; the exact count finalises at allotment.
+    </div>
+    <div class="disc">
+      <b>Not investment advice.</b> Arth Insight is an educational and informational platform. Nothing
+      here is a recommendation to buy, sell or subscribe to any security, and nothing here is a price
+      target. Scores measure disclosure and business characteristics as described in the offer
+      document. Do your own research and consult a SEBI-registered adviser before investing.
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:22px">
+    <span class="lbl">Arth Insight · IPO Intelligence · Published 27 August 2026</span>
+  </div>
+</footer>
+</article>
+<footer>ARTH INSIGHT · <a href="https://arthinsight.com/">arthinsight.com</a> · For information and education only.</footer>
+</div>
+<script id="nav-sticky-js">
+(function(){
+  /* Publish row 1's REAL height as --nav1-h so row 2 pins exactly under it. Measured, not assumed:
+     the bucket row wraps at narrow widths and the standalone nav carries a logo the dashboard does
+     not, so one hard-coded number is wrong on at least one of the two shells at any time. */
+  var row1=document.querySelector('.tabbar-buckets')||document.querySelector('.sitenav')||
+           document.querySelector('.site-header');
+  if(!row1) return;
+  var apply=function(){
+    var h=Math.round(row1.getBoundingClientRect().height);
+    if(h>0) document.documentElement.style.setProperty('--nav1-h', h+'px');
+  };
+  apply();
+  window.addEventListener('load', apply);
+  window.addEventListener('resize', apply);
+  /* The rows are REBUILT at runtime - the bucket row swaps its tab group on every bucket click, and
+     the company page writes its section ribbon only once the data lands. A height measured once is
+     the height of the page before any of that. */
+  if(window.ResizeObserver) new ResizeObserver(apply).observe(row1);
+})();
+</script><script src="/public_nav.js?v=e8a42cc64f"></script></body>
+</html>

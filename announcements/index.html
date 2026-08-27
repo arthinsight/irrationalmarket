@@ -602,7 +602,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   .cosearch input{width:8.5rem}
 }
 
-</style>
+</style><style id="annc-framed">html.is-framed .sitenav,html.is-framed .circ-foot,html.is-framed .annc-when{display:none!important}</style><script>try{if(window.self!==window.top)document.documentElement.classList.add("is-framed")}catch(e){document.documentElement.classList.add("is-framed")}</script>
 </head>
 <body>
 <div class="wrap wide">
@@ -998,7 +998,14 @@ function anncMain(P, BASE){
   var span=function(){return st.mode==="7d";};
   var annDate =function(){return st.mode==="latest"?LATEST_ANN :(span()?null:st.mode);};
   var circDate=function(){return st.mode==="latest"?LATEST_CIRC:(span()?null:st.mode);};
-  var day=function(d){return DAY[d]||{stats:{},circulars:[],unlocks:[],digest:null};};
+  /* THE FALLBACK MUST HAVE THE SAME SHAPE AS A REAL DAY (owner 2026-08-27: the header read
+     "Showing 50 of NaN"). `stats:{}` looks harmless and is not: the counter computes
+     `movers.length + stats.theme_rows`, so an absent `theme_rows` makes that `undefined`, and
+     `number + undefined` is NaN. In span mode the totals are summed, so ONE date still in flight
+     poisons the whole figure — which is why it appeared intermittently and only on multi-day views.
+     A placeholder that omits a field the consumer reads is a placeholder that lies about its shape. */
+  var day=function(d){return DAY[d]||{stats:{movers_n:0,theme_rows:0},movers:[],themes:{},
+                                      theme_rows:{},circulars:[],unlocks:[],digest:null};};
   var eachDate=function(){return P.dates.slice();};
   /* Circulars come from the CALENDAR map, not from the digest days — a date with no polished digest
      still has circulars, and before this the tab could not reach them at all. */
@@ -1202,7 +1209,12 @@ function anncMain(P, BASE){
       ? '<div class="annc-h3">By theme</div>'+out.join("")
       : '<div class="circ-empty">Nothing in the digest matches these filters on '+dmy(_d)+'.</div>';
     return {d:_d, cov:cov, movers:movers, byth:byth,
-            shown:(mv.length+shown), total:((D.movers||[]).length+D.stats.theme_rows)};
+            /* Both halves guarded, not just the first. `D.movers||[]` was already defensive while
+               the term beside it was not — and it is the unguarded one that produced the NaN. A
+               partial payload from any other source lands here too, so the arithmetic defends
+               itself rather than trusting the fallback above to be the only way in. */
+            shown:(mv.length+shown),
+            total:((D.movers||[]).length+(((D.stats||{}).theme_rows)||0))};
   }
 
   /* SPAN MODE IS DATE-BY-DATE (owner 2026-08-18: "when I click on last 7 days the first table still

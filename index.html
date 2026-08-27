@@ -32,6 +32,20 @@
     h3 { margin:0; font-size:var(--fs-xl); line-height:var(--lh-tight); font-weight:600; }
     .copy { max-width:630px; margin:var(--sp-5) 0 0; color:var(--g700); font-size:var(--fs-md); }
     .site-header { position:sticky; top:0; z-index:10; border-bottom:1px solid var(--line); background:rgba(248,250,252,.92); backdrop-filter:blur(12px); }
+    /* The runner (see the markup below <header> for why it expires itself). */
+    .runner { border-bottom:1px solid var(--line); background:#0f2f22; }
+    .runner-in { display:flex; align-items:center; gap:14px; padding:11px 0; text-decoration:none; color:#e6f0ea; }
+    .runner-tag { flex:none; padding:3px 8px; border-radius:4px; background:#1f7a4d; color:#fff; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+    .runner-txt { flex:1; min-width:0; font-size:13.5px; line-height:1.45; }
+    .runner-txt b { color:#fff; font-weight:600; }
+    .runner-go { flex:none; font-size:13px; font-weight:700; color:#7fd4a6; }
+    .runner-in:hover .runner-go { color:#fff; }
+    .runner-in:focus-visible { outline:2px solid #7fd4a6; outline-offset:-2px; }
+    @media (max-width:700px) {
+      .runner-in { align-items:flex-start; flex-wrap:wrap; gap:8px; padding:10px 0; }
+      .runner-txt { flex:1 1 100%; order:3; font-size:12.5px; }
+      .runner-go { margin-left:auto; }
+    }
     .nav { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4); }
     .brand { display:flex; align-items:center; gap:var(--sp-2); font-family:Outfit,sans-serif; font-size:var(--fs-md); font-weight:600; letter-spacing:-.02em; }
     .brand-mark { display:grid; place-items:center; width:30px; height:30px; border-radius:var(--r-sm); background:var(--g900); color:white; font-size:var(--fs-sm); font-weight:700; }
@@ -128,6 +142,40 @@
       <div class="nav-links"><a href="index.html">Home</a><a href="bigpicture/">Big Picture</a><a href="feed/">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div><div class="public-header-search"><input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div></div>
     </nav>
   </header>
+
+  <!-- THE RUNNER. A time-boxed promo strip for the current One Pager Report (owner 2026-08-27:
+       "at home page add link for 3 days as runner").
+
+       IT EXPIRES ITSELF. `data-until` is an INCLUSIVE last day; the script below hides the strip
+       once the reader's date passes it, so a promo that has run its course needs no second deploy
+       to take it down. That matters because a public push is a gated, hand-approved action here —
+       a strip that could only be removed by deploying again would still be live on the homepage
+       every day nobody got round to it. Server-side removal happens whenever the site is next
+       built; this is the belt for the days in between.
+
+       To run the next one: change the href, the text and `data-until`. To stop it early: delete
+       this block. Keep the markup — the strip is hidden by default and only revealed by the script,
+       so a reader with JS off sees nothing rather than a stale promo that never expires. -->
+  <div class="runner" id="runner" data-until="2026-08-30" hidden>
+    <a class="wrap runner-in" href="reports/tempsens/">
+      <span class="runner-tag">IPO Listing</span>
+      <span class="runner-txt"><b>Tempsens Instruments</b> lists 28 August. Read the one-pager
+        — the accounts, the anchor book and what the offer document leaves out.</span>
+      <span class="runner-go">Read →</span>
+    </a>
+  </div>
+  <script>
+  (function(){
+    var r=document.getElementById('runner');
+    if(!r)return;
+    var until=r.getAttribute('data-until');
+    // Compare as YYYY-MM-DD strings in the READER's local date. No Date parsing of `until`, which
+    // would land it at UTC midnight and drop the strip a day early for anyone east of London.
+    var n=new Date(), p=function(x){return(x<10?'0':'')+x;};
+    var today=n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate());
+    if(today<=until)r.hidden=false;
+  })();
+  </script>
 
   <main id="top">
     <section class="hero" style="border-top:0">

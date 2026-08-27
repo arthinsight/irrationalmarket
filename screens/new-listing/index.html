@@ -574,7 +574,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 </head>
 <body>
 <header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="../../index.html">Home</a><a href="../../bigpicture/">Big Picture</a><a href="../../feed/">Feed</a><a href="../../ipo/">IPO Intelligence</a><a href="../../screens/">Screens</a></div></nav></header>
-<div class="wrap wide"><nav class="co-sub" aria-label="Screens"><a class="co-sub-a" href="../../screens/momentum/">Momentum</a><a class="co-sub-a" href="../../screens/investing/">Investing</a><a class="co-sub-a active" href="../../screens/new-listing/" aria-current="page">New Listing</a></nav>
+<div class="wrap wide"><nav class="co-sub" aria-label="Screens"><a class="co-sub-a" href="../../screens/momentum/">Momentum</a><a class="co-sub-a" href="../../screens/investing/">Investing</a><a class="co-sub-a active" href="../../screens/new-listing/" aria-current="page">New Listing</a><a class="co-sub-a" href="../../screens/reports/">One Pager Report</a></nav>
 
 
 <section class="screen-top" id="screen-top">
@@ -1124,7 +1124,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=b1d61acf36';
+  script.src='../../company_renderer.js?v=14f03257ec';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
