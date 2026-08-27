@@ -365,6 +365,13 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
   .table-wrap th:first-child,.table-wrap td:first-child{min-width:150px}
 }
 
+/* Recent developments - CARD CHROME ONLY. The LIST rules (.dev-list/.dev-row/.dev-date/
+   .dev-text/.dev-quant/.dev-src/.dev-more) are injected by the shared M2D library that also
+   renders the rows, so both consumers get one definition. They lived here as well until
+   2026-08-27 and `.dev-row` was defined FOUR times in the shipped page - harmless only while
+   the two copies agreed, which is exactly the drift a shared renderer is meant to remove. */
+.dev-block{margin-top:18px;padding:18px 20px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.dev-head{margin:0 0 12px;font:600 15px Outfit;color:#0f172a}@media(max-width:760px){.dev-block{padding:14px 15px}}
+
 
 /* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
    top nav goes away"). Row 1 pins to the viewport top; row 2 pins directly beneath it at --nav1-h,
@@ -641,7 +648,11 @@ if(!window.M2D){window.M2D=(function(){
   // The picker reaches ~2,131 stocks while the inline payload carries only the 195 members, so for
   // everything else the record, its price and its stage history all come from this file. One promise
   // per symbol, cached, so selecting a stock does not fetch the same file three times.
-  const COMP={}, COMPQ={};
+  // DEV is separate from COMP DELIBERATELY. `fetchCompany` stores only `c.momentum` in COMP -
+  // `recOf` reads `COMP[sym].stock` and depends on that shape - so the company file's OTHER
+  // top-level keys are discarded on the way through. Developments live at the TOP level, so
+  // they need their own slot rather than a change to COMP's contract.
+  const COMP={}, COMPQ={}, DEV={};
 
   // ---- payload split (PAYLOAD_SPLIT_DESIGN.md), GENERATED from assemble_company.VOLATILE_PATHS ----
   // A company file is two halves: <SYM>.json (narrative — changes when research lands) and
@@ -667,7 +678,8 @@ if(!window.M2D){window.M2D=(function(){
     if(COMP[sym]) return Promise.resolve(COMP[sym]);
     if(COMPQ[sym]) return COMPQ[sym];
     COMPQ[sym]=fetchCompanyFile(DATADIR,fileOf(sym))
-      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[]; return m;})
+      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[];
+                DEV[sym]=((c&&c.developments&&c.developments.rows)||[]); return m;})
       .catch(e=>{delete COMPQ[sym]; throw e;});
     return COMPQ[sym];
   }
@@ -828,11 +840,90 @@ if(!window.M2D){window.M2D=(function(){
     // when the file lands. `chart()` already refetches for the price and redraws only the chart;
     // without this the history block kept its first answer until the reader clicked the symbol again.
     // fetchCompany dedupes on COMPQ, so this shares the request chart() makes rather than adding one.
-    if(!COMP[sym]) fetchCompany(sym).then(function(){ if(cur===sym) _set('m2-hist',histTbl(sym)); })
+    if(!COMP[sym]) fetchCompany(sym).then(function(){ if(cur===sym){ _set('m2-hist',histTbl(sym)); devPane(sym); } })
                                     .catch(function(){});
     renderVolAnalysis(sym);
     try{ chart(sym); }
     catch(e){ _set('m2-chart','<div class="m2empty">Chart unavailable for '+esc(sym)+'.</div>'); }
+    devPane(sym);
+  }
+
+  // ── RECENT DEVELOPMENTS ─────────────────────────────────────────────────────────────────────
+  // ONE implementation, TWO consumers — the Momentum tab and the standalone Company page — for the
+  // same reason the rest of M2D is shared: the Company page never loads dashboard.html, and
+  // publish.py strips whole tabs, so a renderer owned by the tab would vanish from the page.
+  // Source: notification's polished digests, parsed by unified_intel/recent_developments.py and
+  // carried on the per-company JSON that fetchCompany() already retrieves — so this costs no extra
+  // request and no payload change.
+  // Measured 2026-08-26: 293 of 2,653 companies carry any, median 1 row, max 5. Renders NOTHING when
+  // a company has none; an empty heading reads as a broken panel, not as an honest absence.
+  var DEV_SHOWN = 5, devCssDone = false;
+  function devCss(){
+    if (devCssDone) return; devCssDone = true;
+    var st = document.createElement('style');
+    st.textContent = '.dev-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}'
+      + '.dev-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline;'
+      + 'padding-bottom:10px;border-bottom:1px solid #eef2f7}'
+      + '.dev-row:last-of-type{border-bottom:0;padding-bottom:0}'
+      + '.dev-date{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.05em;'
+      + 'text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}'
+      + '.dev-text{color:#334155;font-size:13px;line-height:1.55;overflow-wrap:anywhere}'
+      + '.dev-text strong{color:#0f172a;font-weight:600}'
+      + '.dev-quant{display:inline-block;margin-left:4px;padding:2px 7px;border-radius:999px;'
+      + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
+      + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
+      + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
+      + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
+      + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
+      + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
+    document.head.appendChild(st);
+  }
+  var DEVMON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function devDate(d){
+    var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (m[3] + ' ' + DEVMON[+m[2]-1] + ' ' + m[1]) : esc(d||'');
+  }
+  // the digest writes markdown bold inside its prose; escape first, then render only that
+  function devText(t){ return esc(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
+  function devRow(r,hidden){
+    return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
+      + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'+devText(r.text)
+      + (r.quant?' <span class="dev-quant">'+esc(r.quant)+'</span>':'')
+      + (r.url?' <a class="dev-src" href="'+esc(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
+      + '</span></li>';
+  }
+  // Returns the LIST ONLY - the caller supplies its own heading/card chrome, because the two
+  // consumers frame it differently (a .m2card on the tab, a .dev-block section on the page).
+  function devList(rows){
+    rows = (rows||[]).slice();
+    if (!rows.length) return '';
+    devCss();
+    rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+    var vis = rows.slice(0,DEV_SHOWN).map(function(r){return devRow(r,false);}).join('');
+    var hid = rows.slice(DEV_SHOWN).map(function(r){return devRow(r,true);}).join('');
+    // NO inline onclick: a delegated listener has no nested quoting to get wrong. The first version
+    // used one and shipped a syntax error that broke the whole renderer.
+    var btn = hid ? '<button class="dev-more" data-more="1">Show '+(rows.length-DEV_SHOWN)+' more</button>' : '';
+    return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
+  }
+  function devPane(sym){
+    var rows = DEV[sym] || [];
+    var h = devList(rows);
+    _set('m2-dev', h ? '<div class="m2sec">Recent developments</div>' + h : '');
+    var card = document.getElementById('m2-dev-card');
+    if (card) card.style.display = h ? '' : 'none';
+  }
+  if (!window.__devMoreBound) {
+    window.__devMoreBound = true;
+    document.addEventListener('click', function(ev){
+      var b = ev.target && ev.target.closest && ev.target.closest('[data-more]');
+      if (!b) return;
+      var host = b.parentElement; if (!host) return;
+      var hid = host.querySelectorAll('.dev-hidden'); if (!hid.length) return;
+      var collapsed = hid[0].style.display === 'none';
+      Array.prototype.forEach.call(hid, function(x){ x.style.display = collapsed ? 'list-item' : 'none'; });
+      b.textContent = collapsed ? 'Show less' : ('Show ' + hid.length + ' more');
+    });
   }
 
   return {init:function(o){o=o||{};STK=o.stocks||[];META=o.meta||{};DATADIR=o.datadir||'data';},
@@ -841,7 +932,7 @@ if(!window.M2D){window.M2D=(function(){
           histTbl:histTbl, renderVol:renderVolAnalysis, loadDelVol:loadDelVol,
           insights:insights, kv:kv, kvExt:kvExt, mcapCell:mcapCell,
           esc:esc, stg:stg, STG:STG, catLabel:catLabel, sigCell:sigCell, pc:pc, f:f,
-          chips:chips, fileOf:fileOf,
+          chips:chips, fileOf:fileOf, developments:devList, devPane:devPane,
           cur:function(){return cur;}, setCur:function(s){cur=s;},
           setTf:function(n){tf=n;if(cur)chart(cur);}};
 })();}
@@ -856,7 +947,7 @@ function fail(message){app.innerHTML='<div class="pending"><b>Company unavailabl
 var selected=sym();if(!selected){fail('Choose a company from Search or Company Explorer.');return;}
 Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),get('../data/company_page/'+encodeURIComponent(selected)+'.json',true)])
 .then(function(seed){var index=seed[0],row=(index.companies||[]).filter(function(x){return x.s===selected;})[0];if(!row)throw new Error('Symbol not found');var file=row.file||selected+'.json',vol=String(file).replace(/\.json$/,'.v.json');return Promise.all([get('../data/company/'+encodeURIComponent(file)),get('../data/company/'+encodeURIComponent(vol),true)]).then(function(parts){return[merge(parts[0]||{},parts[1]||{}),seed[1]||{},seed[2]||{},row];});})
-.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:selected,name:row.co||selected,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:Object.assign({},explorer,{peers:peers})};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=7ebec1937c';document.body.appendChild(script);})
+.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:selected,name:row.co||selected,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},developments:(company.developments&&company.developments.rows)||[],pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:Object.assign({},explorer,{peers:peers})};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=c4a6ac7eed';document.body.appendChild(script);})
 .catch(function(e){fail(e&&e.message==='Symbol not found'?'That symbol is not available in the public company store.':'Company data could not load. Please try again.');});
 })();
 </script><script id="nav-sticky-js">

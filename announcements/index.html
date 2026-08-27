@@ -239,6 +239,8 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #annc .annc-warn{border-left:3px solid var(--warn);background:var(--chip-bg);
   padding:var(--sp-2) var(--sp-3);border-radius:0 var(--r-sm) var(--r-sm) 0;
   font-size:var(--fs-xs);color:var(--txt);margin:0 0 var(--sp-3)}
+#annc .annc-legend{font-size:var(--fs-xs);color:var(--mut);margin:calc(-1 * var(--sp-1)) 0 var(--sp-3);
+  line-height:1.5;max-width:64ch;}
 #annc .annc-h3{font-size:var(--fs-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--mut);margin:var(--sp-4) 0 var(--sp-2)}
 #annc .annc-mv{display:grid;gap:var(--sp-2);margin:0 0 var(--sp-2)}
@@ -1043,14 +1045,40 @@ function anncMain(P, BASE){
     return {text:t, url:url};
   }
 
-  /* "Rs 112.42 cr reduction; ~7.1% of mcap (our arithmetic)" -> "Rs 112.42 cr reduction; ~7.1%".
+  /* THE SCORE LABEL — one constant, and every surface follows it. Change this string alone to
+     rename the score on the mover cards, the theme lines and the legend. */
+  var SCORE_LABEL='Impact';
+
+  /* "~16.8% of mcap" -> "Impact 16.8" (owner 2026-08-27: the public page should read as a score
+     rather than a raw ratio).
+
+     ⚠ THIS HIDES NOTHING, DELIBERATELY, AND THE DECISION WAS MADE ON THAT BASIS. `amount_rs`,
+     `mcap` and `notability_pct` all still ship on every mover and theme row, so any reader can
+     recompute the figure exactly (454.5 / 2714.1 = 16.75). A ratio of two public numbers cannot be
+     made proprietary by relabelling it, and pretending otherwise would be the worse outcome: an
+     unexplained number on a public finance page. The legend under the movers says what it is.
+
+     The INTERNAL digest is untouched — `highlights_<date>_polished.md` still reads "% of mcap"
+     verbatim — so nothing is lost on our side. This is a display transform, nothing more.
+
+     A trailing qualifier survives: "~12.6% of mcap; SME" -> "Impact 12.6; SME". Measured across
+     2026-08: 399 occurrences, 363 plain and 36 carrying a qualifier. Percentages that are NOT the
+     mcap ratio ("23.21% of the paid-up equity share capital", "52.94% to 54.90%") are untouched,
+     because the pattern requires the "of mcap" tail. */
+  function scoreify(s){
+    return String(s==null?'':s)
+      .replace(/~?\s*([\d.,]+)\s*%\s*of\s+(?:the\s+)?m(?:arket\s*)?cap(?:italisation|italization)?\b/gi,
+               SCORE_LABEL+' $1')
+      .replace(/\bmcap\s+n\/a\b/gi, SCORE_LABEL+' n/a');
+  }
+
+  /* "Rs 112.42 cr reduction; ~7.1% of mcap (our arithmetic)" -> "Rs 112.42 cr reduction; Impact 7.1".
      Only the qualifier after a percentage is removed; every figure survives untouched, and a
      quantum that never mentions mcap is returned unchanged. */
   function qshort(s){
-    return String(s==null?'':s)
+    return scoreify(String(s==null?'':s)
       .replace(/\s*[([]\s*(?:on\s+)?our arithmetic[^)\]]*[)\]]/gi,'')
-      .replace(/\s*[,;]?\s*(?:on\s+)?our arithmetic\b[^.;]*/gi,'')
-      .replace(/(%)\s*of\s+(?:the\s+)?m(?:arket\s*)?cap(?:italisation|italization)?\b/gi,'$1')
+      .replace(/\s*[,;]?\s*(?:on\s+)?our arithmetic\b[^.;]*/gi,''))
       .replace(/[;,]\s*$/,'')
       .replace(/\s{2,}/g,' ')
       .trim();
@@ -1098,7 +1126,14 @@ function anncMain(P, BASE){
       return C.mcapOk(m,mc.lo,mc.hi) &&
         hit((m.symbol||"")+" "+(m.company||"")+" "+(m.headline||""));});
     var movers=(D.movers||[]).length
-      ? '<div class="annc-h3">Top movers</div><div class="annc-mv">'+(mv.length?mv.map(function(m,i){
+      /* The legend is not optional. The cards lead with a bare "Impact 16.8", and an unexplained
+         number on a public finance page is worse than the raw ratio it replaced — so the basis is
+         stated once, here, where the first score is read. */
+      ? '<div class="annc-h3">Top movers</div>'+
+        '<div class="annc-legend">'+SCORE_LABEL+' &mdash; the deal value as a percentage of the '+
+        'company&rsquo;s market capitalisation. A small order at a small company scores higher '+
+        'than a large one at a giant.</div>'+
+        '<div class="annc-mv">'+(mv.length?mv.map(function(m,i){
           var star=m.marquee?'<span class="annc-star" title="named superstar allottee">&#9733;</span> ':'';
           var stat=(m.marquee_status==='proposed')?'PROPOSED allotment to ':'allotted to ';
           return '<div class="annc-card'+(m.marquee?' mq':'')+'"><div class="annc-rank">'+(i+1)+
@@ -1156,7 +1191,11 @@ function anncMain(P, BASE){
                  The emoji it replaces could not be darkened at all. */
               'title="open the filing">&#8599;&#65038;</a>'
             : '<span class="annc-nodoc"></span>';
-          return '<li>'+lk+md(u.text)+'</li>';
+          /* scoreify BEFORE md(): the digest bakes "_(~16.8% of mcap)_" into the authored
+             sentence, so the theme lines cannot be relabelled by a field toggle the way a mover's
+             quantum can. Substituting the fixed suffix is safe where DECOMPOSING the prose would
+             not be (2026-08-14b) — this reads one machine-written phrase, not the sentence. */
+          return '<li>'+lk+md(scoreify(u.text))+'</li>';
         }).join("")+'</ul></div>');
     });
     var byth=out.length
