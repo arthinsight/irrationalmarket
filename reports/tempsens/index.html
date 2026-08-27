@@ -408,7 +408,9 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   align-items:normal;justify-content:normal;gap:normal;
   margin:0;padding:0;border:0;background:none;box-shadow:none}
 
-
+/* THE HOUSE SHEET for every One Pager Report. Scoped under `.op` - see reports.py for why.
+   Shared rather than copied into each body: the reports are a weekly SERIES, and a per-body copy
+   would drift the moment one of them was tweaked. A body carries markup only. */
 .op{
   --ground:#EDF0EC; --surface:#FFFFFF; --surface-2:#F4F6F2;
   --ink:#12160F; --ink-2:#3C453A; --ink-3:#6B7566;
@@ -426,7 +428,20 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   font-family:"Newsreader",Georgia,serif; font-size:var(--fs-md); line-height:1.6;
   -webkit-font-smoothing:antialiased;
 }
-.op .wrap{max-width:1120px; margin:0 auto; padding:0 var(--sp)}
+.op .wrap{width:auto; max-width:1120px; margin:0 auto; padding:0 var(--sp)}
+/* MOBILE, and the two bugs that made the first build unreadable on a phone (2026-08-27).
+   1. `width:auto` above. `company_store_prototype.css` sets `.wrap{width:min(100% - 24px,1320px)}`;
+      nested inside the shell's own `.wrap.wide` that stacked a SECOND gutter on top of this
+      rule's padding, so a 390px phone rendered a 298px column - 24% of the screen lost to
+      nesting. Declaring `width` here stops the chrome supplying it.
+   2. `min-width:0` below. Grid and flex children default to `min-width:auto`, which refuses to
+      shrink below content. The data tables are `white-space:nowrap`, so instead of scrolling
+      inside their own `.tbl-wrap` they blew the whole column out - a 423px card inside a 298px
+      column, running off the side of the screen. `overflow-x:auto` cannot work without this. */
+.op .cols > *{min-width:0}
+.op .card,.op .tbl-wrap,.op .gauges,.op .readout{min-width:0; max-width:100%}
+.op .tbl-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+
 .op h1,.op h2,.op h3,.op .disp{font-family:"Archivo","Helvetica Neue",Arial,sans-serif; text-wrap:balance; margin:0}
 .op .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-variant-numeric:tabular-nums}
 .op .lbl{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace; font-size:var(--fs-xs);
@@ -539,18 +554,24 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 .op .disc{font-size:var(--fs-sm); color:var(--ink-3); line-height:1.55; max-width:62ch}
 .op .disc b{color:var(--ink-2); font-family:"Archivo",sans-serif; font-weight:600}
 
+@media(max-width:700px){
+  .op .card{padding:16px}
+  .op .g{padding:16px}
+  .op .ro{padding:13px 14px 14px; border-right:0; border-bottom:1px solid var(--rule-2)}
+  .op .readout{grid-template-columns:repeat(2,1fr)}
+  .op .cal li,.op .cal.anch li{grid-template-columns:auto 1fr; row-gap:2px}
+  .op .cal .pc,.op .cal.anch .dt{text-align:left}
+  .op .points li{max-width:none}
+  .op .thesis{font-size:16px}
+}
+
 .op .colink{margin:18px 0 0}.op .colink a{color:var(--accent);font-family:"Archivo",sans-serif;font-weight:600;font-size:var(--fs-base);text-decoration:none;border-bottom:1px solid currentColor}</style>
 </head>
 <body>
 <header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="../../index.html">Home</a><a href="../../bigpicture/">Big Picture</a><a href="../../feed/">Feed</a><a href="../../ipo/">IPO Intelligence</a><a href="../../screens/">Screens</a></div></nav></header>
 <div class="wrap wide"><nav class="co-sub" aria-label="Screens"><a class="co-sub-a" href="../../screens/momentum/">Momentum</a><a class="co-sub-a" href="../../screens/investing/">Investing</a><a class="co-sub-a" href="../../screens/new-listing/">New Listing</a><a class="co-sub-a active" href="../../screens/reports/" aria-current="page">One Pager Report</a></nav>
 
-<article class="op"><!-- Report body for /reports/tempsens/. AUTHORED, not generated: these one-pagers are ad-hoc.
-     CSS is scoped under `.op` because SHELL_CSS also defines `.wrap` and `.note` - see
-     `reports.py` for why the scope exists and how the page is assembled. Light-only, to match
-     the rest of the public site (BASE_ROOT_CSS ships no dark tokens). -->
-
-<header class="mast">
+<article class="op"><header class="mast">
   <div class="wrap mast-in">
     <div class="kicker">
       <span class="tag live">Listing 28 Aug 2026</span>
