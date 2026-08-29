@@ -612,20 +612,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
     </table></div>
   </div>
 
-  <!--ANNC-FOOT-INT-START-->
-  <!-- CUT to the one thing a reader can be WRONG about (owner 2026-08-15: "do we need footnote this
-       big?"). File names, the 07:30/21:00 rebuild, the 11%-material ratio and the join key are all
-       things this team can read off the repo; printing them on every page costs attention and buys
-       nothing. The index caveat stays because nothing on the page reveals it &mdash; a reader who sees
-       INDEX rows will otherwise assume the feed covers NSE index changes, and it does not. -->
-  <div class="circ-foot"><b>Provenance (internal).</b>
-    Section 1 reads the polished materiality digest as data; sections 2&ndash;3 read the circulars
-    snapshots. <b>INDEX rows come from two places</b>: BSE files them as circulars, while NSE publishes
-    no constituent-change circular at all &mdash; those rows are <b>detected</b> by diffing the
-    published Nifty constituent lists nightly, so an NSE index change appears on or after its
-    effective date, never before it.
-  </div>
-  <!--ANNC-FOOT-INT-END-->
+  
   <!-- Trimmed 2026-08-15. The dedupe sentence ("both exchanges announce the same listing, so overlap
        is real ... rows are not deduped") had become FALSE: the producer now collapses an event to one
        row and records who announced it in `sources`. A note that describes behaviour the page no
@@ -1465,5 +1452,5 @@ function anncMain(P, BASE){
   });
 })();
 </script>
-<script src="/public_nav.js?v=e8a42cc64f"></script></body>
+</body>
 </html>
