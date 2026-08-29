@@ -14,7 +14,15 @@
   </style>
 </head>
 <body>
-  <header class="site-header"><nav class="wrap nav" aria-label="Primary navigation"><a class="brand" href="index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="index.html">Home</a><a class="active" href="#top">Big Picture</a><a href="feed/">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div><div class="public-header-search"><input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div></div></nav></header>
+  <header class="site-header"><nav class="wrap nav" aria-label="Primary navigation"><a class="brand" href="index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a>      <!-- OWNED BY `public_nav.js`, NOT BY THIS TEMPLATE (swept 2026-08-29). The links and the
+           search box used to be hardcoded here. `public_nav.js` REPLACES `.nav-links` innerHTML and
+           builds `.public-header-search` itself, so a static copy is dead markup in the normal case
+           and an ACTIVE LIE in the failure case: it renders a header that looks almost right while
+           the real nav is absent. That is exactly how `/feed/` shipped for nine days with a 177px
+           search box at x=1243 instead of the shared 330px at x=1090 (it was missing from
+           `deploy_scoped.LOADED_BY["public_nav.js"]`). Empty container = the script fills it, and
+           its absence degrades to NO links rather than to stale ones. -->
+      <div class="nav-links"></div></nav></header>
   <main id="top" class="wrap">
     <div class="page-head"><div><p class="eyebrow">Market Intelligence</p><h1>Big Picture</h1><p class="subtitle">India market breadth, leadership and structure.</p></div></div>
     <section class="regime" aria-label="Market regime summary"><div><div class="regime-name">Bottoming / Basing <span class="status" style="background:var(--warn-bg);color:var(--warn)"><i></i>R5 · Mixed conditions</span></div><p>Market is in a mixed, basing regime. Breadth remains constructive, while the major trend is sideways and near-term trend is up. This is a context read—not a prediction or a trading call.</p></div><div class="regime-meta"><div class="mini-stat"><b>2 / 5</b><span>Market participation</span></div><div class="mini-stat"><b>Sideways</b><span>Broad trend</span></div><div class="mini-stat"><b>Uptrend</b><span>Near-term trend</span></div><div class="mini-stat"><b>Fading</b><span>Trend momentum · −2.0</span></div></div></section>

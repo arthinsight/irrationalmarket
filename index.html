@@ -139,7 +139,15 @@
   <header class="site-header">
     <nav class="wrap nav" aria-label="Primary navigation">
       <a class="brand" href="#top"><span class="brand-mark">A</span><span>Arth Insight</span></a>
-      <div class="nav-links"><a href="index.html">Home</a><a href="bigpicture/">Big Picture</a><a href="feed/">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div><div class="public-header-search"><input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div></div>
+      <!-- OWNED BY `public_nav.js`, NOT BY THIS TEMPLATE (swept 2026-08-29). The links and the
+           search box used to be hardcoded here. `public_nav.js` REPLACES `.nav-links` innerHTML and
+           builds `.public-header-search` itself, so a static copy is dead markup in the normal case
+           and an ACTIVE LIE in the failure case: it renders a header that looks almost right while
+           the real nav is absent. That is exactly how `/feed/` shipped for nine days with a 177px
+           search box at x=1243 instead of the shared 330px at x=1090 (it was missing from
+           `deploy_scoped.LOADED_BY["public_nav.js"]`). Empty container = the script fills it, and
+           its absence degrades to NO links rather than to stale ones. -->
+      <div class="nav-links"></div>
     </nav>
   </header>
 
