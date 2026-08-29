@@ -531,7 +531,18 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   <header class="site-header">
     <nav class="wrap nav" aria-label="Primary navigation">
       <a class="brand" href="index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a>
-      <div class="nav-links"><a href="index.html">Home</a><a href="bigpicture/">Big Picture</a><a class="active" href="#announcements">Feed</a><a href="ipo/">IPO Intelligence</a><a href="screens/">Screens</a></div><div class="public-header-search"><input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div></div>
+      <!-- NAV LINKS AND SEARCH ARE OWNED BY `public_nav.js`, NOT BY THIS TEMPLATE (2026-08-29).
+           They used to be hardcoded here, copied from `big_picture.html`. That copy is what the page
+           showed whenever the script was missing — and it WAS missing, because `/feed/` was never
+           added to `deploy_scoped.LOADED_BY["public_nav.js"]` when it shipped on 2026-08-20. The
+           result was a header that looked almost right and was measurably wrong: the search box came
+           out 177px wide at x=1243 instead of the shared 330px at x=1090, and `.public-mobile-nav`
+           never existed at all. `public_nav.js` REPLACES `.nav-links` innerHTML and sizes
+           `.public-header-search` itself (`flex:0 1 330px`), so a static copy here can only ever be
+           dead markup that masks its own absence. `.nav-links` is left EMPTY on purpose: the script
+           needs the container to fill, and an empty one degrades to no links rather than to stale
+           links pointing wherever this file last said they pointed. -->
+      <div class="nav-links"></div>
     </nav>
   </header>
   <main class="wrap" id="announcements">
@@ -1452,5 +1463,5 @@ function anncMain(P, BASE){
   });
 })();
 </script>
-</body>
+<script src="/public_nav.js?v=e8a42cc64f"></script></body>
 </html>
