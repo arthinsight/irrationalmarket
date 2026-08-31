@@ -68,26 +68,15 @@
   if (siteNav && !siteNav.querySelector('[data-public-home]')) {
     var brand=siteNav.querySelector('.sitenav-logo'); if(brand)brand.setAttribute('href',relative('index.html'));
     var homeLink=document.createElement('a'); homeLink.className='sitenav-a'; homeLink.href=relative('index.html'); homeLink.textContent='Home'; homeLink.dataset.publicHome='1'; siteNav.insertBefore(homeLink,brand ? brand.nextSibling : siteNav.firstChild);
-    siteNav.querySelectorAll('.sitenav-a').forEach(function(a){var label=a.textContent.trim();if(label==='Announcements')a.textContent='Feed';if(a.textContent.trim()==='Feed')a.href=relative('feed/');if(label==='IPO')a.textContent='IPO Intelligence';if(a.textContent.trim()==='Big Picture')a.href=relative('bigpicture/');if(a.textContent.trim()==='Screens')a.href=relative('screens/?tab=tab-momentum2');if(a.textContent.trim()===active)a.classList.add('active');});
+    siteNav.querySelectorAll('.sitenav-a').forEach(function(a){var label=a.textContent.trim();if(label==='Announcements')a.textContent='Feed';if(a.textContent.trim()==='Feed')a.href=relative('feed/');if(label==='IPO')a.textContent='IPO Intelligence';if(a.textContent.trim()==='Big Picture')a.href=relative('bigpicture/');if(a.textContent.trim()==='Screens')a.href=relative('screens/');if(a.textContent.trim()===active)a.classList.add('active');});
   }
 
   // Home uses the existing shared component; moving it into the header removes the hero duplicate.
   var header=document.querySelector('.site-header .nav') || dashboardNav || siteNav, homeSearch=document.querySelector('.home-company-search');
   if(header && homeSearch)homeSearch.remove();
   // Other pages use the same data, destination and keyboard behaviour, with scoped markup.
-  // The `!header.querySelector('.public-header-search')` clause meant "only build a search if the
-  // page has none". Once the page SHIPPED that markup the guard went false and this whole block -
-  // input wiring, fetch, dropdown - was skipped: the box rendered and did nothing. The block now
-  // adopts an existing box, so its presence must not veto the wiring. The `.cosearch` clause stays:
-  // a page carrying the legacy search still opts out of the shared one.
-  if(header && !header.querySelector('.cosearch')){
-    /* ADOPT the box the page already ships, and only build one when it is absent. The search was
-   created entirely in JS and appended, so it existed ONLY if this script loaded — the markup
-   had no search at all, and a failed or slow load showed a nav without it. The page now ships
-   the same element; this wires behaviour to it instead of being its only source. */
-var box=header.querySelector('.public-header-search');
-if(!box){box=document.createElement('div');box.className='public-header-search';header.appendChild(box);}
-if(!box.querySelector('input'))box.innerHTML='<input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div>';
+  if(header && !header.querySelector('.cosearch') && !header.querySelector('.public-header-search')){
+    var box=document.createElement('div');box.className='public-header-search';box.innerHTML='<input type="search" autocomplete="off" spellcheck="false" placeholder="Search company or IPO" aria-label="Search company or IPO"><div class="public-header-results" role="listbox"></div>';header.appendChild(box);
     var input=box.querySelector('input'),results=box.querySelector('.public-header-results'),all=[],loaded=false,loading,selected=-1;
     function load(){if(loaded)return loading||Promise.resolve();loaded=true;loading=fetch(relative('data/index.json')+'?v=20260822b').then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(j){all=(j.companies||[]).map(function(c){return{s:c.s,co:c.co||'',search:c.search||''};});}).catch(function(){results.innerHTML='<div class="public-header-more">Could not load the company index.</div>';});return loading;}
     function go(symbol){if(symbol)location.href=relative('company/')+'?sym='+encodeURIComponent(symbol);}
