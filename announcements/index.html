@@ -239,8 +239,6 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #annc .annc-warn{border-left:3px solid var(--warn);background:var(--chip-bg);
   padding:var(--sp-2) var(--sp-3);border-radius:0 var(--r-sm) var(--r-sm) 0;
   font-size:var(--fs-xs);color:var(--txt);margin:0 0 var(--sp-3)}
-#annc .annc-legend{font-size:var(--fs-xs);color:var(--mut);margin:calc(-1 * var(--sp-1)) 0 var(--sp-3);
-  line-height:1.5;max-width:64ch;}
 #annc .annc-h3{font-size:var(--fs-xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--mut);margin:var(--sp-4) 0 var(--sp-2)}
 #annc .annc-mv{display:grid;gap:var(--sp-2);margin:0 0 var(--sp-2)}
@@ -257,7 +255,14 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #annc .annc-tsec{margin:0 0 var(--sp-3)}
 #annc .annc-tt{font-size:var(--fs-sm);font-weight:700;color:var(--txt);margin:0 0 var(--sp-1)}
 #annc .annc-tl{margin:0;padding-left:var(--sp-4);display:flex;flex-direction:column;gap:6px}
-#annc .annc-tl li{font-size:var(--fs-sm);line-height:1.5;color:var(--txt)}
+#annc .annc-tl li{font-size:var(--fs-sm);line-height:1.5;color:var(--txt);max-width:none}
+/* `max-width:none` UNDOES A SHELL RULE, and it is load-bearing. `ui_tokens` styles the bare
+   tag - `li{max-width:68ch}` - as a prose readability measure. A theme line is a DATA ROW,
+   not a paragraph, so the cap held every line to 536px inside a 1366px panel and left the
+   right 60% of the section empty, while Top movers - built from `div.annc-card`, which the
+   bare-tag rule cannot reach - filled the width. Two sections of one panel disagreed about
+   how wide the page was (owner 2026-08-31: "why is By theme squeezed on left side"). Any
+   list this panel renders must opt out explicitly, because the shell styles the TAG. */
 /* PER-DAY BLOCKS in the 7-day span. The heading is what makes a stack of seven readable as seven
    days rather than one long day; it sticks so the date a reader is inside stays named while they
    scroll it. `.annc-tally` (the digest's closing prose paragraph) is no longer rendered here at
@@ -448,25 +453,6 @@ body{margin:0;background:var(--bg);color:var(--txt);
   font-size:var(--fs-sm,12.5px);color:var(--txt);border-bottom:1px solid var(--line)}
 .cosearch .cosr:last-child{border-bottom:none}
 .cosearch .cosr:hover,.cosearch .cosr.on{background:var(--hover,rgba(15,23,42,.04))}
-/* ── PHONE (owner 2026-08-19): the search is a BUTTON in the bar; tapping it opens the field at the
-   TOP of the page. The bar itself is pinned to the BOTTOM on phones (see the nav rules), and a text
-   field down there is unusable: the on-screen keyboard covers the field, its own results, or both.
-   Opening at the top keeps the field and the result list above the keyboard.
-   `.cosbtn` is hidden on desktop and the input shown; below 700px that swaps. */
-.cosbtn{display:none}
-@media (max-width:700px){
-  .cosearch{margin-left:auto;position:static}
-  .cosbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
-    border:none;background:none;color:var(--mut,#64748b);font-size:var(--fs-lg,18px);cursor:pointer;
-    line-height:1}
-  .cosearch input{display:none}
-  /* open: the field becomes a sheet at the top of the viewport, above the bottom bar and the page */
-  .cosearch.cos-open input{display:block;position:fixed;top:0;left:0;right:0;width:auto;max-width:none;
-    z-index:80;margin:0;border-radius:0;border:none;border-bottom:1px solid var(--line);
-    padding:14px 12px;font-size:var(--fs-md,15px);background:var(--card,#fff)}
-  .cosearch.cos-open .cosl{position:fixed;top:49px;left:0;right:0;max-width:none;min-width:0;
-    max-height:calc(100vh - 120px);overflow:auto;z-index:80;border-radius:0}
-}
 .cosearch .cosr .co{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cosearch .cosr .sy{flex:0 0 auto;font-weight:700;color:var(--mut);font-size:var(--fs-xs,11px)}
 .cosearch .cosmore{padding:6px 11px;font-size:var(--fs-xs,11px);color:var(--mut);background:var(--chip-bg)}
@@ -606,7 +592,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 </head>
 <body>
 <div class="wrap wide">
-<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../bigpicture/">Big Picture</a><a class="sitenav-a" href="../announcements/">Feed</a><a class="sitenav-a" href="../ipo/">IPO Intelligence</a><a class="sitenav-a" href="../screens/momentum/">Screens</a><!--NAVINT-END--><!--COS-START--><div class="cosearch" id="cosearch"><button class="cosbtn" id="cos-open" type="button" aria-label="Search for company or IPO" aria-expanded="false">&#9906;</button><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company or IPO" aria-label="Search for company or IPO"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
+<nav class="sitenav"><a class="sitenav-logo" href="../" aria-label="Arth Insight home"><img src="../icon-180.png" alt="" width="28" height="28"><h1 class="sitenav-name">Arth Insight</h1></a><a class="sitenav-a" href="../index.html?tab=tab-market">Big Picture</a><a class="sitenav-a" href="../feed/">Feed</a><a class="sitenav-a" href="../ipo/">IPO Intelligence</a><a class="sitenav-a" href="../index.html?tab=tab-momentum2">Screens</a><!--NAVINT-END--><!--COS-START--><div class="cosearch" id="cosearch"><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for company" aria-label="Search for company"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></nav>
 
 <!--ANNC-PANEL-START-->
 <div id="tab-annc" class="tabpanel active">
@@ -751,6 +737,11 @@ if(!window.CIRC){window.CIRC=(function(){
        can see both already — and the tranche COUNT says nothing without its dates, which is what the
        lock-in table below exists for. */
     if(l.series) bits.push(kv("Series",esc(l.series)));
+    /* The row sits on the circular's date; this is the day the shares actually start trading, which
+       is usually 1-3 sessions later (AUGMONT: circular 28-08, listed 31-08). Shown only when the
+       circular resolves to an IPO — most LISTING_NEW rows are relistings or migrations with no
+       effective date to state, and an empty label would be worse than none. */
+    if(l.listing_on) bits.push(kv("Lists on",esc(dmy(l.listing_on))));
     return bits.length?'<span class="circ-ofs">'+bits.join("")+'</span>':"";
   }
   /* OFS terms, shown BY DEFAULT rather than behind a click (owner 2026-08-15): the point is that "is
@@ -760,6 +751,16 @@ if(!window.CIRC){window.CIRC=(function(){
   function ofsStrip(o){
     if(!o) return "";
     var bits=[], fixed=(o.price_basis==="SINGLE_CLEARING");
+    /* SAY WHICH LEG THIS ROW IS. An OFS opens to non-retail on `t_day` and to retail on
+       `t1_day`, and both legs now render as their own row on their own day (owner 2026-08-31:
+       "any OFS should have two rows"). Printing "Retail day 01-09" on BOTH of them - which is
+       what a single t1_day field did - left the reader unable to tell which day they were
+       looking at. The non-retail row points FORWARD to the retail session; the retail row
+       names itself. Neither repeats its own date, which the Date column already carries. */
+    if(o.leg==="retail") bits.push(kv("Leg",'<span class="circ-basis">Retail'+
+      (o.t_day?" — non-retail opened "+dmy(o.t_day):"")+'</span>'));
+    else if(o.leg==="nonretail" && o.t1_day) bits.push(kv("Leg",'<span class="circ-basis">Non-retail — retail opens '+
+      dmy(o.t1_day)+'</span>'));
     if(o.price) bits.push(kv(fixed?"Fixed price":"Floor","&#8377;"+fmt(o.price)+
       (fixed?' <span class="circ-basis">allotted at one price</span>':"")));
     if(o.prev_close) bits.push(kv("Prev close","&#8377;"+fmt(o.prev_close)));
@@ -910,7 +911,7 @@ if(!window.CIRC){window.CIRC=(function(){
   }
   return {esc:esc,fmt:fmt,dmy:dmy,mcapOk:mcapOk,mcapBox:mcapBox,circRows:circRows,listRows:listRows,
           ofsStrip:ofsStrip,listStrip:listStrip,reStrip:reStrip,comingRows:comingRows,chips:chips,
-          TYPES:["LISTING_NEW", "PRICE_BAND", "TRADE_TO_TRADE", "SUSPENSION", "SUSPENSION_LIFTED", "DELISTING", "OFS", "INDEX"],CTYPES:["UNLOCK", "RIGHTS", "RE", "BONUS", "SPLIT", "QIP", "PREFERENTIAL", "CONVERSION", "AMALGAMATION"]};
+          TYPES:["LISTING_NEW", "RELISTING", "LISTING_MORE", "PRICE_BAND", "TRADE_TO_TRADE", "SUSPENSION", "SUSPENSION_LIFTED", "DELISTING", "OFS", "INDEX"],CTYPES:["UNLOCK", "RIGHTS", "RE", "BONUS", "SPLIT", "QIP", "PREFERENTIAL", "CONVERSION", "AMALGAMATION"]};
 })();}
 </script>
 <!--ANNC-LIB-END-->
@@ -932,13 +933,7 @@ if(!window.CIRC){window.CIRC=(function(){
   // copy of this script — one renderer, two surfaces, so they cannot drift apart.
   var host=document.getElementById('annc');
   var BASE=(host && host.getAttribute('data-annc-base')) || 'data';
-  // CACHE-BUST THE INDEX, EVERY LOAD. GitHub Pages serves data/*.json with a long max-age, so a
-  // reader who visited yesterday keeps yesterday's index and never sees today's announcements --
-  // the deploy succeeds and the page still looks stale. A stamp baked in at BUILD time would not
-  // fix it: the HTML carrying that stamp is cached too, so an old page keeps asking for the old
-  // version. A per-LOAD value is the only one that cannot itself go stale. The index is ~12 KB.
-  var FRESH='?v='+Date.now();
-  fetch(BASE+'/annc/index.json'+FRESH)
+  fetch(BASE+'/annc/index.json')
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status+' on '+BASE+'/annc/index.json'); return r.json(); })
     .then(function(idx){ try{ anncMain(idx, BASE); }catch(e){ anncDie((e && e.message) || e); throw e; } })
     .catch(function(e){
@@ -960,11 +955,7 @@ function anncMain(P, BASE){
     if(!want.length){ cb(); return; }
     var left=want.length;
     want.forEach(function(d){
-      // Past dates keep their cache DELIBERATELY (see the note above) -- only TODAY's file is still
-      // being written, so only that one is busted, and it is keyed to the index's own `generated`
-      // stamp rather than the clock: it re-fetches when the BUILD changed, not on every render.
-      var bust=(P.today && d>=P.today) ? ('?v='+encodeURIComponent(P.generated||'')) : '';
-      var p=PEND[d] || (PEND[d]=fetch(BASE+'/annc/'+d+'.json'+bust)
+      var p=PEND[d] || (PEND[d]=fetch(BASE+'/annc/'+d+'.json')
         .then(function(r){ return r.ok ? r.json() : {}; })
         .then(function(j){ DAY[d]=j||{}; return DAY[d]; })
         .catch(function(){ DAY[d]={}; return DAY[d]; }));
@@ -972,7 +963,13 @@ function anncMain(P, BASE){
     });
   }
   var $=function(i){return document.getElementById(i);};
-  var st={mode:"latest",themes:new Set(),q:"",types:new Set(),srcs:new Set(),cq:""};
+  /* ONE CONSTANT FOR THE DEFAULT VIEW. The state default and the <select>'s initial value are
+     set in two different places ~40 lines apart; setting one without the other leaves the
+     control reading "Latest" while the page renders seven days, which looks like a rendering
+     bug rather than a default. Owner 2026-08-31: open the Feed on the last 7 days, not the
+     latest day. `7d` is what `span()` tests for. */
+  var DEFAULT_MODE="7d";
+  var st={mode:DEFAULT_MODE,themes:new Set(),q:"",types:new Set(),srcs:new Set(),cq:""};
 
   /* THE THREE SECTIONS RUN ON DIFFERENT CLOCKS, so one date cannot govern all three.
      Measured 2026-08-14: the digest already had that day while the circular feed's newest was
@@ -998,14 +995,7 @@ function anncMain(P, BASE){
   var span=function(){return st.mode==="7d";};
   var annDate =function(){return st.mode==="latest"?LATEST_ANN :(span()?null:st.mode);};
   var circDate=function(){return st.mode==="latest"?LATEST_CIRC:(span()?null:st.mode);};
-  /* THE FALLBACK MUST HAVE THE SAME SHAPE AS A REAL DAY (owner 2026-08-27: the header read
-     "Showing 50 of NaN"). `stats:{}` looks harmless and is not: the counter computes
-     `movers.length + stats.theme_rows`, so an absent `theme_rows` makes that `undefined`, and
-     `number + undefined` is NaN. In span mode the totals are summed, so ONE date still in flight
-     poisons the whole figure — which is why it appeared intermittently and only on multi-day views.
-     A placeholder that omits a field the consumer reads is a placeholder that lies about its shape. */
-  var day=function(d){return DAY[d]||{stats:{movers_n:0,theme_rows:0},movers:[],themes:{},
-                                      theme_rows:{},circulars:[],unlocks:[],digest:null};};
+  var day=function(d){return DAY[d]||{stats:{},circulars:[],unlocks:[],digest:null};};
   var eachDate=function(){return P.dates.slice();};
   /* Circulars come from the CALENDAR map, not from the digest days — a date with no polished digest
      still has circulars, and before this the tab could not reach them at all. */
@@ -1021,7 +1011,7 @@ function anncMain(P, BASE){
     '<option value="7d">Last 7 days</option>'+
     '<option disabled>&#8212;&#8212;&#8212;</option>'+
     P.dates.map(function(d){return '<option value="'+d+'">'+dmy(d)+'</option>';}).join("");
-  $('annc-day').value="latest";
+  $('annc-day').value=DEFAULT_MODE;
   $('annc-day').onchange=function(e){st.mode=e.target.value; draw();};
 
 
@@ -1052,40 +1042,14 @@ function anncMain(P, BASE){
     return {text:t, url:url};
   }
 
-  /* THE SCORE LABEL — one constant, and every surface follows it. Change this string alone to
-     rename the score on the mover cards, the theme lines and the legend. */
-  var SCORE_LABEL='Impact';
-
-  /* "~16.8% of mcap" -> "Impact 16.8" (owner 2026-08-27: the public page should read as a score
-     rather than a raw ratio).
-
-     ⚠ THIS HIDES NOTHING, DELIBERATELY, AND THE DECISION WAS MADE ON THAT BASIS. `amount_rs`,
-     `mcap` and `notability_pct` all still ship on every mover and theme row, so any reader can
-     recompute the figure exactly (454.5 / 2714.1 = 16.75). A ratio of two public numbers cannot be
-     made proprietary by relabelling it, and pretending otherwise would be the worse outcome: an
-     unexplained number on a public finance page. The legend under the movers says what it is.
-
-     The INTERNAL digest is untouched — `highlights_<date>_polished.md` still reads "% of mcap"
-     verbatim — so nothing is lost on our side. This is a display transform, nothing more.
-
-     A trailing qualifier survives: "~12.6% of mcap; SME" -> "Impact 12.6; SME". Measured across
-     2026-08: 399 occurrences, 363 plain and 36 carrying a qualifier. Percentages that are NOT the
-     mcap ratio ("23.21% of the paid-up equity share capital", "52.94% to 54.90%") are untouched,
-     because the pattern requires the "of mcap" tail. */
-  function scoreify(s){
-    return String(s==null?'':s)
-      .replace(/~?\s*([\d.,]+)\s*%\s*of\s+(?:the\s+)?m(?:arket\s*)?cap(?:italisation|italization)?\b/gi,
-               SCORE_LABEL+' $1')
-      .replace(/\bmcap\s+n\/a\b/gi, SCORE_LABEL+' n/a');
-  }
-
-  /* "Rs 112.42 cr reduction; ~7.1% of mcap (our arithmetic)" -> "Rs 112.42 cr reduction; Impact 7.1".
+  /* "Rs 112.42 cr reduction; ~7.1% of mcap (our arithmetic)" -> "Rs 112.42 cr reduction; ~7.1%".
      Only the qualifier after a percentage is removed; every figure survives untouched, and a
      quantum that never mentions mcap is returned unchanged. */
   function qshort(s){
-    return scoreify(String(s==null?'':s)
+    return String(s==null?'':s)
       .replace(/\s*[([]\s*(?:on\s+)?our arithmetic[^)\]]*[)\]]/gi,'')
-      .replace(/\s*[,;]?\s*(?:on\s+)?our arithmetic\b[^.;]*/gi,''))
+      .replace(/\s*[,;]?\s*(?:on\s+)?our arithmetic\b[^.;]*/gi,'')
+      .replace(/(%)\s*of\s+(?:the\s+)?m(?:arket\s*)?cap(?:italisation|italization)?\b/gi,'$1')
       .replace(/[;,]\s*$/,'')
       .replace(/\s{2,}/g,' ')
       .trim();
@@ -1133,14 +1097,7 @@ function anncMain(P, BASE){
       return C.mcapOk(m,mc.lo,mc.hi) &&
         hit((m.symbol||"")+" "+(m.company||"")+" "+(m.headline||""));});
     var movers=(D.movers||[]).length
-      /* The legend is not optional. The cards lead with a bare "Impact 16.8", and an unexplained
-         number on a public finance page is worse than the raw ratio it replaced — so the basis is
-         stated once, here, where the first score is read. */
-      ? '<div class="annc-h3">Top movers</div>'+
-        '<div class="annc-legend">'+SCORE_LABEL+' &mdash; the deal value as a percentage of the '+
-        'company&rsquo;s market capitalisation. A small order at a small company scores higher '+
-        'than a large one at a giant.</div>'+
-        '<div class="annc-mv">'+(mv.length?mv.map(function(m,i){
+      ? '<div class="annc-h3">Top movers</div><div class="annc-mv">'+(mv.length?mv.map(function(m,i){
           var star=m.marquee?'<span class="annc-star" title="named superstar allottee">&#9733;</span> ':'';
           var stat=(m.marquee_status==='proposed')?'PROPOSED allotment to ':'allotted to ';
           return '<div class="annc-card'+(m.marquee?' mq':'')+'"><div class="annc-rank">'+(i+1)+
@@ -1198,23 +1155,14 @@ function anncMain(P, BASE){
                  The emoji it replaces could not be darkened at all. */
               'title="open the filing">&#8599;&#65038;</a>'
             : '<span class="annc-nodoc"></span>';
-          /* scoreify BEFORE md(): the digest bakes "_(~16.8% of mcap)_" into the authored
-             sentence, so the theme lines cannot be relabelled by a field toggle the way a mover's
-             quantum can. Substituting the fixed suffix is safe where DECOMPOSING the prose would
-             not be (2026-08-14b) — this reads one machine-written phrase, not the sentence. */
-          return '<li>'+lk+md(scoreify(u.text))+'</li>';
+          return '<li>'+lk+md(u.text)+'</li>';
         }).join("")+'</ul></div>');
     });
     var byth=out.length
       ? '<div class="annc-h3">By theme</div>'+out.join("")
       : '<div class="circ-empty">Nothing in the digest matches these filters on '+dmy(_d)+'.</div>';
     return {d:_d, cov:cov, movers:movers, byth:byth,
-            /* Both halves guarded, not just the first. `D.movers||[]` was already defensive while
-               the term beside it was not — and it is the unguarded one that produced the NaN. A
-               partial payload from any other source lands here too, so the arithmetic defends
-               itself rather than trusting the fallback above to be the only way in. */
-            shown:(mv.length+shown),
-            total:((D.movers||[]).length+(((D.stats||{}).theme_rows)||0))};
+            shown:(mv.length+shown), total:((D.movers||[]).length+D.stats.theme_rows)};
   }
 
   /* SPAN MODE IS DATE-BY-DATE (owner 2026-08-18: "when I click on last 7 days the first table still
@@ -1281,10 +1229,14 @@ function anncMain(P, BASE){
     if(st.srcs.size)  rows=rows.filter(function(r){return st.srcs.has(r.src);});
     if(st.cq) rows=rows.filter(function(r){
       return (r.subject+" "+r.company).toLowerCase().indexOf(st.cq)>=0;});
+    /* COUNT AFTER EVERY FILTER. The size filter ran BELOW this line, so the counter reported
+       the pre-filter total and section 2 said "N of M" above fewer than N rows - the same
+       defect fixed for section 3 on 2026-08-17, left in place here. A total that does not
+       match the screen is how a reader concludes a row is missing rather than filtered. */
+    rows=rows.filter(function(r){return C.mcapOk(r,mc.lo,mc.hi);});
     $('annc-c2').textContent=rows.length+" of "+all.length+" · "+(span()?"last 7 days":dmy(circDate()));
     // The Date column only earns its place when the rows span more than one day.
     $('annc-th-date').style.display=span()?"":"none";
-    rows=rows.filter(function(r){return C.mcapOk(r,mc.lo,mc.hi);});
     $('annc-t2').innerHTML=C.circRows(rows,span());
   }
 
@@ -1297,7 +1249,18 @@ function anncMain(P, BASE){
     $('annc-unote').innerHTML='Lock-in releases, RE windows and bonus/split record dates, '+
       '<b>15 days from '+ud+'</b>. A lock-in is dated the first day the shares can be <b>sold</b>'+
       ' &mdash; one trading day after it expires. % is of total listed shares.';
-    u=u.filter(function(r){return C.mcapOk(r,mc.lo,mc.hi)
+    /* THE SIZE FLOOR DOES NOT APPLY TO THIS SECTION. One market-cap range governs sections 1
+       and 2 by design, and that is right for a digest of market-moving news. It is wrong here:
+       a lock-in release is structurally an SME/small-cap event, so the shared ₹300 Cr DEFAULT -
+       which no reader chose - was removing 13 of 41 unlock rows (32%), among them GVELECTRIC at
+       ₹150.5 Cr, whose absence the owner reported as a missing row (2026-08-31). The counter
+       below already said "29 of 50", and that was still read as data loss rather than a filter.
+       An explicit range the reader TYPES is still honoured: `mc._touched` is set by the mcap
+       control's own callback, so a deliberate 300 filters this section while the untouched
+       default does not. Sniffing the VALUE instead would have made a typed 300 indistinguishable
+       from the default and silently ignored it. */
+    var _mcLo = (mc._touched ? mc.lo : "");
+    u=u.filter(function(r){return C.mcapOk(r,_mcLo,mc.hi)
       && (!ct.size || ct.has(r.type));});
     /* COUNT WHAT IS SHOWN, and say what it is OF. This counter was set before the filters ran, so it
        read "17 events" above 12 rows — the market-cap floor removes rows silently, and a total that
@@ -1317,9 +1280,18 @@ function anncMain(P, BASE){
      index lists; an explicit date needs only itself. Fetch-then-paint, so a section never renders
      an empty state that merely means "not loaded yet" — the trap that makes a missing file look
      like a quiet day on the exchange. */
+  /* THE LOADER MUST ASK THE RENDERER WHICH DAYS IT WILL DRAW. This returned
+     `[LATEST_ANN, LATEST_CIRC]` while `drawDigest` renders `latestDates()` - today AND
+     yesterday (owner 2026-08-19). With both feeds on the same day that is ONE file, so
+     yesterday was rendered from a `DAY[d]` that was never fetched: `D.coverage` came out
+     undefined and the block read "NaN announcements captured" above "Nothing in the digest
+     matches these filters" (owner 2026-08-31). Section 1 asks `latestDates()` directly, so
+     the two can no longer disagree; section 2 still needs the circular feed's own newest
+     day, which runs on a different clock. Same rule as `_listing_event_date` in the
+     circulars module: ONE function owns the decision, and everything else reads it. */
   function neededDates(){
     if(span()) return (P.files||[]).slice();
-    if(st.mode==="latest") return [LATEST_ANN, LATEST_CIRC];
+    if(st.mode==="latest") return latestDates().concat([LATEST_CIRC]);
     return [st.mode];
   }
   function paint(){drawDigest();drawCirculars();drawUnlocks();}
@@ -1327,7 +1299,9 @@ function anncMain(P, BASE){
   /* one market-cap range governs all three sections, like the date does */
   var mc={lo:"300",hi:""};
   var ct=new Set();
-  C.mcapBox($('annc-mcap'),mc,draw);
+  // `_touched` distinguishes the DEFAULT range from one the reader actually set - see the unlock
+  // filter above, which honours the second and ignores the first.
+  C.mcapBox($('annc-mcap'),mc,function(){mc._touched=true;draw();});
   C.chips($('annc-ctypes'),C.CTYPES,ct,draw);
   /* Theme chips are built from the DATES' OWN titles, not a hard-coded list: migrated July digests
      carry sections today's vocabulary has no key for ("Credit-rating changes", "Analyst / investor
@@ -1349,30 +1323,14 @@ function anncMain(P, BASE){
 </script>
 <script id="co-search-js">
 (function(){
-  // SHOWING IS `display:block`, NOT `display:''`. The stylesheet's default for .cosl is display:none,
-  // so clearing the INLINE value hands control back to that rule and the dropdown stays hidden — it
-  // built the right options every time and never appeared. Browser-verified 2026-08-17; the Node
-  // harness could not catch it because it reads innerHTML and does not evaluate CSS.
   var q=document.getElementById('cos-q'), list=document.getElementById('cos-list');
   if(!q||!list) return;
-  var ALL=[], loaded=false, MAX=6, loadErr='';
+  var ALL=[], loaded=false, MAX=6;
   function load(){
     if(loaded) return; loaded=true;
-    fetch('../data/index.json')
-      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-      .then(function(j){
-        ALL=(j.companies||[]).map(function(c){return {s:c.s, co:c.co||''};});
-        if(!ALL.length) loadErr='the company index is empty';
-      })
-      .catch(function(e){
-        // SAY SO. This used to swallow the failure and leave ALL empty, so typing produced nothing
-        // and the box looked broken rather than unable to load. The common case is the page opened
-        // from the file system, where the browser blocks the fetch outright.
-        ALL=[];
-        loadErr = (location.protocol==='file:')
-          ? 'opened from the file system — serve the folder over HTTP for search to work'
-          : ('could not load the company index (' + ((e && e.message) || e) + ')');
-      });
+    fetch('../data/index.json').then(function(r){return r.ok?r.json():{};}).then(function(j){
+      ALL=(j.companies||[]).map(function(c){return {s:c.s, co:c.co||''};});
+    }).catch(function(){ ALL=[]; });
   }
   q.addEventListener('focus', load);
   q.addEventListener('input', function(){
@@ -1389,15 +1347,12 @@ function anncMain(P, BASE){
     if(hits.length>MAX){ for(;i<ALL.length;i++){ var x=ALL[i];
         if(x.s.toUpperCase().indexOf(t)>=0 || x.co.toUpperCase().indexOf(t)>=0) more++; }
       more+=hits.length-MAX; hits=hits.slice(0,MAX); }
-    if(!hits.length){
-      list.innerHTML='<div class="cosmore">'+(loadErr || 'No match.')+'</div>';
-      list.style.display='block'; return;
-    }
+    if(!hits.length){ list.innerHTML='<div class="cosmore">No match.</div>'; list.style.display=''; return; }
     list.innerHTML=hits.map(function(r){
       return '<div class="cosr" role="option" data-cos="'+r.s+'"><span class="co">'+
              r.co.replace(/[&<>]/g,'')+'</span><span class="sy">'+r.s+'</span></div>';
     }).join('')+(more?'<div class="cosmore">+'+more+' more &mdash; keep typing</div>':'');
-    list.style.display='block';
+    list.style.display='';
   });
   function go(sym){ if(sym) location.href='../company/?sym='+encodeURIComponent(sym); }
   list.addEventListener('click', function(e){
@@ -1405,46 +1360,13 @@ function anncMain(P, BASE){
     if(row) go(row.getAttribute('data-cos'));
   });
   // Enter picks the first match, which is what a keyboard user expects after typing a ticker.
-  /* KEYBOARD SELECTION (owner 2026-08-19: "I can't use keyboard down or up arrow to select and
-     enter"). Enter alone took the FIRST row, so a reader who wanted the third had to reach for the
-     mouse. Arrow keys move a highlight through the rows and Enter takes the highlighted one; with
-     nothing highlighted Enter still takes the first, so the old muscle memory keeps working.
-     `.cosr.on` is already styled (same rule as :hover), so the highlight needs no new CSS. */
-  var act = -1;
-  function rows(){ return Array.prototype.slice.call(list.querySelectorAll('[data-cos]')); }
-  function mark(i){
-    var rs = rows(); if(!rs.length){ act = -1; return; }
-    act = (i + rs.length) % rs.length;
-    rs.forEach(function(r,k){ r.classList.toggle('on', k === act); });
-    if(rs[act].scrollIntoView) rs[act].scrollIntoView({block:'nearest'});
-  }
   q.addEventListener('keydown', function(e){
-    if(e.key==='ArrowDown'){ e.preventDefault(); mark(act + 1); return; }
-    if(e.key==='ArrowUp'){ e.preventDefault(); mark(act - 1); return; }
-    if(e.key==='Enter'){
-      var rs = rows(), pick = (act >= 0 && rs[act]) || rs[0];
-      if(pick){ e.preventDefault(); go(pick.getAttribute('data-cos')); } }
-    if(e.key==='Escape'){ list.style.display='none'; closeSheet(); }
-  });
-  /* a fresh query invalidates the highlight — otherwise Enter takes row 3 of the PREVIOUS results */
-  q.addEventListener('input', function(){ act = -1; });
-
-  /* PHONE: the button opens the field as a sheet at the top of the viewport (see the CSS). */
-  var box = document.getElementById('cosearch'), openBtn = document.getElementById('cos-open');
-  function closeSheet(){
-    if(!box) return;
-    box.classList.remove('cos-open');
-    if(openBtn) openBtn.setAttribute('aria-expanded','false');
-    list.style.display='none';
-  }
-  if(openBtn) openBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    var open = box.classList.toggle('cos-open');
-    openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if(open){ q.focus(); load(); } else { list.style.display='none'; }
+    if(e.key==='Enter'){ var first=list.querySelector('[data-cos]');
+      if(first){ e.preventDefault(); go(first.getAttribute('data-cos')); } }
+    if(e.key==='Escape'){ list.style.display='none'; }
   });
   document.addEventListener('click', function(e){
-    if(!document.getElementById('cosearch').contains(e.target)){ list.style.display='none'; closeSheet(); }
+    if(!document.getElementById('cosearch').contains(e.target)) list.style.display='none';
   });
 })();
 </script><script id="nav-sticky-js">
@@ -1468,7 +1390,7 @@ function anncMain(P, BASE){
   if(window.ResizeObserver) new ResizeObserver(apply).observe(row1);
 })();
 </script>
-<footer>ARTH INSIGHT · <a href="https://arthinsight.com/">arthinsight.com</a> · For information and education only.</footer>
+<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
 </div>
 <script src="/public_nav.js?v=dfe1aa1e0c"></script></body>
 </html>
