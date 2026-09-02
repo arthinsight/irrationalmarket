@@ -190,7 +190,7 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #tab-momentum2 .imp{font-size:var(--fs-xs,11px);font-weight:700;border-radius:var(--r-md,8px);padding:0 6px}
 #tab-momentum2 .imp.High{background:var(--bad-bg);color:var(--bad)}#tab-momentum2 .imp.Medium{background:var(--warn-bg);color:var(--warn)}
 #tab-momentum2 .m2chartbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-#tab-momentum2 .m2tf button{font-family:inherit;background:var(--g100);color:var(--g700);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:3px 11px;margin-right:5px;cursor:pointer;font-size:var(--fs-sm,12.5px)}
+#tab-momentum2 .m2tf button{background:var(--g100);color:var(--g700);border:1px solid var(--g100);border-radius:var(--r-md,8px);padding:3px 11px;margin-right:5px;cursor:pointer;font-size:var(--fs-sm,12.5px)}
 #tab-momentum2 .m2tf button.active{background:var(--hl);color:#fff;border-color:var(--hl)}
 #tab-momentum2 .m2hover{font-size:var(--fs-sm,12.5px);color:var(--txt);font-variant-numeric:tabular-nums}
 #tab-momentum2 #m2-chart svg{width:100%;height:auto;display:block}
@@ -308,69 +308,111 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
 .risk-row-body h3 { font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
 .risk-row-body p { font-size: 13px; color: #475569; margin: 0; line-height: 1.5; }
 
-/* Where the money goes — proportional use-of-proceeds bars. The internal DRHP dashboard uses
-   .ipg-bar/.track/.fill; those classes are not in the public stylesheet, so the card carries
-   its own rather than importing internal chrome. */
-.use-bar{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(90px,1fr) auto;align-items:center;gap:10px;padding:6px 0;font-size:12.5px}
-.use-n{min-width:0;overflow-wrap:anywhere;color:#334155}
-.use-track{height:8px;overflow:hidden;border-radius:999px;background:#f1f5f9}
-.use-fill{display:block;height:100%;border-radius:inherit;background:#2563eb}
-.use-amt{white-space:nowrap;color:#64748b;font-size:11.5px;font-weight:700}
-.use-unit{color:#64748b;font-weight:400}
-@media(max-width:760px){.use-bar{grid-template-columns:1fr auto;gap:6px}.use-track{grid-column:1/-1}}
+/* ---------------------------------------------------------------------------------------------
+   PHONE ONLY (max-width:700px) — qa/mobile_audit M7 (no text under 11px) and M5 (tap targets).
 
-/* PHONE LEGIBILITY AND REACH (qa/mobile_audit M5/M7/M10, 2026-08-25).
-   Desktop sizes are unchanged - every rule here is inside the phone breakpoint.
+   This file is loaded by BOTH /company/ (company_page.py) and every /screens/* page
+   (screens_pages.build_html), so one block here fixes all five routes rather than five copies.
 
-   M7 - nothing below 11px. `.eyebrow` shipped 10px and `.evidence` badges 9px, which is below the
-   audit's own legibility floor and below what most people can read on a bus.
-   M5 - 40px is a fingertip. `.show-more-btn` was 24px and the chart timeframe buttons 23px; both
-   are ordinary buttons, not dense chips among their own kind, so they get the full floor.
-   M10 - a table that overflows WHILE crushing a column to 11-15 wrapped lines is unreadable in
-   both directions. Giving cells a real minimum lets the row take the width it needs and the
-   wrapper scroll, which is what `.table-wrap{overflow:auto}` is already there for. */
-@media(max-width:760px){
-  /* Every sub-11px size in this stylesheet, raised to the floor. Listed one by one rather than with
-     a blanket rule because each is a deliberate label style on desktop; only the phone size moves. */
-  .eyebrow,.evidence,.title-row span,.decision-strip span,th,.kpi span,.profile-band span,
-  .status,.cred-metrics span,.analysis-strip span,.call-context span,.verdict-banner span,
-  .explorer-title span,.explorer-stock span,.explorer-stock small,small.row-note,
-  .theme-parent,.theme-pill,.theme-pill.long,.src-title span,
-  .prototype-bar b{font-size:11px}
-  /* These are declared as `<parent> span{font-size:9px}` descendant rules, which outrank a
-     flat `span` in this block - so match them the same way. */
-  .analysis-strip span,
-  .call-context span,
-  .cred-metrics span,
-  .decision-strip span,
-  .explorer-stock span,
-  .explorer-title span,
-  .kpi span,
-  .profile-band span,
-  .theme-intel span,
-  .verdict-banner span{font-size:11px}
-  .evidence{padding:3px 8px}
-  /* Ordinary buttons and form controls get the full 40px fingertip - they are not dense chips. */
-  .show-more-btn{min-height:40px;padding:8px 14px}
-  #m2-tf button,.m2tf button{min-height:40px;padding:8px 12px}
+   WHY A MEDIA BLOCK AND NOT A GLOBAL BUMP. Every size below is a deliberate desktop choice: 9px
+   uppercase 800-weight eyebrows/labels are the page's visual grammar, and they read fine at a
+   desktop viewing distance in a 1460px shell. On a 375px phone the same glyphs are simply too
+   small — M7's floor is 11px and these were 9-10px. Raising them GLOBALLY would restyle the
+   desktop page nobody complained about, so the fix is scoped to the phone.
+
+   `--fs-xs` (11px) is the shared token and is already AT the floor, so there is no undersized
+   token to raise: these are hardcoded literals in the rules above. 11px is used where the label is
+   a dense inline chip/eyebrow, 11.5px where it is a standalone line with room. */
+@media(max-width:700px){
+  /* Section eyebrows and band/strip/kpi micro-labels — all 9-10px above. */
+  .eyebrow,.theme-parent,.call-context span,.cred-metrics span{font-size:11.5px}
+  .decision-strip span,.profile-band span,.analysis-strip span,.kpi span,
+  .theme-intel span,.verdict-banner span,.explorer-title span{font-size:11px}
+  /* Pills and badges. Padding is trimmed a hair so the taller glyphs do not grow the row. */
+  .evidence,.status,.theme-pill{font-size:11px;padding:3px 8px}
+  /* Table headers. `table.mmhist th` (stage history) inherits this same bare `th` rule. */
+  th{font-size:11px}
+  /* `.row-note` is a <small> inside `table{font-size:12px}`, so the browser's own `small`
+     shrink put it at 10px. Pinned rather than left to inherit. */
+  .row-note{font-size:11px}
+  /* Stock explorer rows: the name was 10px and the stage note 9px. */
+  .explorer-stock span{font-size:11px}
+  .explorer-stock small{font-size:11px}
+
+  /* M5 — tap targets. These are single controls, not chips among their own kind, so they take
+     the 40px floor rather than the dense-32 exemption. */
+  /* `.show-more-btn` carries its padding in an INLINE style attribute (written by
+     company_store_prototype.js), which no plain rule can outrank — hence !important. It rendered
+     24px tall. */
+  .show-more-btn{min-height:40px!important;padding:8px 14px!important}
+  /* Matches `#tab-momentum2 .m2tf button` (momentum_2_dashboard.py) on specificity so it wins
+     without !important; that rule's 3px padding rendered these 22px. */
+  #tab-momentum2 .m2tf button{min-height:40px;padding:8px 12px}
+  /* The floating "Stocks" button measured 39px — one pixel under. */
   .explorer-open{min-height:40px}
-  .screen-filters input,.screen-filters select{min-height:40px}
-  /* M10: a table that overflows WHILE crushing a column to 14 wrapped lines is unreadable both
-     ways. `!important` because the shared mobile rules set `white-space:normal` on these same
-     cells, which is what produced the wrapping; the wrapper already scrolls (`overflow:auto`), so
-     letting the row take its natural width is the readable outcome. */
-  .data-table th,.data-table td,.table-wrap th,.table-wrap td{
-    min-width:104px;white-space:nowrap!important}
-  .data-table th:first-child,.data-table td:first-child,
-  .table-wrap th:first-child,.table-wrap td:first-child{min-width:150px}
 }
 
-/* Recent developments - CARD CHROME ONLY. The LIST rules (.dev-list/.dev-row/.dev-date/
-   .dev-text/.dev-quant/.dev-src/.dev-more) are injected by the shared M2D library that also
-   renders the rows, so both consumers get one definition. They lived here as well until
-   2026-08-27 and `.dev-row` was defined FOUR times in the shipped page - harmless only while
-   the two copies agreed, which is exactly the drift a shared renderer is meant to remove. */
-.dev-block{margin-top:18px;padding:18px 20px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.dev-head{margin:0 0 12px;font:600 15px Outfit;color:#0f172a}@media(max-width:760px){.dev-block{padding:14px 15px}}
+
+/* ── M10: horizontal scroll with a PINNED first column (owner 2026-09-02) ───────────────────────
+   The commitments / walk-the-talk tables are 4 columns that measure ~400px inside a 302px phone
+   viewport. `.table-wrap{overflow:auto}` already scrolled them, but `td:first-child` carries
+   `min-width:18ch; white-space:normal`, so the label column wrapped 5+ lines deep WHILE the table
+   overflowed -- the audit's M10 rule ("too wide AND too tight"), and the reason it fires on
+   /company/ and /screens/momentum/ (10 findings).
+
+   Scrolling alone does not fix it: scroll a 4-column table sideways and the row loses its label,
+   so the numbers become unreadable. Pinning column 1 keeps the label on screen while the data
+   columns scroll under it -- which is why the owner asked for both, not either.
+
+   Phone only. Desktop has room for all four columns and is untouched. */
+@media (max-width:700px){
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Stop the label column wrapping into a 5-line stack: it is what makes the table "too tight".
+     14ch fits the longest label used ("Forward commitment") on two lines, not ten. */
+  .table-wrap th:first-child,
+  .table-wrap td:first-child{
+    position:sticky; left:0; z-index:2;
+    min-width:14ch; max-width:14ch;
+    white-space:normal; overflow-wrap:anywhere;
+    /* An opaque background is REQUIRED -- a sticky cell over a transparent one shows the scrolled
+       content through it. The header cell needs its own, since thead has no card background. */
+    background:#fff;
+  }
+  .table-wrap th:first-child{background:#f8fafc; z-index:3}
+  /* A hairline so the pinned column reads as pinned rather than as a rendering artefact. */
+  .table-wrap th:first-child::after,
+  .table-wrap td:first-child::after{
+    content:""; position:absolute; top:0; right:0; bottom:0; width:1px; background:#e2e8f0;
+  }
+  /* WHY THERE IS NO BLANKET `td{max-width}` HERE. Tried 2026-09-02 and MEASURED: capping every
+     cell at 22ch took the gate from 10 findings to 14 -- it added a new 9-cell finding on all four
+     /screens/ pages by squeezing columns that were fitting. Reverted.
+
+     What remains, and it is a DESIGN decision rather than a CSS one: a row whose prose cell runs to
+     22 lines makes every short cell beside it report as "squeezed", because a table row is as tall
+     as its tallest cell. The audit is right that the row is unreadable on a phone; the fix is to
+     stop putting long prose in a table cell on a 375px viewport (a stacked card, or a truncation
+     with a tap-to-expand), not to constrain the columns further. */
+}
+
+
+/* ── Board and leadership / KMP: person cards, not a table (owner 2026-09-02) ───────────────────
+   The board list was a 3-column table whose last column is a free-text biography. A table row is
+   as tall as its tallest cell, so a 4-line bio stretched the Director and Role columns into tall
+   thin strips -- unreadable on desktop and the exact M10 "too wide AND too tight" shape on a phone.
+   A card reads name -> role -> bio, which is the order a reader wants, and auto-fit reflows it to a
+   single column on a phone with no horizontal scroll at all.
+   Deliberately mirrors `.product-grid`/`.product-card` above rather than inventing a second system;
+   only the type scale differs, because a person's name is the anchor here. */
+.person-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.person-card{min-width:0;max-width:100%;padding:15px;border:1px solid #e2e8f0;border-radius:7px;
+  background:#f8fafc;overflow-wrap:anywhere}
+.person-card h4{margin:0;font:600 13px Outfit,sans-serif;color:#0f172a}
+.person-card .person-role{margin:3px 0 0;color:#2563eb;font-size:11px;font-weight:700}
+.person-card .person-bio{margin:8px 0 0;color:#334155;font-size:12px;line-height:1.5}
+@media (max-width:700px){
+  .person-grid{grid-template-columns:1fr}
+}
 
 
 /* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
@@ -518,7 +560,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 </style>
 </head>
 <body>
-<header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"></div></nav></header>
+<header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="../index.html">Home</a><a href="../bigpicture/">Big Picture</a><a href="../feed/">Feed</a><a href="../ipo/">IPO Intelligence</a><a href="../screens/">Screens</a></div></nav></header>
 <div class="wrap wide">
 
 <main id="store-company" class="company-shell"><div class="pending"><b>Loading company intelligence…</b></div></main><script id="store-payload" type="application/json">{}</script><!--PUBLIC_COVERAGE-M2D-START-->
@@ -648,38 +690,13 @@ if(!window.M2D){window.M2D=(function(){
   // The picker reaches ~2,131 stocks while the inline payload carries only the 195 members, so for
   // everything else the record, its price and its stage history all come from this file. One promise
   // per symbol, cached, so selecting a stock does not fetch the same file three times.
-  // DEV is separate from COMP DELIBERATELY. `fetchCompany` stores only `c.momentum` in COMP -
-  // `recOf` reads `COMP[sym].stock` and depends on that shape - so the company file's OTHER
-  // top-level keys are discarded on the way through. Developments live at the TOP level, so
-  // they need their own slot rather than a change to COMP's contract.
-  const COMP={}, COMPQ={}, DEV={};
-
-  // ---- payload split (PAYLOAD_SPLIT_DESIGN.md), GENERATED from assemble_company.VOLATILE_PATHS ----
-  // A company file is two halves: <SYM>.json (narrative — changes when research lands) and
-  // <SYM>.v.json (price/stage series — a new row every trading day). Split so a day of price moves
-  // stops re-storing 47 MB of unchanged narrative in the deploy repo.
-  function fetchCompanyFile(DATADIR,file){
-    var base=DATADIR+'/company/'+encodeURIComponent(file);
-    var vol=DATADIR+'/company/'+encodeURIComponent(String(file).replace(/\.json$/,'.v.json'));
-    return Promise.all([
-      fetch(base).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}),
-      fetch(vol).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
-    ]).then(function(a){
-      var b=a[0],v=a[1]; if(!v) return b;                 // pre-split or stripped: base IS the whole
-      var o={}; for(var k in b)o[k]=b[k];
-      if(v.momentum!==undefined)o.momentum=v.momentum;
-      if(v.deepdive&&v.deepdive.px!==undefined){var s_px={},b_px=o.deepdive||{};for(var q in b_px)s_px[q]=b_px[q];s_px.px=v.deepdive.px;o.deepdive=s_px;}
-      if(v.drhp&&v.drhp.grades!==undefined){var s_grades={},b_grades=o.drhp||{};for(var q in b_grades)s_grades[q]=b_grades[q];s_grades.grades=v.drhp.grades;o.drhp=s_grades;}
-      return o;
-    });
-  }
-
+  const COMP={}, COMPQ={};
   function fetchCompany(sym){
     if(COMP[sym]) return Promise.resolve(COMP[sym]);
     if(COMPQ[sym]) return COMPQ[sym];
-    COMPQ[sym]=fetchCompanyFile(DATADIR,fileOf(sym))
-      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[];
-                DEV[sym]=((c&&c.developments&&c.developments.rows)||[]); return m;})
+    COMPQ[sym]=fetch(DATADIR+'/company/'+encodeURIComponent(fileOf(sym)))
+      .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[]; return m;})
       .catch(e=>{delete COMPQ[sym]; throw e;});
     return COMPQ[sym];
   }
@@ -835,95 +852,9 @@ if(!window.M2D){window.M2D=(function(){
     _set('m2-data',kv(r));
     _set('m2-data-ext',kvExt(r));
     _set('m2-hist',histTbl(sym));
-    // A symbol outside the bulk file has its history ONLY in its own company file, which arrives
-    // after this render — so the first draw is necessarily provisional and something must redraw it
-    // when the file lands. `chart()` already refetches for the price and redraws only the chart;
-    // without this the history block kept its first answer until the reader clicked the symbol again.
-    // fetchCompany dedupes on COMPQ, so this shares the request chart() makes rather than adding one.
-    if(!COMP[sym]) fetchCompany(sym).then(function(){ if(cur===sym){ _set('m2-hist',histTbl(sym)); devPane(sym); } })
-                                    .catch(function(){});
     renderVolAnalysis(sym);
     try{ chart(sym); }
     catch(e){ _set('m2-chart','<div class="m2empty">Chart unavailable for '+esc(sym)+'.</div>'); }
-    devPane(sym);
-  }
-
-  // ── RECENT DEVELOPMENTS ─────────────────────────────────────────────────────────────────────
-  // ONE implementation, TWO consumers — the Momentum tab and the standalone Company page — for the
-  // same reason the rest of M2D is shared: the Company page never loads dashboard.html, and
-  // publish.py strips whole tabs, so a renderer owned by the tab would vanish from the page.
-  // Source: notification's polished digests, parsed by unified_intel/recent_developments.py and
-  // carried on the per-company JSON that fetchCompany() already retrieves — so this costs no extra
-  // request and no payload change.
-  // Measured 2026-08-26: 293 of 2,653 companies carry any, median 1 row, max 5. Renders NOTHING when
-  // a company has none; an empty heading reads as a broken panel, not as an honest absence.
-  var DEV_SHOWN = 5, devCssDone = false;
-  function devCss(){
-    if (devCssDone) return; devCssDone = true;
-    var st = document.createElement('style');
-    st.textContent = '.dev-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}'
-      + '.dev-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline;'
-      + 'padding-bottom:10px;border-bottom:1px solid #eef2f7}'
-      + '.dev-row:last-of-type{border-bottom:0;padding-bottom:0}'
-      + '.dev-date{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.05em;'
-      + 'text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}'
-      + '.dev-text{color:#334155;font-size:13px;line-height:1.55;overflow-wrap:anywhere}'
-      + '.dev-text strong{color:#0f172a;font-weight:600}'
-      + '.dev-quant{display:inline-block;margin-left:4px;padding:2px 7px;border-radius:999px;'
-      + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
-      + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
-      + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
-      + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
-      + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
-      + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
-    document.head.appendChild(st);
-  }
-  var DEVMON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  function devDate(d){
-    var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? (m[3] + ' ' + DEVMON[+m[2]-1] + ' ' + m[1]) : esc(d||'');
-  }
-  // the digest writes markdown bold inside its prose; escape first, then render only that
-  function devText(t){ return esc(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
-  function devRow(r,hidden){
-    return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
-      + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'+devText(r.text)
-      + (r.quant?' <span class="dev-quant">'+esc(r.quant)+'</span>':'')
-      + (r.url?' <a class="dev-src" href="'+esc(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
-      + '</span></li>';
-  }
-  // Returns the LIST ONLY - the caller supplies its own heading/card chrome, because the two
-  // consumers frame it differently (a .m2card on the tab, a .dev-block section on the page).
-  function devList(rows){
-    rows = (rows||[]).slice();
-    if (!rows.length) return '';
-    devCss();
-    rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
-    var vis = rows.slice(0,DEV_SHOWN).map(function(r){return devRow(r,false);}).join('');
-    var hid = rows.slice(DEV_SHOWN).map(function(r){return devRow(r,true);}).join('');
-    // NO inline onclick: a delegated listener has no nested quoting to get wrong. The first version
-    // used one and shipped a syntax error that broke the whole renderer.
-    var btn = hid ? '<button class="dev-more" data-more="1">Show '+(rows.length-DEV_SHOWN)+' more</button>' : '';
-    return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
-  }
-  function devPane(sym){
-    var rows = DEV[sym] || [];
-    var h = devList(rows);
-    _set('m2-dev', h ? '<div class="m2sec">Recent developments</div>' + h : '');
-    var card = document.getElementById('m2-dev-card');
-    if (card) card.style.display = h ? '' : 'none';
-  }
-  if (!window.__devMoreBound) {
-    window.__devMoreBound = true;
-    document.addEventListener('click', function(ev){
-      var b = ev.target && ev.target.closest && ev.target.closest('[data-more]');
-      if (!b) return;
-      var host = b.parentElement; if (!host) return;
-      var hid = host.querySelectorAll('.dev-hidden'); if (!hid.length) return;
-      var collapsed = hid[0].style.display === 'none';
-      Array.prototype.forEach.call(hid, function(x){ x.style.display = collapsed ? 'list-item' : 'none'; });
-      b.textContent = collapsed ? 'Show less' : ('Show ' + hid.length + ' more');
-    });
   }
 
   return {init:function(o){o=o||{};STK=o.stocks||[];META=o.meta||{};DATADIR=o.datadir||'data';},
@@ -931,8 +862,8 @@ if(!window.M2D){window.M2D=(function(){
           select:select_detail, chart:chart, recOf:recOf, fetchCompany:fetchCompany,
           histTbl:histTbl, renderVol:renderVolAnalysis, loadDelVol:loadDelVol,
           insights:insights, kv:kv, kvExt:kvExt, mcapCell:mcapCell,
-          esc:esc, stg:stg, STG:STG, catLabel:catLabel, sigCell:sigCell, pc:pc, f:f,
-          chips:chips, fileOf:fileOf, developments:devList, devPane:devPane,
+          esc:esc, stg:stg, catLabel:catLabel, sigCell:sigCell, pc:pc, f:f,
+          chips:chips, fileOf:fileOf,
           cur:function(){return cur;}, setCur:function(s){cur=s;},
           setTf:function(n){tf=n;if(cur)chart(cur);}};
 })();}
@@ -945,9 +876,9 @@ function get(url,optional){return fetch(url).then(function(r){if(!r.ok){if(optio
 function merge(a,b){if(!b||typeof b!=='object')return a;Object.keys(b).forEach(function(k){if(a[k]&&b[k]&&typeof a[k]==='object'&&!Array.isArray(a[k])&&!Array.isArray(b[k]))merge(a[k],b[k]);else a[k]=b[k];});return a;}
 function fail(message){app.innerHTML='<div class="pending"><b>Company unavailable</b><p>'+message+'</p></div>';}
 var selected=sym();if(!selected){fail('Choose a company from Search or Company Explorer.');return;}
-Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),get('../data/company_page/'+encodeURIComponent(selected)+'.json',true)])
-.then(function(seed){var index=seed[0],row=(index.companies||[]).filter(function(x){return x.s===selected;})[0];if(!row)throw new Error('Symbol not found');var file=row.file||selected+'.json',vol=String(file).replace(/\.json$/,'.v.json');return Promise.all([get('../data/company/'+encodeURIComponent(file)),get('../data/company/'+encodeURIComponent(vol),true)]).then(function(parts){return[merge(parts[0]||{},parts[1]||{}),seed[1]||{},seed[2]||{},row];});})
-.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:selected,name:row.co||selected,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},developments:(company.developments&&company.developments.rows)||[],pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:Object.assign({},explorer,{peers:peers})};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=14f03257ec';document.body.appendChild(script);})
+Promise.all([get('../data/index.json'),get('../data/company_explorer.json')])
+.then(function(seed){var index=seed[0],list=index.companies||[];var row=list.filter(function(x){return x.s===selected;})[0];if(!row)row=list.filter(function(x){return (x.aka||[]).some(function(a){return String(a).toUpperCase()===selected;});})[0];if(!row)throw new Error('Symbol not found');if(row.s!==selected&&window.history&&history.replaceState){try{history.replaceState(null,'',location.pathname+'?sym='+encodeURIComponent(row.s)+location.hash);}catch(e){}}var file=row.file||row.s+'.json',vol=String(file).replace(/\.json$/,'.v.json');return Promise.all([get('../data/company/'+encodeURIComponent(file)),get('../data/company/'+encodeURIComponent(vol),true),get('../data/company_page/'+encodeURIComponent(row.s)+'.json',true)]).then(function(parts){return[merge(parts[0]||{},parts[1]||{}),seed[1]||{},parts[2]||{},row];});})
+.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:row.s,name:row.co||row.s,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:{momentum:explorer.momentum||[],investing:explorer.investing||[],new:explorer.new||[],peers:peers}};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=23181b1ac4';document.body.appendChild(script);})
 .catch(function(e){fail(e&&e.message==='Symbol not found'?'That symbol is not available in the public company store.':'Company data could not load. Please try again.');});
 })();
 </script><script id="nav-sticky-js">
@@ -971,7 +902,7 @@ Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),get(
   if(window.ResizeObserver) new ResizeObserver(apply).observe(row1);
 })();
 </script>
-<footer>ARTH INSIGHT · <a href="https://arthinsight.com/">arthinsight.com</a> · For information and education only.</footer>
+<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
 </div>
-<script src="/public_nav.js?v=dfe1aa1e0c"></script></body>
+<script src="/public_nav.js?v=dca3b9cd9d"></script></body>
 </html>

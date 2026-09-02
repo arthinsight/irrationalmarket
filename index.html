@@ -44,6 +44,9 @@
     @media (max-width:700px) {
       .runner-in { align-items:flex-start; flex-wrap:wrap; gap:8px; padding:10px 0; }
       .runner-txt { flex:1 1 100%; order:3; font-size:12.5px; }
+      /* 10.5px is under qa/mobile_audit M7's 11px floor. Phone only — the desktop runner keeps
+         its tighter tag. */
+      .runner-tag { font-size:11px; }
       .runner-go { margin-left:auto; }
     }
     .nav { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4); }
@@ -112,25 +115,6 @@
   font-size:var(--fs-sm,12.5px);color:var(--txt);border-bottom:1px solid var(--line)}
 .cosearch .cosr:last-child{border-bottom:none}
 .cosearch .cosr:hover,.cosearch .cosr.on{background:var(--hover,rgba(15,23,42,.04))}
-/* ── PHONE (owner 2026-08-19): the search is a BUTTON in the bar; tapping it opens the field at the
-   TOP of the page. The bar itself is pinned to the BOTTOM on phones (see the nav rules), and a text
-   field down there is unusable: the on-screen keyboard covers the field, its own results, or both.
-   Opening at the top keeps the field and the result list above the keyboard.
-   `.cosbtn` is hidden on desktop and the input shown; below 700px that swaps. */
-.cosbtn{display:none}
-@media (max-width:700px){
-  .cosearch{margin-left:auto;position:static}
-  .cosbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
-    border:none;background:none;color:var(--mut,#64748b);font-size:var(--fs-lg,18px);cursor:pointer;
-    line-height:1}
-  .cosearch input{display:none}
-  /* open: the field becomes a sheet at the top of the viewport, above the bottom bar and the page */
-  .cosearch.cos-open input{display:block;position:fixed;top:0;left:0;right:0;width:auto;max-width:none;
-    z-index:80;margin:0;border-radius:0;border:none;border-bottom:1px solid var(--line);
-    padding:14px 12px;font-size:var(--fs-md,15px);background:var(--card,#fff)}
-  .cosearch.cos-open .cosl{position:fixed;top:49px;left:0;right:0;max-width:none;min-width:0;
-    max-height:calc(100vh - 120px);overflow:auto;z-index:80;border-radius:0}
-}
 .cosearch .cosr .co{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cosearch .cosr .sy{flex:0 0 auto;font-weight:700;color:var(--mut);font-size:var(--fs-xs,11px)}
 .cosearch .cosmore{padding:6px 11px;font-size:var(--fs-xs,11px);color:var(--mut);background:var(--chip-bg)}
@@ -191,8 +175,8 @@
         <p class="eyebrow">Indian Stock Market Data and Intelligence</p>
         <h1>See the market.<br>Understand the business.<br>Find the signal.</h1>
         <p>Arth Insight brings market structure, business quality and post-listing behaviour into one clear view—so you can spend less time filtering noise.</p>
-        <div class="hero-search home-company-search"><!--COS-START--><div class="cosearch" id="cosearch"><button class="cosbtn" id="cos-open" type="button" aria-label="Search for a company or IPO" aria-expanded="false">&#9906;</button><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a company or IPO" aria-label="Search for a company or IPO"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></div>
-        <div class="actions"><a class="button" href="screens/?tab=tab-momentum2">Explore Momentum</a><a class="button secondary" href="screens/?tab=tab-investible">Explore Investing</a></div>
+        <div class="hero-search home-company-search"><!--COS-START--><div class="cosearch" id="cosearch"><input id="cos-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a company or IPO" aria-label="Search for a company or IPO"><div class="cosl" id="cos-list" role="listbox"></div></div><!--COS-END--></div>
+        <div class="actions"><a class="button" href="screens/momentum/">Explore Momentum</a><a class="button secondary" href="screens/investing/">Explore Investing</a></div>
         <div class="proof" aria-label="Platform principles"><span class="chip">Systematic</span><span class="chip">Transparent</span><span class="chip">Data-driven</span><span class="chip">No analyst opinions</span></div>
       </div>
     </section>
@@ -202,8 +186,8 @@
         <div class="section-head"><div><p class="eyebrow">The platform</p><h2>Three ways to understand Indian equities.</h2></div><p class="copy">Not another stock screener. One intelligence layer that connects the market, the business and the journey after listing.</p></div>
         <div class="pillars">
           <a class="pillar" href="ipo/index.html"><span class="number">01 — IPO INTELLIGENCE</span><h3>Read it before listing. Follow it after.</h3><p>Deep-dive the DRHP/RHP before the IPO, then follow return, drawdown, liquidity and breakout behaviour after listing.</p><div class="tags"><span class="chip">DRHP / RHP</span><span class="chip">Return</span><span class="chip">Drawdown</span><span class="chip">Liquidity</span></div><span class="text-link">Explore IPO Intelligence →</span></a>
-          <a class="pillar" href="screens/?tab=tab-momentum2"><span class="number">02 — MOMENTUM</span><h3>Market structure &amp; momentum</h3><p>Find stocks entering, or remaining in, constructive market structures.</p><div class="stage-line" aria-label="Market cycle"><span>1</span><i></i><span>2</span><i></i><span>3</span><i></i><span>4</span></div><div class="tags"><span class="chip">Stage</span><span class="chip">Trend</span><span class="chip">Volume</span></div><span class="text-link">Explore Momentum →</span></a>
-          <a class="pillar" href="screens/?tab=tab-investible"><span class="number">03 — INVESTING</span><h3>Business quality &amp; valuation</h3><p>Understand how strong the underlying business is—and whether the market is recognising that quality.</p><div class="tags"><span class="chip">Growth</span><span class="chip">Profitability</span><span class="chip">Cash flow</span><span class="chip">Valuation</span></div><span class="text-link">Explore Investing →</span></a>
+          <a class="pillar" href="screens/momentum/"><span class="number">02 — MOMENTUM</span><h3>Market structure &amp; momentum</h3><p>Find stocks entering, or remaining in, constructive market structures.</p><div class="stage-line" aria-label="Market cycle"><span>1</span><i></i><span>2</span><i></i><span>3</span><i></i><span>4</span></div><div class="tags"><span class="chip">Stage</span><span class="chip">Trend</span><span class="chip">Volume</span></div><span class="text-link">Explore Momentum →</span></a>
+          <a class="pillar" href="screens/investing/"><span class="number">03 — INVESTING</span><h3>Business quality &amp; valuation</h3><p>Understand how strong the underlying business is—and whether the market is recognising that quality.</p><div class="tags"><span class="chip">Growth</span><span class="chip">Profitability</span><span class="chip">Cash flow</span><span class="chip">Valuation</span></div><span class="text-link">Explore Investing →</span></a>
         </div>
       </div>
     </section>
@@ -231,30 +215,14 @@
   <footer><div class="wrap footer-row"><span>ARTH INSIGHT · Indian Stock Market Data and Intelligence</span><span>Public market and company intelligence · For information and education only.</span></div></footer>
 <script id="co-search-js">
 (function(){
-  // SHOWING IS `display:block`, NOT `display:''`. The stylesheet's default for .cosl is display:none,
-  // so clearing the INLINE value hands control back to that rule and the dropdown stays hidden — it
-  // built the right options every time and never appeared. Browser-verified 2026-08-17; the Node
-  // harness could not catch it because it reads innerHTML and does not evaluate CSS.
   var q=document.getElementById('cos-q'), list=document.getElementById('cos-list');
   if(!q||!list) return;
-  var ALL=[], loaded=false, MAX=6, loadErr='';
+  var ALL=[], loaded=false, MAX=6;
   function load(){
     if(loaded) return; loaded=true;
-    fetch('data/index.json')
-      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-      .then(function(j){
-        ALL=(j.companies||[]).map(function(c){return {s:c.s, co:c.co||''};});
-        if(!ALL.length) loadErr='the company index is empty';
-      })
-      .catch(function(e){
-        // SAY SO. This used to swallow the failure and leave ALL empty, so typing produced nothing
-        // and the box looked broken rather than unable to load. The common case is the page opened
-        // from the file system, where the browser blocks the fetch outright.
-        ALL=[];
-        loadErr = (location.protocol==='file:')
-          ? 'opened from the file system — serve the folder over HTTP for search to work'
-          : ('could not load the company index (' + ((e && e.message) || e) + ')');
-      });
+    fetch('data/index.json').then(function(r){return r.ok?r.json():{};}).then(function(j){
+      ALL=(j.companies||[]).map(function(c){return {s:c.s, co:c.co||''};});
+    }).catch(function(){ ALL=[]; });
   }
   q.addEventListener('focus', load);
   q.addEventListener('input', function(){
@@ -271,15 +239,12 @@
     if(hits.length>MAX){ for(;i<ALL.length;i++){ var x=ALL[i];
         if(x.s.toUpperCase().indexOf(t)>=0 || x.co.toUpperCase().indexOf(t)>=0) more++; }
       more+=hits.length-MAX; hits=hits.slice(0,MAX); }
-    if(!hits.length){
-      list.innerHTML='<div class="cosmore">'+(loadErr || 'No match.')+'</div>';
-      list.style.display='block'; return;
-    }
+    if(!hits.length){ list.innerHTML='<div class="cosmore">No match.</div>'; list.style.display=''; return; }
     list.innerHTML=hits.map(function(r){
       return '<div class="cosr" role="option" data-cos="'+r.s+'"><span class="co">'+
              r.co.replace(/[&<>]/g,'')+'</span><span class="sy">'+r.s+'</span></div>';
     }).join('')+(more?'<div class="cosmore">+'+more+' more &mdash; keep typing</div>':'');
-    list.style.display='block';
+    list.style.display='';
   });
   function go(sym){ if(sym) location.href='company/?sym='+encodeURIComponent(sym); }
   list.addEventListener('click', function(e){
@@ -287,47 +252,14 @@
     if(row) go(row.getAttribute('data-cos'));
   });
   // Enter picks the first match, which is what a keyboard user expects after typing a ticker.
-  /* KEYBOARD SELECTION (owner 2026-08-19: "I can't use keyboard down or up arrow to select and
-     enter"). Enter alone took the FIRST row, so a reader who wanted the third had to reach for the
-     mouse. Arrow keys move a highlight through the rows and Enter takes the highlighted one; with
-     nothing highlighted Enter still takes the first, so the old muscle memory keeps working.
-     `.cosr.on` is already styled (same rule as :hover), so the highlight needs no new CSS. */
-  var act = -1;
-  function rows(){ return Array.prototype.slice.call(list.querySelectorAll('[data-cos]')); }
-  function mark(i){
-    var rs = rows(); if(!rs.length){ act = -1; return; }
-    act = (i + rs.length) % rs.length;
-    rs.forEach(function(r,k){ r.classList.toggle('on', k === act); });
-    if(rs[act].scrollIntoView) rs[act].scrollIntoView({block:'nearest'});
-  }
   q.addEventListener('keydown', function(e){
-    if(e.key==='ArrowDown'){ e.preventDefault(); mark(act + 1); return; }
-    if(e.key==='ArrowUp'){ e.preventDefault(); mark(act - 1); return; }
-    if(e.key==='Enter'){
-      var rs = rows(), pick = (act >= 0 && rs[act]) || rs[0];
-      if(pick){ e.preventDefault(); go(pick.getAttribute('data-cos')); } }
-    if(e.key==='Escape'){ list.style.display='none'; closeSheet(); }
-  });
-  /* a fresh query invalidates the highlight — otherwise Enter takes row 3 of the PREVIOUS results */
-  q.addEventListener('input', function(){ act = -1; });
-
-  /* PHONE: the button opens the field as a sheet at the top of the viewport (see the CSS). */
-  var box = document.getElementById('cosearch'), openBtn = document.getElementById('cos-open');
-  function closeSheet(){
-    if(!box) return;
-    box.classList.remove('cos-open');
-    if(openBtn) openBtn.setAttribute('aria-expanded','false');
-    list.style.display='none';
-  }
-  if(openBtn) openBtn.addEventListener('click', function(e){
-    e.stopPropagation();
-    var open = box.classList.toggle('cos-open');
-    openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if(open){ q.focus(); load(); } else { list.style.display='none'; }
+    if(e.key==='Enter'){ var first=list.querySelector('[data-cos]');
+      if(first){ e.preventDefault(); go(first.getAttribute('data-cos')); } }
+    if(e.key==='Escape'){ list.style.display='none'; }
   });
   document.addEventListener('click', function(e){
-    if(!document.getElementById('cosearch').contains(e.target)){ list.style.display='none'; closeSheet(); }
+    if(!document.getElementById('cosearch').contains(e.target)) list.style.display='none';
   });
 })();
-</script><script src="/public_nav.js?v=e8a42cc64f"></script></body>
+</script><script src="/public_nav.js?v=dca3b9cd9d"></script></body>
 </html>
