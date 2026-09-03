@@ -1150,7 +1150,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=4fb60fedb5';
+  script.src='../../company_renderer.js?v=0e4689db5c';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
@@ -1182,12 +1182,15 @@ function loadSymbol(selected,index,explorer,replace){
   var row=(index.companies||[]).filter(function(x){return x.s===selected;})[0];
   if(!row)return Promise.reject(new Error('Symbol not found'));
   var file=row.file||selected+'.json',vol=String(file).replace(/\.json$/,'.v.json');
+  /* TWO FETCHES, NOT THREE (2026-09-03). The presentation half used to be a third file,
+     `data/company_page/<SYM>.json`; it is now planted into the base payload by
+     `company_public_page.build_sidecars`, so `company` IS the `extra` argument. Note the base file
+     is `row.file`, NOT `<selected>.json` -- `M&M` is stored as `M_M.json`. */
   return Promise.all([get('../../data/company/'+encodeURIComponent(file)),
-                      get('../../data/company/'+encodeURIComponent(vol),true),
-                      get('../../data/company_page/'+encodeURIComponent(selected)+'.json',true)])
+                      get('../../data/company/'+encodeURIComponent(vol),true)])
     .then(function(parts){
       var company=merge(parts[0]||{},parts[1]||{});
-      var P=buildPayload(company,explorer,parts[2]||{},row,selected);
+      var P=buildPayload(company,explorer,company,row,selected);
       document.getElementById('store-payload').textContent=JSON.stringify(P)/* no </ escaping: this sets textContent, which is NOT parsed
         as HTML, so the sequence cannot close the script element. The company page escapes it
         because it INLINES the payload into markup at build time; here it never touches HTML. */;
