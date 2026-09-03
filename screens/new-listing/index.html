@@ -396,6 +396,25 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
 }
 
 
+/* ── Board and leadership / KMP: person cards, not a table (owner 2026-09-02) ───────────────────
+   The board list was a 3-column table whose last column is a free-text biography. A table row is
+   as tall as its tallest cell, so a 4-line bio stretched the Director and Role columns into tall
+   thin strips -- unreadable on desktop and the exact M10 "too wide AND too tight" shape on a phone.
+   A card reads name -> role -> bio, which is the order a reader wants, and auto-fit reflows it to a
+   single column on a phone with no horizontal scroll at all.
+   Deliberately mirrors `.product-grid`/`.product-card` above rather than inventing a second system;
+   only the type scale differs, because a person's name is the anchor here. */
+.person-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.person-card{min-width:0;max-width:100%;padding:15px;border:1px solid #e2e8f0;border-radius:7px;
+  background:#f8fafc;overflow-wrap:anywhere}
+.person-card h4{margin:0;font:600 13px Outfit,sans-serif;color:#0f172a}
+.person-card .person-role{margin:3px 0 0;color:#2563eb;font-size:11px;font-weight:700}
+.person-card .person-bio{margin:8px 0 0;color:#334155;font-size:12px;line-height:1.5}
+@media (max-width:700px){
+  .person-grid{grid-template-columns:1fr}
+}
+
+
 /* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
    top nav goes away"). Row 1 pins to the viewport top; row 2 pins directly beneath it at --nav1-h,
    which NAV_STICKY_JS measures off the real row. A hard-coded offset is wrong the moment the row
@@ -856,13 +875,34 @@ if(!window.M2D){window.M2D=(function(){
   // The picker reaches ~2,131 stocks while the inline payload carries only the 195 members, so for
   // everything else the record, its price and its stage history all come from this file. One promise
   // per symbol, cached, so selecting a stock does not fetch the same file three times.
-  const COMP={}, COMPQ={};
+  const COMP={}, COMPQ={}, DEV={};   /* DEV: per-symbol Recent-developments rows, restored 2026-09-03 */
   function fetchCompany(sym){
     if(COMP[sym]) return Promise.resolve(COMP[sym]);
     if(COMPQ[sym]) return COMPQ[sym];
-    COMPQ[sym]=fetch(DATADIR+'/company/'+encodeURIComponent(fileOf(sym)))
-      .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[]; return m;})
+    /* BOTH HALVES. `assemble_company.VOLATILE_PATHS` moved ('momentum',) wholesale into
+       `<SYM>.v.json` so a price tick stops rewriting the research half (PAYLOAD_SPLIT_DESIGN.md).
+       This reader was never updated: it fetched only the base file, where `momentum` no longer
+       exists, so `c.momentum` was undefined, `PRICE[sym]` was [] and every chart rendered
+       "No NSE price history for this symbol." while the data sat in the sibling file -- E2E has 897
+       points through 2026-09-02. Stage still rendered, which is why this looked like a chart bug
+       rather than a fetch bug. The volatile half is OPTIONAL: a pre-split or hollow-stripped company
+       has only the base, and must still load. */
+    const _vol=String(fileOf(sym)).replace(/\.json$/,'.v.json');
+    COMPQ[sym]=Promise.all([
+      fetch(DATADIR+'/company/'+encodeURIComponent(fileOf(sym)))
+        .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}),
+      fetch(DATADIR+'/company/'+encodeURIComponent(_vol))
+        .then(r=>r.ok?r.json():null).catch(()=>null)])
+      .then(parts=>{const b=parts[0]||{}, v=parts[1];
+                const c=Object.assign({},b);
+                if(v&&v.momentum!==undefined)c.momentum=v.momentum;
+                if(v&&v.deepdive&&v.deepdive.px!==undefined)
+                  c.deepdive=Object.assign({},b.deepdive||{},{px:v.deepdive.px});
+                if(v&&v.drhp&&v.drhp.grades!==undefined)
+                  c.drhp=Object.assign({},b.drhp||{},{grades:v.drhp.grades});
+                return c;})
+      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[];
+                DEV[sym]=((c&&c.developments&&c.developments.rows)||[]); return m;})
       .catch(e=>{delete COMPQ[sym]; throw e;});
     return COMPQ[sym];
   }
@@ -986,6 +1026,68 @@ if(!window.M2D){window.M2D=(function(){
         if(tb)tb.innerHTML=m; });
   }
 
+  /* RECENT DEVELOPMENTS -- restored 2026-09-03. These six functions were dropped from this
+     module while `screens_pages.buildPayload()` kept supplying `developments:` (its own comment
+     warns this key had already been missed once). The renderer reads P.developments and renders
+     NOTHING with no error when the pane is absent, so the panel vanished from four live pages
+     with every gate green. Recovered verbatim from public_backup_20260901_092943. */
+function devCss(){
+    if (devCssDone) return; devCssDone = true;
+    var st = document.createElement('style');
+    st.textContent = '.dev-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}'
+      + '.dev-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline;'
+      + 'padding-bottom:10px;border-bottom:1px solid #eef2f7}'
+      + '.dev-row:last-of-type{border-bottom:0;padding-bottom:0}'
+      + '.dev-date{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.05em;'
+      + 'text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}'
+      + '.dev-text{color:#334155;font-size:13px;line-height:1.55;overflow-wrap:anywhere}'
+      + '.dev-text strong{color:#0f172a;font-weight:600}'
+      + '.dev-quant{display:inline-block;margin-left:4px;padding:2px 7px;border-radius:999px;'
+      + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
+      + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
+      + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
+      + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
+      + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
+      + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
+    document.head.appendChild(st);
+  }
+  var DEVMON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function devDate(d){
+    var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (m[3] + ' ' + DEVMON[+m[2]-1] + ' ' + m[1]) : esc(d||'');
+  }
+  // the digest writes markdown bold inside its prose; escape first, then render only that
+  function devText(t){ return esc(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
+  function devRow(r,hidden){
+    return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
+      + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'+devText(r.text)
+      + (r.quant?' <span class="dev-quant">'+esc(r.quant)+'</span>':'')
+      + (r.url?' <a class="dev-src" href="'+esc(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
+      + '</span></li>';
+  }
+  // Returns the LIST ONLY - the caller supplies its own heading/card chrome, because the two
+  // consumers frame it differently (a .m2card on the tab, a .dev-block section on the page).
+  function devList(rows){
+    rows = (rows||[]).slice();
+    if (!rows.length) return '';
+    devCss();
+    rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+    var vis = rows.slice(0,DEV_SHOWN).map(function(r){return devRow(r,false);}).join('');
+    var hid = rows.slice(DEV_SHOWN).map(function(r){return devRow(r,true);}).join('');
+    // NO inline onclick: a delegated listener has no nested quoting to get wrong. The first version
+    // used one and shipped a syntax error that broke the whole renderer.
+    var btn = hid ? '<button class="dev-more" data-more="1">Show '+(rows.length-DEV_SHOWN)+' more</button>' : '';
+    return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
+  }
+  function devPane(sym){
+    var rows = DEV[sym] || [];
+    var h = devList(rows);
+    _set('m2-dev', h ? '<div class="m2sec">Recent developments</div>' + h : '');
+    var card = document.getElementById('m2-dev-card');
+    if (card) card.style.display = h ? '' : 'none';
+  }
+
+
   function _set(id,h){var e=document.getElementById(id); if(e) e.innerHTML=h;}
   function select_detail(sym){
     cur=sym;
@@ -1029,7 +1131,7 @@ if(!window.M2D){window.M2D=(function(){
           histTbl:histTbl, renderVol:renderVolAnalysis, loadDelVol:loadDelVol,
           insights:insights, kv:kv, kvExt:kvExt, mcapCell:mcapCell,
           esc:esc, stg:stg, catLabel:catLabel, sigCell:sigCell, pc:pc, f:f,
-          chips:chips, fileOf:fileOf,
+          chips:chips, fileOf:fileOf, developments:devList, devPane:devPane,
           cur:function(){return cur;}, setCur:function(s){cur=s;},
           setTf:function(n){tf=n;if(cur)chart(cur);}};
 })();}
@@ -1048,7 +1150,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=cdc0013b2c';
+  script.src='../../company_renderer.js?v=4fb60fedb5';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
