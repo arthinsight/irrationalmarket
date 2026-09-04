@@ -185,69 +185,111 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
 .risk-row-body h3 { font-size: 14px; font-weight: 600; color: #1e293b; margin: 0 0 4px 0; }
 .risk-row-body p { font-size: 13px; color: #475569; margin: 0; line-height: 1.5; }
 
-/* Where the money goes — proportional use-of-proceeds bars. The internal DRHP dashboard uses
-   .ipg-bar/.track/.fill; those classes are not in the public stylesheet, so the card carries
-   its own rather than importing internal chrome. */
-.use-bar{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(90px,1fr) auto;align-items:center;gap:10px;padding:6px 0;font-size:12.5px}
-.use-n{min-width:0;overflow-wrap:anywhere;color:#334155}
-.use-track{height:8px;overflow:hidden;border-radius:999px;background:#f1f5f9}
-.use-fill{display:block;height:100%;border-radius:inherit;background:#2563eb}
-.use-amt{white-space:nowrap;color:#64748b;font-size:11.5px;font-weight:700}
-.use-unit{color:#64748b;font-weight:400}
-@media(max-width:760px){.use-bar{grid-template-columns:1fr auto;gap:6px}.use-track{grid-column:1/-1}}
+/* ---------------------------------------------------------------------------------------------
+   PHONE ONLY (max-width:700px) — qa/mobile_audit M7 (no text under 11px) and M5 (tap targets).
 
-/* PHONE LEGIBILITY AND REACH (qa/mobile_audit M5/M7/M10, 2026-08-25).
-   Desktop sizes are unchanged - every rule here is inside the phone breakpoint.
+   This file is loaded by BOTH /company/ (company_page.py) and every /screens/* page
+   (screens_pages.build_html), so one block here fixes all five routes rather than five copies.
 
-   M7 - nothing below 11px. `.eyebrow` shipped 10px and `.evidence` badges 9px, which is below the
-   audit's own legibility floor and below what most people can read on a bus.
-   M5 - 40px is a fingertip. `.show-more-btn` was 24px and the chart timeframe buttons 23px; both
-   are ordinary buttons, not dense chips among their own kind, so they get the full floor.
-   M10 - a table that overflows WHILE crushing a column to 11-15 wrapped lines is unreadable in
-   both directions. Giving cells a real minimum lets the row take the width it needs and the
-   wrapper scroll, which is what `.table-wrap{overflow:auto}` is already there for. */
-@media(max-width:760px){
-  /* Every sub-11px size in this stylesheet, raised to the floor. Listed one by one rather than with
-     a blanket rule because each is a deliberate label style on desktop; only the phone size moves. */
-  .eyebrow,.evidence,.title-row span,.decision-strip span,th,.kpi span,.profile-band span,
-  .status,.cred-metrics span,.analysis-strip span,.call-context span,.verdict-banner span,
-  .explorer-title span,.explorer-stock span,.explorer-stock small,small.row-note,
-  .theme-parent,.theme-pill,.theme-pill.long,.src-title span,
-  .prototype-bar b{font-size:11px}
-  /* These are declared as `<parent> span{font-size:9px}` descendant rules, which outrank a
-     flat `span` in this block - so match them the same way. */
-  .analysis-strip span,
-  .call-context span,
-  .cred-metrics span,
-  .decision-strip span,
-  .explorer-stock span,
-  .explorer-title span,
-  .kpi span,
-  .profile-band span,
-  .theme-intel span,
-  .verdict-banner span{font-size:11px}
-  .evidence{padding:3px 8px}
-  /* Ordinary buttons and form controls get the full 40px fingertip - they are not dense chips. */
-  .show-more-btn{min-height:40px;padding:8px 14px}
-  #m2-tf button,.m2tf button{min-height:40px;padding:8px 12px}
+   WHY A MEDIA BLOCK AND NOT A GLOBAL BUMP. Every size below is a deliberate desktop choice: 9px
+   uppercase 800-weight eyebrows/labels are the page's visual grammar, and they read fine at a
+   desktop viewing distance in a 1460px shell. On a 375px phone the same glyphs are simply too
+   small — M7's floor is 11px and these were 9-10px. Raising them GLOBALLY would restyle the
+   desktop page nobody complained about, so the fix is scoped to the phone.
+
+   `--fs-xs` (11px) is the shared token and is already AT the floor, so there is no undersized
+   token to raise: these are hardcoded literals in the rules above. 11px is used where the label is
+   a dense inline chip/eyebrow, 11.5px where it is a standalone line with room. */
+@media(max-width:700px){
+  /* Section eyebrows and band/strip/kpi micro-labels — all 9-10px above. */
+  .eyebrow,.theme-parent,.call-context span,.cred-metrics span{font-size:11.5px}
+  .decision-strip span,.profile-band span,.analysis-strip span,.kpi span,
+  .theme-intel span,.verdict-banner span,.explorer-title span{font-size:11px}
+  /* Pills and badges. Padding is trimmed a hair so the taller glyphs do not grow the row. */
+  .evidence,.status,.theme-pill{font-size:11px;padding:3px 8px}
+  /* Table headers. `table.mmhist th` (stage history) inherits this same bare `th` rule. */
+  th{font-size:11px}
+  /* `.row-note` is a <small> inside `table{font-size:12px}`, so the browser's own `small`
+     shrink put it at 10px. Pinned rather than left to inherit. */
+  .row-note{font-size:11px}
+  /* Stock explorer rows: the name was 10px and the stage note 9px. */
+  .explorer-stock span{font-size:11px}
+  .explorer-stock small{font-size:11px}
+
+  /* M5 — tap targets. These are single controls, not chips among their own kind, so they take
+     the 40px floor rather than the dense-32 exemption. */
+  /* `.show-more-btn` carries its padding in an INLINE style attribute (written by
+     company_store_prototype.js), which no plain rule can outrank — hence !important. It rendered
+     24px tall. */
+  .show-more-btn{min-height:40px!important;padding:8px 14px!important}
+  /* Matches `#tab-momentum2 .m2tf button` (momentum_2_dashboard.py) on specificity so it wins
+     without !important; that rule's 3px padding rendered these 22px. */
+  #tab-momentum2 .m2tf button{min-height:40px;padding:8px 12px}
+  /* The floating "Stocks" button measured 39px — one pixel under. */
   .explorer-open{min-height:40px}
-  .screen-filters input,.screen-filters select{min-height:40px}
-  /* M10: a table that overflows WHILE crushing a column to 14 wrapped lines is unreadable both
-     ways. `!important` because the shared mobile rules set `white-space:normal` on these same
-     cells, which is what produced the wrapping; the wrapper already scrolls (`overflow:auto`), so
-     letting the row take its natural width is the readable outcome. */
-  .data-table th,.data-table td,.table-wrap th,.table-wrap td{
-    min-width:104px;white-space:nowrap!important}
-  .data-table th:first-child,.data-table td:first-child,
-  .table-wrap th:first-child,.table-wrap td:first-child{min-width:150px}
 }
 
-/* Recent developments - CARD CHROME ONLY. The LIST rules (.dev-list/.dev-row/.dev-date/
-   .dev-text/.dev-quant/.dev-src/.dev-more) are injected by the shared M2D library that also
-   renders the rows, so both consumers get one definition. They lived here as well until
-   2026-08-27 and `.dev-row` was defined FOUR times in the shipped page - harmless only while
-   the two copies agreed, which is exactly the drift a shared renderer is meant to remove. */
-.dev-block{margin-top:18px;padding:18px 20px;border:1px solid #dbe4ef;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}.dev-head{margin:0 0 12px;font:600 15px Outfit;color:#0f172a}@media(max-width:760px){.dev-block{padding:14px 15px}}
+
+/* ── M10: horizontal scroll with a PINNED first column (owner 2026-09-02) ───────────────────────
+   The commitments / walk-the-talk tables are 4 columns that measure ~400px inside a 302px phone
+   viewport. `.table-wrap{overflow:auto}` already scrolled them, but `td:first-child` carries
+   `min-width:18ch; white-space:normal`, so the label column wrapped 5+ lines deep WHILE the table
+   overflowed -- the audit's M10 rule ("too wide AND too tight"), and the reason it fires on
+   /company/ and /screens/momentum/ (10 findings).
+
+   Scrolling alone does not fix it: scroll a 4-column table sideways and the row loses its label,
+   so the numbers become unreadable. Pinning column 1 keeps the label on screen while the data
+   columns scroll under it -- which is why the owner asked for both, not either.
+
+   Phone only. Desktop has room for all four columns and is untouched. */
+@media (max-width:700px){
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Stop the label column wrapping into a 5-line stack: it is what makes the table "too tight".
+     14ch fits the longest label used ("Forward commitment") on two lines, not ten. */
+  .table-wrap th:first-child,
+  .table-wrap td:first-child{
+    position:sticky; left:0; z-index:2;
+    min-width:14ch; max-width:14ch;
+    white-space:normal; overflow-wrap:anywhere;
+    /* An opaque background is REQUIRED -- a sticky cell over a transparent one shows the scrolled
+       content through it. The header cell needs its own, since thead has no card background. */
+    background:#fff;
+  }
+  .table-wrap th:first-child{background:#f8fafc; z-index:3}
+  /* A hairline so the pinned column reads as pinned rather than as a rendering artefact. */
+  .table-wrap th:first-child::after,
+  .table-wrap td:first-child::after{
+    content:""; position:absolute; top:0; right:0; bottom:0; width:1px; background:#e2e8f0;
+  }
+  /* WHY THERE IS NO BLANKET `td{max-width}` HERE. Tried 2026-09-02 and MEASURED: capping every
+     cell at 22ch took the gate from 10 findings to 14 -- it added a new 9-cell finding on all four
+     /screens/ pages by squeezing columns that were fitting. Reverted.
+
+     What remains, and it is a DESIGN decision rather than a CSS one: a row whose prose cell runs to
+     22 lines makes every short cell beside it report as "squeezed", because a table row is as tall
+     as its tallest cell. The audit is right that the row is unreadable on a phone; the fix is to
+     stop putting long prose in a table cell on a 375px viewport (a stacked card, or a truncation
+     with a tap-to-expand), not to constrain the columns further. */
+}
+
+
+/* ── Board and leadership / KMP: person cards, not a table (owner 2026-09-02) ───────────────────
+   The board list was a 3-column table whose last column is a free-text biography. A table row is
+   as tall as its tallest cell, so a 4-line bio stretched the Director and Role columns into tall
+   thin strips -- unreadable on desktop and the exact M10 "too wide AND too tight" shape on a phone.
+   A card reads name -> role -> bio, which is the order a reader wants, and auto-fit reflows it to a
+   single column on a phone with no horizontal scroll at all.
+   Deliberately mirrors `.product-grid`/`.product-card` above rather than inventing a second system;
+   only the type scale differs, because a person's name is the anchor here. */
+.person-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.person-card{min-width:0;max-width:100%;padding:15px;border:1px solid #e2e8f0;border-radius:7px;
+  background:#f8fafc;overflow-wrap:anywhere}
+.person-card h4{margin:0;font:600 13px Outfit,sans-serif;color:#0f172a}
+.person-card .person-role{margin:3px 0 0;color:#2563eb;font-size:11px;font-weight:700}
+.person-card .person-bio{margin:8px 0 0;color:#334155;font-size:12px;line-height:1.5}
+@media (max-width:700px){
+  .person-grid{grid-template-columns:1fr}
+}
 
 
 /* BOTH ROWS STAY PUT (owner 2026-08-18: "both should stay at top ... currently when I scroll down
@@ -594,7 +636,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 .op .colink{margin:18px 0 0}.op .colink a{color:var(--accent);font-family:"Archivo",sans-serif;font-weight:600;font-size:var(--fs-base);text-decoration:none;border-bottom:1px solid currentColor}</style>
 </head>
 <body>
-<header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"></div></nav></header>
+<header class="site-header"><nav class="public-company-nav nav" aria-label="Primary navigation"><a class="brand" href="../../index.html"><span class="brand-mark">A</span><span>Arth Insight</span></a><div class="nav-links"><a href="../../index.html">Home</a><a href="../../bigpicture/">Big Picture</a><a href="../../feed/">Feed</a><a href="../../ipo/">IPO Intelligence</a><a href="../../screens/">Screens</a></div></nav></header>
 <div class="wrap wide"><nav class="co-sub" aria-label="Screens"><a class="co-sub-a" href="../../screens/momentum/">Momentum</a><a class="co-sub-a" href="../../screens/investing/">Investing</a><a class="co-sub-a" href="../../screens/new-listing/">New Listing</a><a class="co-sub-a active" href="../../screens/reports/" aria-current="page">One Pager Report</a></nav>
 
 <article class="op"><header class="mast">
@@ -962,7 +1004,7 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   </div>
 </footer>
 </article>
-<footer>ARTH INSIGHT · <a href="https://arthinsight.com/">arthinsight.com</a> · For information and education only.</footer>
+<footer><a href="https://arthinsight.com/">arthinsight.com</a></footer>
 </div>
 <script id="nav-sticky-js">
 (function(){
