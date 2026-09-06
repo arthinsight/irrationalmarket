@@ -148,14 +148,7 @@
        To run the next one: change the href, the text and `data-until`. To stop it early: delete
        this block. Keep the markup — the strip is hidden by default and only revealed by the script,
        so a reader with JS off sees nothing rather than a stale promo that never expires. -->
-  <div class="runner" id="runner" data-until="2026-08-30" hidden>
-    <a class="wrap runner-in" href="reports/tempsens/">
-      <span class="runner-tag">IPO Listing</span>
-      <span class="runner-txt"><b>Tempsens Instruments</b> lists 28 August. Read the one-pager
-        — the accounts, the anchor book and what the offer document leaves out.</span>
-      <span class="runner-go">Read →</span>
-    </a>
-  </div>
+  
   <script>
   (function(){
     var r=document.getElementById('runner');
@@ -257,8 +250,16 @@
       if(first){ e.preventDefault(); go(first.getAttribute('data-cos')); } }
     if(e.key==='Escape'){ list.style.display='none'; }
   });
+  // The wrapper is looked up ONCE and null-guarded. This handler is bound to `document`, so it runs
+  // on EVERY click on the page; where the widget ships without its `#cosearch` wrapper (the public
+  // header search renders the input and list inside `.public-header-search`), the unguarded
+  // `getElementById('cosearch').contains(...)` threw a TypeError on every click and keystroke --
+  // measured 2026-09-04 on the :8001 homepage: 9 pageerrors from three searches, and the
+  // click-outside-to-close behaviour never worked because the handler died before reaching it.
+  var root=document.getElementById('cosearch');
   document.addEventListener('click', function(e){
-    if(!document.getElementById('cosearch').contains(e.target)) list.style.display='none';
+    var box=root||(list&&list.parentNode);
+    if(box&&!box.contains(e.target)) list.style.display='none';
   });
 })();
 </script><script src="/public_nav.js?v=dca3b9cd9d"></script></body>
