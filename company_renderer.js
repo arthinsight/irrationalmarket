@@ -2,8 +2,79 @@
 const P=JSON.parse(document.getElementById('store-payload').textContent),I=P.identity,R=P.report||{},Q=P.drhpResearch||{},M=P.market||{},D=P.currentResearch||{},C=P.currentContext||{},PM=P.pageModel||null;
 const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),A=v=>Array.isArray(v)?v:(v?[v]:[]),N=(v,d=1)=>{var n=Number(v);return v==null||v===''||!isFinite(n)?'—':n.toLocaleString('en-IN',{maximumFractionDigits:d});};/* NaN GUARD 2026-09-03 (owner: "on page financial one table heading is NaN"). The old test was `v==null||v===''`, which does NOT catch NaN -- and every period table computes its cells, so a row missing one field renders `undefined/100` = NaN and prints the literal string "NaN". Seen on QUALIANCEINTERNATIONAL (FY22 has no `pat`, FY26 no `ebitda`), HARITINDUSTRIES and OMGALAXY. `isFinite` also catches Infinity from a divide-by-zero, which the same cells can produce. */
 const ordinal=v=>{let n=Number(v),s=['th','st','nd','rd'],m=n%100;return N(n,0)+(s[(m-20)%10]||s[m]||s[0])};
-const value=x=>typeof x==='string'?x:(x?.title||x?.risk||x?.item||x?.note||x?.event||x?.detail||x?.purpose||x?.issue||x?.approval||x?.signal||x?.check||JSON.stringify(x));
-const list=(v,n=8)=>A(v).length?'<ul class="intel-list">'+A(v).slice(0,n).map(x=>'<li>'+mdInline(E(mdLine(value(x))))+'</li>').join('')+'</ul>':'',card=(t,b,c='')=>b?'<article class="card '+c+'"><h3>'+E(t)+'</h3>'+b+'</article>':'';
+/* SHAPE CONTRACT FOR TEXT RENDERING -- 2026-09-04 (owner: "its Market size and growth is not
+   presented correctly (has bracket double quote etc) do RCA and see how wide spread it is on ANY
+   sections and fix so this does not happen"; "I don't need a patch, it should be an architecture
+   level fix").
+
+   THE ARCHITECTURE PROBLEM, stated plainly: the payload has no shape contract, so three different
+   shapes arrive at ONE renderer. `sk.market_size` is a list of dicts, `sk.drivers` is a
+   pipe-delimited string, `sk.cagrs` is null. `value()` ended in `JSON.stringify(x)`, so any dict
+   without one of the known text keys printed its own source syntax -- braces, quotes and all --
+   straight onto the page.
+
+   Measured across all 2,889 published company payloads before this fix: 16 (field, shape) pairs on
+   1,342 companies (46.5%) would render raw syntax. market_size (841 companies) and cagrs (801) were
+   two members of that class, not the class itself -- nine pipe-delimited strings (strengths,
+   strategies, mdna, end_markets, certs, drivers, schemes) rendered as one run-on line, and
+   promoters_directors (100) and plants (24) printed dicts. A market_size special case would have
+   left 13 of the 16 pairs broken, which is why the fix is here in the helper and not in a card.
+
+   THE CONTRACT, applied to every field that reaches a text renderer:
+     dict                  -> "Label — value" from its own fields, never its syntax
+     list of dicts         -> one line per record, each through the same rule
+     pipe-delimited string -> split into items (`pipe()` at line ~140 already did this, but only 4
+                              of 13 call sites used it -- the split now happens by shape, not by
+                              the caller remembering)
+     null / undefined      -> dropped, never the words "None" or "undefined"
+   `JSON.stringify` is deliberately NOT a fallback: an unrenderable value yields '' and disappears
+   rather than leaking syntax. qa/raw_syntax_check.js gates this on the rendered DOM. */
+
+/* Keys that carry the human-readable text of a record, in priority order. Extended beyond the
+   original list because the shapes above are real: a market-size row leads with `metric`, a plant
+   with `location`, a person with `name`. */
+const TEXT_KEYS=['title','risk','item','note','event','detail','purpose','issue','approval','signal','check','metric','label','name','location','text','summary','description','statement','question','driver','scheme','factor','area','head','category','type','q'];
+/* Keys holding the QUANTITY that qualifies the label, and the ones that time-stamp it. */
+const VALUE_KEYS=['value','amount','figure','size','cagr','pct','percent','rate','count','number','qty','quantum','amount_lakhs','amount_cr'];
+const WHEN_KEYS=['year','fy','period','as_of','asof','date','horizon','quarter'];
+const isPlain=x=>x&&typeof x==='object'&&!Array.isArray(x);
+const NOISE_KEYS=new Set(['id','_id','uid','key','slug','src','source_page','page','idx','index','order','rank','raw','evidence_id']);
+const scalarish=v=>v!=null&&v!==''&&(typeof v!=='object');
+/* Render a record as prose: "<label> — <value> (<when>)", falling back to the record's own
+   remaining scalar fields so a shape we have never seen still reads as text rather than syntax. */
+const recordText=x=>{
+    const pick=keys=>{for(const k of keys){const v=x[k];if(scalarish(v))return String(v).trim()}return''};
+    const label=pick(TEXT_KEYS),val=pick(VALUE_KEYS),when=pick(WHEN_KEYS);
+    if(label||val){
+        let out=label&&val?label+' — '+val:(label||val);
+        /* only append the period when it is not already spelled out in the value */
+        if(when&&out.toLowerCase().indexOf(String(when).toLowerCase())===-1)out+=' ('+when+')';
+        return out;
+    }
+    /* Unknown shape: name its own scalar fields rather than dumping the object. */
+    const used=new Set([...TEXT_KEYS,...VALUE_KEYS,...WHEN_KEYS]);
+    const parts=Object.keys(x).filter(k=>!used.has(k)&&!NOISE_KEYS.has(k)&&scalarish(x[k])&&typeof x[k]!=='boolean')
+        .map(k=>k.replace(/_/g,' ')+': '+String(x[k]).trim());
+    return parts.join(' · ');
+};
+const value=x=>x==null?'':(typeof x==='string'?x:(typeof x==='number'||typeof x==='boolean'?String(x):(isPlain(x)?recordText(x):(Array.isArray(x)?x.map(value).filter(Boolean).join('; '):''))));
+/* Normalise ANY payload value into the list of display strings it represents. This is the single
+   place that decides "what are the items?", so a pipe string, a dict, a list of dicts and null all
+   reach every list renderer already correct. */
+const items=v=>{
+    if(v==null||v==='')return[];
+    if(typeof v==='string'){
+        const t=v.trim();
+        if(!t||t==='None'||t==='undefined'||t==='nan')return[];
+        return t.indexOf('|')!==-1?t.split('|').map(x=>x.trim()).filter(Boolean):[t];
+    }
+    if(Array.isArray(v))return v.flatMap(items);
+    if(isPlain(v)){const s=value(v);return s?[s]:[]}
+    return[String(v)];
+};
+/* `list()` now routes through `items()`, so every caller gets the shape contract without changing
+   a single call site -- that is what makes this architectural rather than a per-card patch. */
+const list=(v,n=8)=>{const xs=items(v);return xs.length?'<ul class="intel-list">'+xs.slice(0,n).map(x=>'<li>'+mdInline(E(mdLine(x)))+'</li>').join('')+'</ul>':''},card=(t,b,c='')=>b?'<article class="card '+c+'"><h3>'+E(t)+'</h3>'+b+'</article>':'';
 /* PERIOD-COLUMN TABLE (owner 2026-09-02: "keep year or QTr on column heading not row").
    A financial table reads by METRIC across time, so the period belongs on the column axis and the
    metric on the row axis -- the same orientation the Deep-Dive uses. `table()` above renders the
@@ -206,18 +277,71 @@ function drhpFinancialsGeneric(){
     let efficiency=tableByPeriod(['Year','RoE','RoCE','DSO days','Debt / equity','DSCR'],A(f.return_ratios).map(x=>[E(x.fy),x.roe_pct==null?'—':N(x.roe_pct,1)+'%',x.roce_pct==null?'—':N(x.roce_pct,1)+'%',x.dso_days==null?'—':N(x.dso_days,0),x.debt_equity==null?'—':N(x.debt_equity,2),x.dscr==null?'—':N(x.dscr,2)]));
     let bsRows=A(f.balance_sheet_key).map(x=>[E(x.fy),x.networth==null?'—':N(x.networth/100,2),x.total_debt==null?'—':N(x.total_debt/100,2),x.cash==null?'—':N(x.cash/100,2),x.trade_receivables==null?'—':N(x.trade_receivables/100,2),x.inventory==null?'—':N(x.inventory/100,2)]);
     let cfRows=A(f.cash_flow).map(x=>[E(x.fy),x.cfo==null?'—':N(x.cfo/100,2),x.cfi==null?'—':N(x.cfi/100,2),x.cff==null?'—':N(x.cff/100,2)]);
-    let loans=A(f.debt_profile?.loans),debtRows=loans.map(x=>[E(concise(x.type||'Borrowing',100)),E(concise(x.lender||'—',70)),x.amount_lakhs==null?'—':'₹'+N(x.amount_lakhs/100,2)+' cr',x.rate_pct==null?(x.floating?'Floating':'—'):N(x.rate_pct,2)+'%']);
+    /* DEBT COMPOSITION -- summary, not bank-by-bank. 2026-09-04 (owner: "show only debt profile
+       like total debt or short term or long term, not all detailed row e.g. it has bank wise which
+       is not needed").
+
+       Shape, measured over all 2,889 payloads: `debt_profile` is a DICT in all 99 companies that
+       carry it -- never a bare list -- with `loans` (98) and `total_lakhs` (98) the only keys that
+       generalise; the other 24 keys appear on 1-10 companies each. 638 per-lender rows in total,
+       median 4 and max 33 per company: that is the detail the owner is asking us to drop.
+
+       THE SPLIT IS SHOWN ONLY WHERE THE DOCUMENT STATES IT. Short/long term is not a stored field;
+       it appears only inside the free-text `type` ("... (short-term borrowing)"), and only 38 of
+       the 638 loans say so -- 6%. Classifying the silent 94% by guessing would invent a split the
+       filing never made, so unstated debt is carried as "Other / unclassified" and the reader can
+       see the difference. `total_lakhs` is preferred over summing the rows, because it is the
+       figure the document printed; the sum is used only when no total was stated. */
+    let loans=A(f.debt_profile?.loans),dpRaw=f.debt_profile||{};
+    let bucket=t=>/short[-\s]?term/i.test(t)?'short':(/long[-\s]?term/i.test(t)?'long':'other');
+    let sums={short:0,long:0,other:0},anyAmt=false;
+    loans.forEach(x=>{let a=Number(x&&x.amount_lakhs);if(isFinite(a)){anyAmt=true;sums[bucket(String((x&&x.type)||''))]+=a}});
+    let statedTotal=Number(dpRaw.total_lakhs),
+        totalLakhs=isFinite(statedTotal)?statedTotal:(anyAmt?sums.short+sums.long+sums.other:null);
+    let cr=v=>'₹'+N(v/100,2)+' cr';
+    let debtRows=[];
+    if(totalLakhs!=null)debtRows.push(['Total debt',cr(totalLakhs)]);
+    if(sums.short>0)debtRows.push(['Short-term borrowings',cr(sums.short)]);
+    if(sums.long>0)debtRows.push(['Long-term borrowings',cr(sums.long)]);
+    if(sums.other>0&&(sums.short>0||sums.long>0))debtRows.push(['Other / unclassified',cr(sums.other)]);
+    if(loans.length)debtRows.push(['Facilities',N(loans.length,0)+(loans.length===1?' facility':' facilities')]);
     let checks=table(['Check','Result','Evidence'],A(intel.forensic).map(x=>[E(x.check),status(x.verdict),E(x.note)]));
-    return'<div class="stack">'+card('Three-year operating record',badge('Reported fact')+pnl)+card('Margins, returns and balance-sheet efficiency',efficiency,'positive')+/* SPLIT INTO TWO CARDS 2026-09-02 (owner). They were one card holding two unrelated tables:
+    return'<div class="stack">'+card('Three-year operating record',badge('Reported fact')+pnl)+/* SPLIT INTO TWO CARDS 2026-09-02 (owner). They were one card holding two unrelated tables:
    a balance sheet is a POSITION at a date, a cash-flow statement is a MOVEMENT over a period.
    Stacking them under one heading invited reading a net-worth figure as a flow. Both now use
-   `tableByPeriod`, so the year is a COLUMN and each metric is a row. */
-+(bsRows.length?card('Balance-sheet trajectory',tableByPeriod(['Year','Net worth ₹cr','Debt ₹cr','Cash ₹cr','Receivables ₹cr','Inventory ₹cr'],bsRows)):'')+(cfRows.length?card('Cash flow',tableByPeriod(['Year','CFO ₹cr','Investing CF ₹cr','Financing CF ₹cr'],cfRows)):'')+(debtRows.length?card('Debt composition',table(['Facility','Lender','Outstanding','Rate'],debtRows)):'')+(A(intel.forensic).length?card('Forensic checks',checks):'')+creditRatingCard()+'</div>'
+   `tableByPeriod`, so the year is a COLUMN and each metric is a row.
+
+   COMMENT MOVED ABOVE THE OPERATOR, 2026-09-04. It used to sit BETWEEN the two `+` signs:
+   `card(...)+ /* ... *SLASH +(bsRows.length?...)`. JS then read the second `+` as a UNARY plus on
+   the string that followed, so the whole expression evaluated to `'...' + (+'<article>...')` =
+   NaN, and the page printed a bare "NaN" where the balance-sheet card should have been -- the
+   card was silently dropped on EVERY DRHP financials page (confirmed on QUALIANCEINTERNATIONAL,
+   KWICK and ESDSSOFTWARESOLUTION). A comment must never separate a binary operator from its
+   right-hand operand. Found by qa/raw_syntax_check.js, which is exactly the class of defect it
+   was written to catch. */
+card('Margins, returns and balance-sheet efficiency',efficiency,'positive')
++(bsRows.length?card('Balance-sheet trajectory',tableByPeriod(['Year','Net worth ₹cr','Debt ₹cr','Cash ₹cr','Receivables ₹cr','Inventory ₹cr'],bsRows)):'')+(cfRows.length?card('Cash flow',tableByPeriod(['Year','CFO ₹cr','Investing CF ₹cr','Financing CF ₹cr'],cfRows)):'')+(debtRows.length?card('Debt composition',table(['Measure','Amount'],debtRows)):'')+(A(intel.forensic).length?card('Forensic checks',checks):'')+creditRatingCard()+'</div>'
 }
 function inExecution(){let o=sec('objects_execution'),intel=sec('intellisense'),gd=intel.growth_durability||{},w=P.wtt||{},all=A(P.commitments),pick=re=>[...all].reverse().find(x=>re.test(x.item||'')),prom=[pick(/joint venture.*foldable hinge/i),pick(/Arms Components/i),pick(/45 to 50 new tools/i)].filter(Boolean);let uses=table(['Use','₹cr'],A(o.objects).map(x=>[E(x.purpose),x.amount_lakhs==null?'—':N(x.amount_lakhs/100,0)]));let promises=table(['Strategic commitment','Horizon','Evidence marker'],prom.map(x=>[E(x.item),E(x.horizon),E([x.promised_value,x.unit].filter(z=>z&&z!=='None').join(' ')||'Qualitative')]));let evidence=table(['Evidence test','State','What the store shows'],A(gd.signals).map(x=>[E((x.signal||'').replaceAll('_',' ')),status(x.status),E(x.note)]));let credibility=w.symbol?'<div class="credibility"><div class="grade compact">'+E(w.credibility_grade||'N/A')+'</div><div><h3>Walk the Talk is not scored yet</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||1)+'</b> quarter logged</span><span><b>'+E(w.open_commitments||0)+'</b> tracked across page</span><span><b>'+E(w.reconciled_n||0)+'</b> reconciled</span></div></div>':'';return credibility+'<div class="stack">'+card('Use of fresh issue',uses)+card('Growth evidence',badge('Analytical inference','inference')+'<div class="scoreline"><strong>'+E(gd.score||'—')+'</strong><span> / evidence score</span></div>'+evidence,'inference-card')+card('Unique strategic commitments',promises)+'</div>'}
 function inOwnership(){
     let c=sec('capital_ownership'),g=sec('governance'),anc=D.anchor_allotment||{};
-    let holders=table(['Holder','Category','Shares','Pre-offer'],A(c.shareholders_1pct).map(x=>[E(x.name),E(x.category||'—'),E(x.shares),x.pct==null?'—':N(x.pct,2)+'%']));
+    /* MATERIAL SHAREHOLDERS: promoter/promoter-group only, and never an empty row -- 2026-09-04
+       (owner: "show only records except promoter or promoter group? if blank row don't show").
+
+       The filter is CONDITIONAL, and the measurement is why. Across all 2,889 payloads, 101
+       companies carry `shareholders_1pct` (826 rows). The distinct `category` values are
+       'promoter' (203), 'public' (191), 'promoter group' (61), 'director' (3) -- and 368 rows,
+       45% of the corpus, carry NO category at all. An unconditional "keep only promoter" would
+       therefore blank the table for 19 companies whose every row is uncategorised, plus 2 more
+       that label rows but list no promoter: 21 of 97 good tables destroyed to tidy 76.
+       So: filter only when THIS company actually labels its rows, otherwise show them all and let
+       the Category column say '—'. A filter that silently empties a good table is a worse defect
+       than the one being fixed. Blank rows (no name, no shares, no pct) are dropped either way. */
+    let shRows=A(c.shareholders_1pct).filter(x=>x&&(String(x.name||'').trim()||String(x.shares||'').trim()||x.pct!=null));
+    let shLabelled=shRows.some(x=>String(x.category||'').trim());
+    let shPromoter=shRows.filter(x=>/promoter/i.test(String(x.category||'')));
+    if(shLabelled&&shPromoter.length)shRows=shPromoter;
+    let holders=table(['Holder','Category','Shares','Pre-offer'],shRows.map(x=>[E(x.name),E(x.category||'—'),E(x.shares),x.pct==null?'—':N(x.pct,2)+'%']));
     let brief=value=>{let text=String(value||'').replace(/\s+/g,' ').replace(/^(?:except as detailed below|such price has been computed)[:,]?\s*/i,'').trim();let sentence=(text.match(/^.{30,120}?[.!?](?:\s|$)/)||[])[0]||text.slice(0,110);return sentence.length<text.length?sentence.replace(/[.!?]?$/,'…'):sentence};
     let history=table(['Event','Summary'],A(c.capital_history).slice(0,10).map(x=>[E(String(x.event||'').replaceAll('_',' ')),E(brief(x.details))]));
     
@@ -621,7 +745,6 @@ if ((PM && PM.adapters && PM.adapters.deepDive && PM.adapters.deepDive.profile =
 function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};links.forEach(a=>a.onclick=()=>setActive(a.dataset.section));addEventListener('scroll',sync,{passive:true});let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);setTimeout(reveal,350);setTimeout(reveal,1800)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
 function render(){let app=document.getElementById('store-company');if(P.layout==='vertical')return renderVertical(app);app.innerHTML=hero()+'<div class="research-shell"><div class="tabbar" role="tablist" aria-label="Company research">'+tabs.map((t,i)=>'<button role="tab" tabindex="'+(i?-1:0)+'" data-tab="'+t[0]+'" aria-selected="'+(i===0)+'">'+t[1]+'</button>').join('')+'</div>'+tabs.map((t,i)=>'<section class="tab-panel" role="tabpanel" id="'+t[0]+'" '+(i?'hidden':'')+'><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('')+'</div>';let activate=id=>{let active;document.querySelectorAll('[data-tab]').forEach(b=>{let on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on)active=b});document.querySelectorAll('.tab-panel').forEach(p=>p.hidden=p.id!==id);history.replaceState(null,'','#'+id);if(active&&matchMedia('(max-width:760px)').matches)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};let buttons=[...document.querySelectorAll('[data-tab]')];buttons.forEach((b,i)=>{b.onclick=()=>activate(b.dataset.tab);b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;let n=(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();activate(buttons[n].dataset.tab)}});let hash=location.hash.slice(1);if(tabs.some(t=>t[0]===hash))activate(hash);initStage()}
 /* Listing pages must not turn evidence blobs into public prose. */
-function drhpOfferStructure(c){let d=c.dilution||{},ofs=A(c.ofs),lock=c.lock_in||{},pledge=c.pledging||{},facts=[];if(d.fresh_shares!=null)facts.push({label:'Fresh issue shares',value:N(d.fresh_shares,0)});if(d.dilution_pct!=null)facts.push({label:'Dilution',value:N(d.dilution_pct,2)+'%'});if(d.pre_issue_shares!=null)facts.push({label:'Pre-issue shares',value:N(d.pre_issue_shares,0)});if(d.post_issue_shares!=null)facts.push({label:'Post-issue shares',value:N(d.post_issue_shares,0)});if(pledge.pledged_pct!=null)facts.push({label:'Promoter shares pledged',value:N(pledge.pledged_pct,2)+'%'});let html=facts.length?card('Offer at a glance',kpis(facts)):'';if(ofs.length)html+=card('Offer for sale',table(['Selling shareholder','Shares'],ofs.map(x=>[E(x.seller||'-'),x.shares==null?'-':N(String(x.shares).replaceAll(',',''),0)])));let labels={promoter_20pct:'Minimum promoter contribution',promoter_excess:'Promoter excess holding',pre_issue_others:'Other pre-issue holders',anchor_50pct_30d:'Anchor allocation - 30 days',anchor_50pct_90d:'Anchor allocation - 90 days'},rows=Object.entries(labels).map(([key,label])=>{let x=lock[key];return x?[E(label),E(concise(x.period||String(x),150)),E(concise(x.until||'',95))]:null}).filter(Boolean);if(rows.length)html+=card('Lock-in schedule',table(['Holding','Lock-in','End date'],rows));return html}
 function drhpListingGeneric(){let s=P.ipo?.summary||{},o=sec('objects_execution'),c=sec('capital_ownership'),listed=String(s['Listing Open Price']||'').trim()!=='';let dates=kpis([{label:'Price band',value:E(s['Price Range']||'-')},{label:'Issue price',value:s['Issue Price']?'Rs '+N(s['Issue Price']):'-'},{label:'Issue opens',value:E(s['Issue Start Date']||'-')},{label:'Issue closes',value:E(s['Issue End Date']||'-')},{label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing']||'-')}]),uses=table(['Offer object','Amount'],A(o.objects).map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)])),discovery=listed?card('Price discovery',table(['Issue price','Listing open','Listing gain'],[['Rs '+N(s['Issue Price']),'Rs '+N(s['Listing Open Price']),N(s['Listing Gain %'],1)+'%']])):'';return'<div class="stack">'+card(listed?'Offer and listing timeline':'Offer timeline',dates)+card('Offer objects',uses)+drhpOfferStructure(c)+discovery+'</div>'}
 /* Deterministic offer facts.  Use the disclosed upper price band for comparability across
    IPOs, even when a final issue price is also present.  Nothing is inferred without a stated
@@ -630,19 +753,6 @@ function offerNumber(v){let m=String(v==null?'':v).replace(/,/g,'').match(/\d+(?
 function offerUpperBand(s){let nums=(String(s['Price Range']||'').match(/\d+(?:\.\d+)?/g)||[]).map(Number);return nums.length?Math.max(...nums):null}
 function offerNoteNumber(note,re){let text=String(note||'');if(String(re).includes('Promoters and Promoter Group')){let pm=text.match(/Promoters and Promoter Group[\s\S]*?\bat\s+([\d,]+)\s+Equity Shares/i);return pm?offerNumber(pm[1]):null}let m=text.match(re);return m?offerNumber(m[1]):null}
 function offerPlacementRows(c){return A(c.capital_history).map(x=>{let t=String(x.details||''),is=/private placement/i.test(t);if(!is)return null;let date=(t.match(/(?:on|dated?)\s+(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})/i)||[])[1]||x.date||'';let shares=offerNoteNumber(t,/allotted\s+([\d,]+)\s+Equity shares/i),price=offerNoteNumber(t,/issue price of\s*(?:Rs\.?|₹)?\s*([\d,.]+)/i);return shares&&price?{date,shares,price,amount:shares*price}:null}).filter(Boolean)}
-function drhpOfferStructure(c){let d=c.dilution||{},ofs=A(c.ofs),lock=c.lock_in||{},pledge=c.pledging||{},s=P.ipo?.summary||{},upper=offerUpperBand(s),note=d.note||'',fresh=offerNumber(d.fresh_shares),ofsShares=ofs.reduce((n,x)=>n+(offerNumber(x.shares)||0),0)||offerNoteNumber(note,/Offer for Sale of up to\s*([\d,]+)/i),total=offerNoteNumber(note,/Total Equity Shares offered[^:]*:\s*up to\s*([\d,]+)/i),pre=offerNoteNumber(note,/outstanding prior to the Offer\s*([\d,]+)/i),post=offerNoteNumber(note,/outstanding after the Offer\s*([\d,]+)/i),promoterPre=offerNoteNumber(c.promoter_holding?.note,/Promoters and Promoter Group[^\d]*([\d,]+)\s+Equity Shares/i),promoterPost=promoterPre!=null&&ofsShares!=null?promoterPre-ofsShares:null,promoterPostPct=promoterPost!=null&&post?100*promoterPost/post:null,fy26=A(sec('financials').pnl_3yr).find(x=>String(x.fy)==='FY26')||{},pat=offerNumber(fy26.pat),eps=pat!=null&&post?pat*100000/post:null,mcap=upper!=null&&post?upper*post:null,facts=[];
-    if(upper!=null)facts.push({label:'Upper price band',value:'₹'+N(upper,2)});
-    if(total&&upper!=null)facts.push({label:'Total issue size',value:'₹'+N(total*upper/10000000,2)+' cr'});
-    if(fresh&&upper!=null)facts.push({label:'Fresh issue',value:'₹'+N(fresh*upper/10000000,2)+' cr'});
-    if(ofsShares&&upper!=null)facts.push({label:'Offer for sale',value:'₹'+N(ofsShares*upper/10000000,2)+' cr'});
-    if(mcap!=null)facts.push({label:'Market capitalisation',value:'₹'+N(mcap/10000000,2)+' cr'});
-    if(eps!=null)facts.push({label:'Post-issue EPS (FY26)',value:'₹'+N(eps,2)});
-    if(eps&&upper!=null)facts.push({label:'P/E (FY26, post-issue)',value:N(upper/eps,2)+'x'});
-    let html=facts.length?card('Offer at a glance',kpis(facts)+'<p class="method-note">Derived using the stated upper price band and stated share counts.</p>'):'';
-    let holding=[];if(promoterPre!=null)holding.push(['Pre-issue promoter + promoter group',N(promoterPre,0),c.promoter_holding?.pre_pct==null?'—':N(c.promoter_holding.pre_pct,2)+'%']);if(promoterPost!=null)holding.push(['Post-issue promoter + promoter group (derived)',N(promoterPost,0),N(promoterPostPct,2)+'%']);if(holding.length)html+=card('Promoter holding',table(['Holding','Shares','%'],holding));
-    if(ofs.length)html+=card('Offer for sale',kpis([{label:'Seller category',value:/promoter/i.test(c.promoter_holding?.note||'')?'Promoters':'Selling shareholders'},{label:'OFS shares',value:ofsShares?N(ofsShares,0):'—'}]));
-    let placements=offerPlacementRows(c);if(placements.length)html+=card('Private placement (Pre-IPO)',table(['Date','Shares','Price','Amount'],placements.map(x=>[E(x.date),N(x.shares,0),'₹'+N(x.price,2),'₹'+N(x.amount/10000000,2)+' cr'])));
-    let labels={promoter_20pct:'Minimum promoter contribution',promoter_excess:'Promoter excess holding',pre_issue_others:'Other pre-issue holders',anchor_50pct_30d:'Anchor allocation - 30 days',anchor_50pct_90d:'Anchor allocation - 90 days'},rows=Object.entries(labels).map(([key,label])=>{let x=lock[key];return x?[E(label),E(concise(x.period||String(x),150)),E(concise(x.until||'',95))]:null}).filter(Boolean);if(rows.length)html+=card('Lock-in schedule',table(['Holding','Lock-in','End date'],rows));if(pledge.pledged_pct!=null)html+=card('Promoter pledge',kpis([{label:'Shares pledged',value:N(pledge.pledged_pct,2)+'%'}]));return html}
 function drhpListingGeneric(){let s=P.ipo?.summary||{},o=sec('objects_execution'),c=sec('capital_ownership'),listed=String(s['Listing Open Price']||'').trim()!=='';let dates=kpis([{label:'Price band',value:E(s['Price Range']||'—')},{label:'Issue price',value:s['Issue Price']?'₹'+N(s['Issue Price']):'—'},{label:'Issue opens',value:E(s['Issue Start Date']||'—')},{label:'Issue closes',value:E(s['Issue End Date']||'—')},{label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing']||'—')}]),uses=table(['Offer object','Amount'],A(o.objects).map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)])),discovery=listed?card('Price discovery',table(['Issue price','Listing open','Listing gain'],[['₹'+N(s['Issue Price']),'₹'+N(s['Listing Open Price']),N(s['Listing Gain %'],1)+'%']])):'';return'<div class="stack">'+card(listed?'Offer and listing timeline':'Offer timeline',dates)+card('Offer objects',uses)+drhpOfferStructure(c)+discovery+'</div>'}
 /* Public Offer card: upper band is a calculation input, not a displayed metric. */
 function drhpOfferStructure(c){
