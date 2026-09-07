@@ -421,9 +421,20 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
    wraps, the type scale changes or a phone narrows it, and it fails as a gap or an overlap rather
    than as an error. The background is load-bearing, not decoration: a transparent sticky row lets
    the content scroll straight through it. */
-:root{--nav1-h:44px}
+/* THE DEFAULT MUST APPROXIMATE THE REAL HEADER (owner 2026-09-07: "sub nav when scrolled down ...
+   hide more than half under the shared nav at top"). 44px was the DASHBOARD's row-1 height; the
+   PUBLIC header `.site-header` measures 65px desktop / 57px phone. Until NAV_STICKY_JS lands the
+   real number, this default governs — measured at 1443ms on /screens/momentum/, because the script
+   is emitted last and the height only settles once the webfont loads. At 44px the sub-nav pinned
+   21px too high and 48% of it sat behind the header. 60px is the honest middle of 57-65. */
+:root{--nav1-h:60px}
 .tabbar-buckets,.sitenav{position:sticky;top:0;z-index:41;background:var(--bg)}
-.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}
+/* Z-INDEX 101, NOT 40. `.site-header` (public_templates/company_store_prototype.css) is z-index:100.
+   At 40 the sub-nav lost the stacking contest and any offset error resolved as DISAPPEARING behind
+   the header rather than overlapping it — an invisible failure instead of a cosmetic one. Above 100
+   the row stays readable and clickable even if --nav1-h is momentarily wrong. 101 > the dashboard
+   shell's row-1 41 too, so that shell's intended order (row 2 reachable) is unchanged. */
+.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}   /* 40 < .site-header's 100 ON PURPOSE. The header is a stacking context (backdrop-filter), so its search dropdown cannot rise above anything outranking the header -- raising the sub-nav above it clips the results list (owner 2026-08-31, re-broken and reverted 2026-09-07). Overlap is prevented by --nav1-h being CORRECT, not by ordering. */
 /* LESS AIR ABOVE AND BETWEEN (owner 2026-08-18: "lot of space above and in between second nav").
    The dashboard put 24px of body padding above row 1, each row then carried its own margin, and the
    reader met three gaps before the first word of content. The padding moves ONTO the sticky rows so
@@ -691,6 +702,11 @@ if(!window.M2D){window.M2D=(function(){
   // everything else the record, its price and its stage history all come from this file. One promise
   // per symbol, cached, so selecting a stock does not fetch the same file three times.
   const COMP={}, COMPQ={}, DEV={};   /* DEV: per-symbol Recent-developments rows, restored 2026-09-03 */
+  /* How many developments render before the 'Show N more' button. Owner 2026-09-06:
+     "on page we show only top 5 latest if more, show more button". This was REFERENCED at
+     three sites in devList and declared nowhere, so every render threw ReferenceError and
+     the pane has never appeared -- a restore only in name until this line existed. */
+  const DEV_SHOWN = 5;
   function fetchCompany(sym){
     if(COMP[sym]) return Promise.resolve(COMP[sym]);
     if(COMPQ[sym]) return COMPQ[sym];
@@ -895,6 +911,23 @@ function devCss(){
     return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
   }
   function devPane(sym){
+    /* FETCH ON DEMAND, like chart() does. `DEV[sym]` is populated ONLY by fetchCompany, but
+       select_detail reaches recOf(sym) from the INLINE payload for the ~195 member symbols and
+       never fetches their file -- so for exactly those stocks DEV[sym] was undefined and this pane
+       stayed hidden, which reads as "this company has no filings" rather than "not loaded yet".
+       `DEV[sym]` (not `rows.length`) is the honest "we have looked" flag: an empty ARRAY means
+       fetched-and-none, `undefined` means never fetched. */
+    if (DEV[sym] === undefined) {
+      // HIDE FIRST. Returning early with the card still showing leaves the PREVIOUS company's
+      // filings on screen under the new company's heading -- the same class of bug the chart pane
+      // records ("a throw used to skip everything after it, leaving the previous stock's volume
+      // table on screen"). Blank it, then let the fetch re-enter.
+      _set('m2-dev', '');
+      var c0 = document.getElementById('m2-dev-card');
+      if (c0) c0.style.display = 'none';
+      fetchCompany(sym).then(function(){ if (cur === sym) devPane(sym); }).catch(function(){});
+      return;
+    }
     var rows = DEV[sym] || [];
     var h = devList(rows);
     _set('m2-dev', h ? '<div class="m2sec">Recent developments</div>' + h : '');
@@ -920,6 +953,11 @@ function devCss(){
              ' &mdash; it is not in the stage universe.</div>');
         _set('m2-data',''); _set('m2-data-ext',''); _set('m2-hist','');
         _set('m2-chart',''); _set('m2-vol-table','');
+        // DEVELOPMENTS STILL RENDER HERE. A company outside the stage universe has no momentum
+        // record but can still have filings -- DEV[sym] is populated by fetchCompany from the SAME
+        // file, independently of `momentum`. Blanking every pane on this branch (as it did) would
+        // hide the one thing this company does have.
+        devPane(sym);
         return;
       }
       _set('m2-head','<span class="sym">'+esc(sym)+'</span>');
@@ -931,6 +969,8 @@ function devCss(){
     }
     _set('m2-head','<span class="sym">'+esc(r.s)+'</span>'+stg(r.g)+
          (r.c?'<span class="chip">'+esc(catLabel(r.c))+'</span>':'')+mcapCell(r.m));
+    // Directly after the heading box, before every other pane -- the owner's placement (2026-09-07).
+    devPane(sym);
     _set('m2-insights',insights(r));
     _set('m2-data',kv(r));
     _set('m2-data-ext',kvExt(r));
@@ -958,6 +998,16 @@ function sym(){var m=/[?&]sym=([^&#]+)/.exec(location.search||'');return m?decod
 function get(url,optional){return fetch(url).then(function(r){if(!r.ok){if(optional)return {};throw new Error('HTTP '+r.status);}return r.json();});}
 function merge(a,b){if(!b||typeof b!=='object')return a;Object.keys(b).forEach(function(k){if(a[k]&&b[k]&&typeof a[k]==='object'&&!Array.isArray(a[k])&&!Array.isArray(b[k]))merge(a[k],b[k]);else a[k]=b[k];});return a;}
 function fail(message){app.innerHTML='<div class="pending"><b>Company unavailable</b><p>'+message+'</p></div>';}
+/* `developments:extra.developments||[]` IN THE `P` LITERAL BELOW -- do not drop it (2026-09-07).
+   This boot builds `P` as an EXPLICIT field list, so a key that is in the payload but not named
+   here simply never reaches the renderer. `developments` was added to `_presentation_payload` and
+   to `sidecar_keys` on 2026-09-06 and lands correctly in data/company/<SYM>.json -- but it was
+   never added HERE, so `P.developments` was undefined on every company and `devSection()` returned
+   '' for all 2,791 of them. No error, no empty box: the section just did not exist, which is
+   indistinguishable from "this company has no filings".
+   That makes FOUR places that must know this key -- `screens_pages.py:87` already warned it is
+   "the THIRD payload builder that needs this key ... its own comment warns this key had already
+   been missed once". This was the fourth. Anything reading P.<key> needs a line in this literal. */
 var selected=sym();if(!selected){fail('Choose a company from Search or Company Explorer.');return;}
 /* PRE-LISTING LINKS MUST SURVIVE THE RENAME (owner 2026-09-03). A company is keyed on its
    normalised name until it lists, then on its ticker -- so every link shared during the IPO window
@@ -969,7 +1019,7 @@ var selected=sym();if(!selected){fail('Choose a company from Search or Company E
 Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),
              get('../data/company_aliases.json',true)])
 .then(function(seed){var index=seed[0],list=index.companies||[];var aliases=seed[2]||{};if(!list.some(function(x){return x.s===selected;})){var target=aliases[selected]||aliases[String(selected).toUpperCase()];if(target&&list.some(function(x){return x.s===target;})){selected=target;try{history.replaceState(null,'','?sym='+encodeURIComponent(target)+location.hash);}catch(e){}}}var row=list.filter(function(x){return x.s===selected;})[0];if(!row)row=list.filter(function(x){return (x.aka||[]).some(function(a){return String(a).toUpperCase()===selected;});})[0];if(!row)throw new Error('Symbol not found');if(row.s!==selected&&window.history&&history.replaceState){try{history.replaceState(null,'',location.pathname+'?sym='+encodeURIComponent(row.s)+location.hash);}catch(e){}}var file=row.file||row.s+'.json',vol=String(file).replace(/\.json$/,'.v.json');return Promise.all([get('../data/company/'+encodeURIComponent(file)),get('../data/company/'+encodeURIComponent(vol),true)]).then(function(parts){var company=merge(parts[0]||{},parts[1]||{});return[company,seed[1]||{},company,row];});})
-.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:row.s,name:row.co||row.s,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:{momentum:explorer.momentum||[],investing:explorer.investing||[],new:explorer.new||[],peers:peers}};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=ab46490a5d';document.body.appendChild(script);})
+.then(function(parts){var company=parts[0],explorer=parts[1],extra=parts[2],row=parts[3],dd=company.deepdive||{},dr=company.drhp||{},mo=company.momentum||{},research=dd.s?dd:dr,peer=research.peer_panel||{},marketPrice=mo.price||extra.marketFallback||[],peers=(peer.peers||[]).filter(function(x){return x.s;}).map(function(x){return{symbol:x.s,name:x.name||x.s,meta:x.group||peer.industry||'Peer'};});var P={identity:extra.identity||{symbol:row.s,name:row.co||row.s,sector:row.sector||''},credit:dd.credit||dr.credit||null,summary:extra.summary||{},products:extra.products||[],endMarkets:extra.endMarkets||[],report:dr.rpt||{},drhpResearch:dr,currentResearch:research,currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},projection:{},developments:extra.developments||[],segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},sections:mo.stock?[{id:'stage',label:'Stage Analysis',renderer:'stage',available:true,completeness:'full',sourceType:'momentum'}]:[]},layout:'vertical',explorer:{momentum:explorer.momentum||[],investing:explorer.investing||[],new:explorer.new||[],peers:peers}};document.getElementById('store-payload').textContent=JSON.stringify(P).replace(/<\//g,'<\\/');var script=document.createElement('script');script.src='../company_renderer.js?v=9ca675e7a6';document.body.appendChild(script);})
 .catch(function(e){fail(e&&e.message==='Symbol not found'?'That symbol is not available in the public company store.':'Company data could not load. Please try again.');});
 })();
 </script><script id="nav-sticky-js">
@@ -987,6 +1037,13 @@ Promise.all([get('../data/index.json'),get('../data/company_explorer.json'),
   apply();
   window.addEventListener('load', apply);
   window.addEventListener('resize', apply);
+  /* THE WEBFONT MOVES ROW 1 (owner 2026-09-07). Sampling --nav1-h across a real load gave
+     100ms=44px, 380ms=53px, 1443ms=65px: the staircase is Outfit/Inter arriving, not one reflow.
+     Measuring before the font lands publishes a too-small height, and the sub-nav pins under the
+     header until something else happens to fire `apply`. document.fonts.ready re-measures at the
+     moment the text metrics stop changing. */
+  if(document.fonts && document.fonts.ready && document.fonts.ready.then)
+    document.fonts.ready.then(apply);
   /* The rows are REBUILT at runtime - the bucket row swaps its tab group on every bucket click, and
      the company page writes its section ribbon only once the data lands. A height measured once is
      the height of the page before any of that. */

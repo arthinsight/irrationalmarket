@@ -742,8 +742,125 @@ if ((PM && PM.adapters && PM.adapters.deepDive && PM.adapters.deepDive.profile =
     let order = ['business', 'case', 'peers', 'concall', 'financials', 'execution', 'themes', 'stage', 'ownership', 'risks'];
     verticalTabs.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
 }
-function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};links.forEach(a=>a.onclick=()=>setActive(a.dataset.section));addEventListener('scroll',sync,{passive:true});let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);setTimeout(reveal,350);setTimeout(reveal,1800)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
-function render(){let app=document.getElementById('store-company');if(P.layout==='vertical')return renderVertical(app);app.innerHTML=hero()+'<div class="research-shell"><div class="tabbar" role="tablist" aria-label="Company research">'+tabs.map((t,i)=>'<button role="tab" tabindex="'+(i?-1:0)+'" data-tab="'+t[0]+'" aria-selected="'+(i===0)+'">'+t[1]+'</button>').join('')+'</div>'+tabs.map((t,i)=>'<section class="tab-panel" role="tabpanel" id="'+t[0]+'" '+(i?'hidden':'')+'><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('')+'</div>';let activate=id=>{let active;document.querySelectorAll('[data-tab]').forEach(b=>{let on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on)active=b});document.querySelectorAll('.tab-panel').forEach(p=>p.hidden=p.id!==id);history.replaceState(null,'','#'+id);if(active&&matchMedia('(max-width:760px)').matches)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};let buttons=[...document.querySelectorAll('[data-tab]')];buttons.forEach((b,i)=>{b.onclick=()=>activate(b.dataset.tab);b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;let n=(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();activate(buttons[n].dataset.tab)}});let hash=location.hash.slice(1);if(tabs.some(t=>t[0]===hash))activate(hash);initStage()}
+/* RECENT DEVELOPMENTS -- ported into the PUBLIC company template 2026-09-06 (PART 4 of the
+   restore; see output/_scratch/recent_dev/DESIGN.md). These helpers existed ONLY in
+   `momentum_2_dashboard.py` (the internal momentum-2 tab) and scored zero hits here, so the
+   company page had no way to render `P.developments` even once the payload carried it.
+   Ported, not re-invented: devList's own contract is that it returns the LIST ONLY and each
+   consumer supplies its own heading/card chrome, so the framing below is this page's `.card`
+   idiom rather than the tab's `.m2card`. The escaper is this template's E(), not momentum's esc(). */
+var devCssDone = false;
+/* How many developments render before the 'Show N more' button. Owner 2026-09-06: "on page we
+   show only top 5 latest if more, show more button". Declared HERE as well as in
+   momentum_2_dashboard because the two are separate JS artifacts -- a constant defined there is
+   not in scope in company_renderer.js, and referencing it undefined throws ReferenceError and
+   kills the whole render. */
+const DEV_SHOWN = 5;
+function devCss(){
+  if (devCssDone) return; devCssDone = true;
+  var st = document.createElement('style');
+  st.textContent =
+    /* THE BLOCK'S OWN CHROME. position:static and NO z-index by design -- see devSection(). It sits
+       between the hero and `.research-shell`'s sticky `.tabbar`, so it needs bottom margin (the
+       tabbar pins at var(--nav1-h) and must not appear glued to this card) and nothing else. */
+    /* min-width:0/max-width:100% mirror the `.vertical-section` overflow guard in
+       company_store_prototype.css:14 -- inside a grid column, a child without min-width:0 refuses
+       to shrink below its content and pushes the whole page into a horizontal scroll. Long filing
+       prose with no spaces is exactly that content. Moving off `.vertical-section` (see
+       devSection()) also moved off that guard, so it is restated here. */
+      '.dev-section{position:static;margin:0 0 var(--sp-3,18px);padding:0;border:0;'
+    + 'min-width:0;max-width:100%}'
+    + '.dev-section .section-head{margin-bottom:10px}'
+    + '.dev-section .section-head h2{margin:0;font-size:17px;font-weight:800;color:#0f172a}'
+    + '.dev-section .section-head .eyebrow{margin:0 0 2px;font-size:10px;font-weight:800;'
+    + 'letter-spacing:.06em;text-transform:uppercase;color:#64748b}'
+    + '.dev-section .card{padding:16px 18px;border:1px solid #dbe4ef;border-radius:10px;'
+    + 'background:#fff}'
+    + '.dev-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}'
+    + '.dev-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline;'
+    + 'padding-bottom:10px;border-bottom:1px solid #eef2f7}'
+    + '.dev-row:last-of-type{border-bottom:0;padding-bottom:0}'
+    + '.dev-date{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.05em;'
+    + 'text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}'
+    + '.dev-text{color:#334155;font-size:13px;line-height:1.55;overflow-wrap:anywhere}'
+    + '.dev-text strong{color:#0f172a;font-weight:600}'
+    + '.dev-quant{display:inline-block;margin-left:4px;padding:2px 7px;border-radius:999px;'
+    + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
+    + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
+    + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
+    + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
+    + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
+    + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
+  document.head.appendChild(st);
+}
+var DEVMON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function devDate(d){
+  var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + ' ' + DEVMON[+m[2]-1] + ' ' + m[1]) : E(d||'');
+}
+// the digest writes markdown bold inside its prose; escape first, then render only that
+function devText(t){ return E(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
+function devRow(r,hidden){
+  return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
+    + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'+devText(r.text)
+    + (r.quant?' <span class="dev-quant">'+E(r.quant)+'</span>':'')
+    + (r.url?' <a class="dev-src" href="'+E(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
+    + '</span></li>';
+}
+// Returns the LIST ONLY - the caller supplies its own heading/card chrome, because the two
+// consumers frame it differently (a .m2card on the tab, a .card section on this page).
+function devList(rows){
+  rows = (rows||[]).slice();
+  if (!rows.length) return '';
+  devCss();
+  rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  var vis = rows.slice(0,DEV_SHOWN).map(function(r){return devRow(r,false);}).join('');
+  var hid = rows.slice(DEV_SHOWN).map(function(r){return devRow(r,true);}).join('');
+  // NO inline onclick: a delegated listener has no nested quoting to get wrong. The first version
+  // used one and shipped a syntax error that broke the whole renderer.
+  var btn = hid ? '<button class="dev-more" data-more="1">Show '+(rows.length-DEV_SHOWN)+' more</button>' : '';
+  return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
+}
+/* THIS PAGE'S CHROME. `P.developments` is a flat LIST of rows (company_public_page emits it
+   top-level). ZERO developments must produce NO SECTION AT ALL, not an empty card: devList
+   returns '' for an empty list and this returns '' in turn, so nothing is inserted. */
+function devSection(){
+  var h = devList(A(P.developments));
+  if (!h) return '';
+  /* `.dev-section`, NOT `.vertical-section` (owner 2026-09-07: the block sits "between company
+     header and sub nav"). `.vertical-section` is styled for sections INSIDE `.research-shell` --
+     `border-bottom:1px solid #dbe4ef` and `scroll-margin-top:calc(var(--nav1-h) + 54px)` -- so out
+     here it wore a divider it should not have and a scroll offset for a nav it does not sit under.
+     The id moved off `developments` too: `renderVertical`'s scroll-spy and hash branch enumerate
+     section ids as if they were tabs, and this is not one.
+     STACKING: static, no z-index, no transform/filter/opacity. `.site-header` is z-index:100 AND a
+     stacking context (backdrop-filter), and `.tabbar,.co-sub` is 40 ON PURPOSE -- anything that
+     outranks the header clips the header's search dropdown (broken and reverted twice 2026-09-07).
+     A statically positioned block cannot outrank or clip anything, so this stays out of that fight.
+     It must not be sticky either: two stickies at the same `top` is the overlap bug itself. */
+  return '<section class="dev-section" id="recent-developments"><div class="section-head">'
+    + '<p class="eyebrow">Latest filings</p><h2>Recent developments</h2></div>'
+    + '<div class="stack"><article class="card">'+h+'</article></div></section>';
+}
+/* DELEGATED, not inline. One document-level listener covers whichever layout rendered the button
+   and survives any re-render, and there is no nested quoting inside an HTML attribute to get
+   wrong. Toggles the .dev-hidden rows and flips the label. */
+function devBind(){
+  if (devBind._on) return; devBind._on = true;
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.dev-more') : null;
+    if (!btn) return;
+    var host = btn.previousElementSibling;
+    if (!host || !host.classList || !host.classList.contains('dev-list')) return;
+    var rows = host.querySelectorAll('.dev-hidden');
+    if (!rows.length) return;
+    var open = rows[0].style.display === 'none';
+    for (var i=0;i<rows.length;i++) rows[i].style.display = open ? '' : 'none';
+    btn.textContent = open ? 'Show less' : ('Show '+rows.length+' more');
+  });
+}
+function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+devSection()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};links.forEach(a=>a.onclick=()=>setActive(a.dataset.section));addEventListener('scroll',sync,{passive:true});let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);setTimeout(reveal,350);setTimeout(reveal,1800)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
+function render(){devBind();let app=document.getElementById('store-company');if(P.layout==='vertical')return renderVertical(app);app.innerHTML=hero()+devSection()+'<div class="research-shell"><div class="tabbar" role="tablist" aria-label="Company research">'+tabs.map((t,i)=>'<button role="tab" tabindex="'+(i?-1:0)+'" data-tab="'+t[0]+'" aria-selected="'+(i===0)+'">'+t[1]+'</button>').join('')+'</div>'+tabs.map((t,i)=>'<section class="tab-panel" role="tabpanel" id="'+t[0]+'" '+(i?'hidden':'')+'><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('')+'</div>';let activate=id=>{let active;document.querySelectorAll('[data-tab]').forEach(b=>{let on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on)active=b});document.querySelectorAll('.tab-panel').forEach(p=>p.hidden=p.id!==id);history.replaceState(null,'','#'+id);if(active&&matchMedia('(max-width:760px)').matches)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};let buttons=[...document.querySelectorAll('[data-tab]')];buttons.forEach((b,i)=>{b.onclick=()=>activate(b.dataset.tab);b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;let n=(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();activate(buttons[n].dataset.tab)}});let hash=location.hash.slice(1);if(tabs.some(t=>t[0]===hash))activate(hash);initStage()}
 /* Listing pages must not turn evidence blobs into public prose. */
 function drhpListingGeneric(){let s=P.ipo?.summary||{},o=sec('objects_execution'),c=sec('capital_ownership'),listed=String(s['Listing Open Price']||'').trim()!=='';let dates=kpis([{label:'Price band',value:E(s['Price Range']||'-')},{label:'Issue price',value:s['Issue Price']?'Rs '+N(s['Issue Price']):'-'},{label:'Issue opens',value:E(s['Issue Start Date']||'-')},{label:'Issue closes',value:E(s['Issue End Date']||'-')},{label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing']||'-')}]),uses=table(['Offer object','Amount'],A(o.objects).map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)])),discovery=listed?card('Price discovery',table(['Issue price','Listing open','Listing gain'],[['Rs '+N(s['Issue Price']),'Rs '+N(s['Listing Open Price']),N(s['Listing Gain %'],1)+'%']])):'';return'<div class="stack">'+card(listed?'Offer and listing timeline':'Offer timeline',dates)+card('Offer objects',uses)+drhpOfferStructure(c)+discovery+'</div>'}
 /* Deterministic offer facts.  Use the disclosed upper price band for comparability across
