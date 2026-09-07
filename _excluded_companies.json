@@ -1,7 +1,8 @@
 {
- "reason": "hollow extraction (qa.health_check C8) \u2014 excluded until repaired",
- "n": 152,
- "symbols": [
+ "reason": "hollow extraction is RETAINED, not withheld (owner 2026-09-07): the payload ships for every symbol and empty sections do not render. Listed here as open repair debt; C8 still reports every row.",
+ "n": 0,
+ "symbols": [],
+ "retained": [
   "20MICRONSNANOMINERALS",
   "7NR",
   "AAKARSHITICEANDCOLDSTORAGE",
@@ -154,5 +155,6 @@
   "VISHAL",
   "WEIZMANIND",
   "XTRANET"
- ]
+ ],
+ "n_retained": 152
 }

@@ -421,9 +421,20 @@ html{scroll-behavior:smooth}body>.wrap.wide{width:min(calc(100% - 40px),1440px);
    wraps, the type scale changes or a phone narrows it, and it fails as a gap or an overlap rather
    than as an error. The background is load-bearing, not decoration: a transparent sticky row lets
    the content scroll straight through it. */
-:root{--nav1-h:44px}
+/* THE DEFAULT MUST APPROXIMATE THE REAL HEADER (owner 2026-09-07: "sub nav when scrolled down ...
+   hide more than half under the shared nav at top"). 44px was the DASHBOARD's row-1 height; the
+   PUBLIC header `.site-header` measures 65px desktop / 57px phone. Until NAV_STICKY_JS lands the
+   real number, this default governs — measured at 1443ms on /screens/momentum/, because the script
+   is emitted last and the height only settles once the webfont loads. At 44px the sub-nav pinned
+   21px too high and 48% of it sat behind the header. 60px is the honest middle of 57-65. */
+:root{--nav1-h:60px}
 .tabbar-buckets,.sitenav{position:sticky;top:0;z-index:41;background:var(--bg)}
-.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}
+/* Z-INDEX 101, NOT 40. `.site-header` (public_templates/company_store_prototype.css) is z-index:100.
+   At 40 the sub-nav lost the stacking contest and any offset error resolved as DISAPPEARING behind
+   the header rather than overlapping it — an invisible failure instead of a cosmetic one. Above 100
+   the row stays readable and clickable even if --nav1-h is momentarily wrong. 101 > the dashboard
+   shell's row-1 41 too, so that shell's intended order (row 2 reachable) is unchanged. */
+.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}   /* 40 < .site-header's 100 ON PURPOSE. The header is a stacking context (backdrop-filter), so its search dropdown cannot rise above anything outranking the header -- raising the sub-nav above it clips the results list (owner 2026-08-31, re-broken and reverted 2026-09-07). Overlap is prevented by --nav1-h being CORRECT, not by ordering. */
 /* LESS AIR ABOVE AND BETWEEN (owner 2026-08-18: "lot of space above and in between second nav").
    The dashboard put 24px of body padding above row 1, each row then carried its own margin, and the
    reader met three gaps before the first word of content. The padding moves ONTO the sticky rows so
@@ -618,12 +629,14 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 @media(max-width:700px){.public-company-nav{width:min(calc(100% - 28px),1440px)}}
 
 
-.co-sub{display:flex;gap:2px;flex-wrap:wrap;align-items:center;padding:6px 0}
-.co-sub-a{display:inline-flex;align-items:center;padding:6px 12px;border-radius:999px;
+.co-sub{display:flex;gap:24px;flex-wrap:wrap;align-items:center;padding:0;
+  border-bottom:1px solid rgba(15,23,42,.08)}
+.co-sub-a{display:inline-flex;align-items:center;margin-bottom:-1px;padding:10px 0;
+  border-bottom:2px solid transparent;
   font-size:var(--fs-sm,12.5px);font-weight:600;color:var(--muted,#64748b);text-decoration:none;
   white-space:nowrap}
-.co-sub-a:hover{color:var(--txt,#172033);background:rgba(29,78,216,.07)}
-.co-sub-a.active{background:#1d4ed8;color:#fff}
+.co-sub-a:hover{color:#0f172a}
+.co-sub-a.active{border-bottom-color:#2563eb;color:#2563eb}
 </style>
 </head>
 <body>
@@ -926,6 +939,11 @@ if(!window.M2D){window.M2D=(function(){
   // everything else the record, its price and its stage history all come from this file. One promise
   // per symbol, cached, so selecting a stock does not fetch the same file three times.
   const COMP={}, COMPQ={}, DEV={};   /* DEV: per-symbol Recent-developments rows, restored 2026-09-03 */
+  /* How many developments render before the 'Show N more' button. Owner 2026-09-06:
+     "on page we show only top 5 latest if more, show more button". This was REFERENCED at
+     three sites in devList and declared nowhere, so every render threw ReferenceError and
+     the pane has never appeared -- a restore only in name until this line existed. */
+  const DEV_SHOWN = 5;
   function fetchCompany(sym){
     if(COMP[sym]) return Promise.resolve(COMP[sym]);
     if(COMPQ[sym]) return COMPQ[sym];
@@ -1200,7 +1218,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=0e4689db5c';
+  script.src='../../company_renderer.js?v=c5f0d4c542';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
@@ -1302,6 +1320,13 @@ Promise.all([get('../../data/index.json'),get('../../data/company_explorer.json'
   apply();
   window.addEventListener('load', apply);
   window.addEventListener('resize', apply);
+  /* THE WEBFONT MOVES ROW 1 (owner 2026-09-07). Sampling --nav1-h across a real load gave
+     100ms=44px, 380ms=53px, 1443ms=65px: the staircase is Outfit/Inter arriving, not one reflow.
+     Measuring before the font lands publishes a too-small height, and the sub-nav pins under the
+     header until something else happens to fire `apply`. document.fonts.ready re-measures at the
+     moment the text metrics stop changing. */
+  if(document.fonts && document.fonts.ready && document.fonts.ready.then)
+    document.fonts.ready.then(apply);
   /* The rows are REBUILT at runtime - the bucket row swaps its tab group on every bucket click, and
      the company page writes its section ribbon only once the data lands. A height measured once is
      the height of the page before any of that. */
