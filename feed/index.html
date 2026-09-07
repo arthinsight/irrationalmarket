@@ -110,9 +110,9 @@
    wraps, the type scale changes or a phone narrows it, and it fails as a gap or an overlap rather
    than as an error. The background is load-bearing, not decoration: a transparent sticky row lets
    the content scroll straight through it. */
-:root{--nav1-h:44px}
+:root{--nav1-h:60px}   /* measured: the public header renders 57-65px, never 44. 44px pinned row 2 under it. */
 .tabbar-buckets,.sitenav{position:sticky;top:0;z-index:41;background:var(--bg)}
-.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}
+.tabbar,.co-sub{position:sticky;top:var(--nav1-h);z-index:40;background:var(--bg)}   /* 40 < .site-header's 100 ON PURPOSE. The header is a stacking context (backdrop-filter), so its search dropdown cannot rise above anything outranking the header -- raising the sub-nav above it clips the results list (owner 2026-08-31, re-broken and reverted 2026-09-07). Overlap is prevented by --nav1-h being CORRECT, not by ordering. */   /* 101 > .site-header's 100: an offset that is momentarily wrong then merely overlaps, instead of vanishing behind the header. */
 /* LESS AIR ABOVE AND BETWEEN (owner 2026-08-18: "lot of space above and in between second nav").
    The dashboard put 24px of body padding above row 1, each row then carried its own margin, and the
    reader met three gaps before the first word of content. The padding moves ONTO the sticky rows so
