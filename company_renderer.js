@@ -836,6 +836,17 @@ function devCss(){
     + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
     + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
     + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
+    /* MARQUEE DEAL MARKER. A filing and a market transaction render in the same list (the filing
+       rows come from the base half, the deals from `<SYM>.v.json`), and a reader must be able to
+       tell them apart -- one is a company disclosure, the other is somebody trading the stock.
+       The LIGHTEST treatment that achieves it: a small muted pill carrying the store's OWN
+       `deal_type` ("BLOCK"/"BULK"), set before the sentence. Deliberately NOT colour-coded by
+       BUY/SELL -- green/red would editorialise (a marquee sale is not automatically bad news) and
+       would have to carry meaning the data does not support. Neutral slate, same family as
+       `.dev-date`, so it reads as metadata rather than as a status. */
+    + '.dev-kind{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:4px;'
+    + 'background:#f1f5f9;color:#475569;font-size:9px;font-weight:800;letter-spacing:.06em;'
+    + 'vertical-align:1px}'
     + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
     + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
     + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
@@ -848,9 +859,21 @@ function devDate(d){
 }
 // the digest writes markdown bold inside its prose; escape first, then render only that
 function devText(t){ return E(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
+/* A row is EITHER a filing (from the base half, always carries `url`) or a marquee bulk/block deal
+   (from `<SYM>.v.json`, `kind:'deal'`, NEVER carries a url -- a market print has no document).
+   `r.tag` is the store's own deal_type; both are absent on filing rows, so the two branches below
+   are additive and the existing rendering is byte-identical for every pre-existing row.
+   The `r.url ? <a> : ''` guard was already here and already correct -- it simply had never been
+   exercised by a real linkless row until these deals arrived. */
 function devRow(r,hidden){
   return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
-    + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'+devText(r.text)
+    + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'
+    /* The space after </span> is LOAD-BEARING, not formatting. Without it the badge and the
+       sentence are one text node to anything reading textContent -- a screen reader, a copy-paste,
+       or the render gate -- which produces "BLOCKMotilal Oswal bought ...". The CSS margin only
+       separates them visually. */
+    + (r.tag?'<span class="dev-kind">'+E(r.tag)+'</span> ':'')
+    + devText(r.text)
     + (r.quant?' <span class="dev-quant">'+E(r.quant)+'</span>':'')
     + (r.url?' <a class="dev-src" href="'+E(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
     + '</span></li>';
@@ -886,8 +909,12 @@ function devSection(){
      outranks the header clips the header's search dropdown (broken and reverted twice 2026-09-07).
      A statically positioned block cannot outrank or clip anything, so this stays out of that fight.
      It must not be sticky either: two stickies at the same `top` is the overlap bug itself. */
+  /* EYEBROW: "Filings and deals", not the original "Latest filings". The block stopped being
+     filings-only on 2026-09-08 when marquee bulk/block deals began merging in from the volatile
+     half; a heading that says "filings" over a row reading "Abakkus bought 2,80,000 shares" labels
+     a market transaction as a company disclosure, which is a wrong fact in the furniture. */
   return '<section class="dev-section" id="recent-developments"><div class="section-head">'
-    + '<p class="eyebrow">Latest filings</p><h2>Recent developments</h2></div>'
+    + '<p class="eyebrow">Filings and deals</p><h2>Recent developments</h2></div>'
     + '<div class="stack"><article class="card">'+h+'</article></div></section>';
 }
 /* DELEGATED, not inline. One document-level listener covers whichever layout rendered the button
