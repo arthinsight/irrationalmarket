@@ -613,24 +613,47 @@ function opFinancials(){
     let epsYoYRow=['EPS Growth YoY (%)'];
     let epsQoQRow=['EPS Growth QoQ (%)'];
 
+    /* ZERO IS NOT ABSENT. 2026-09-07 (owner: "Zero Pnl should not show").
+       This block read `Number(x.revenue||0)` on all five metrics, so a missing value became the
+       NUMBER 0 before N() could render it as an em-dash -- a fabricated figure that looks like real
+       data and cannot be told from one. Measured over the 2,935 live payloads: 1,682 carry an
+       `actuals` series, 409 of them have at least one missing cell, 2,021 cells in total
+       (eps 1,174, opm_pct 229, pat 225, revenue 202, op 191).
+
+       `||0` was only half the defect. EVERY ONE of those 2,021 cells is an explicit JSON `null`,
+       and `Number(null)` is 0, not NaN -- `isFinite(0)` is true, so N() would still print "0" even
+       with the `||0` removed. The value has to stay null all the way INTO N(). Hence num():
+       absent stays absent, and a stored 0 (477 of them in the corpus, genuine zero-revenue or
+       zero-PAT quarters) still passes through and still renders "0".
+
+       The growth rows had the SAME defect one level down, and it was the worse half: the guards
+       tested the PREVIOUS row (`prevQtr.eps`) while the arithmetic used the CURRENT row's value.
+       With the current value coerced to 0 that computes (0-prev)/prev = a clean -100%. Live on
+       AARTIIND Q4FY25, which stores `eps:null` and printed "EPS Growth QoQ -100%" between a
+       -11.8% and a +144.5% quarter. growth() returns null unless BOTH endpoints are real, and
+       keeps the old falsy-denominator behaviour so a zero prior still yields the em-dash. */
+    /* `n===0?0:n` collapses NEGATIVE zero. The store holds -0.0 on 134 cells (a rounded tiny loss);
+       the old `||0` hid them because -0 is falsy, and without this they would newly print "-0". */
+    let num=v=>{if(v==null||v==='')return null;let n=Number(v);return isFinite(n)?(n===0?0:n):null;};
+    let growth=(cur,prev)=>(cur==null||prev==null||!prev)?null:((cur-prev)/prev)*100;
     actuals.forEach((x,i)=>{
-        let rev=Number(x.revenue||0);
-        let op=Number(x.op||0);
-        let opm=Number(x.opm_pct||0);
-        let pat=Number(x.pat||0);
-        let eps=Number(x.eps||0);
+        let rev=num(x.revenue);
+        let op=num(x.op);
+        let opm=num(x.opm_pct);
+        let pat=num(x.pat);
+        let eps=num(x.eps);
         revRow.push(N(rev,0));
         opRow.push(N(op,0));
-        opmRow.push(N(opm,1)+'%');
+        opmRow.push(opm==null?'—':N(opm,1)+'%');
         patRow.push(N(pat,0));
         epsRow.push(N(eps,2));
         revYoYRow.push(x.rev_yoy!=null?N(x.rev_yoy,1)+'%':'—');
         let prevYear=actuals[i-4];
-        let epsYoY=(prevYear&&prevYear.eps)?((eps-prevYear.eps)/prevYear.eps)*100:null;
+        let epsYoY=growth(eps,prevYear?num(prevYear.eps):null);
         epsYoYRow.push(epsYoY!=null?N(epsYoY,1)+'%':'—');
         let prevQtr=actuals[i-1];
-        let revQoQ=(prevQtr&&prevQtr.revenue)?((rev-prevQtr.revenue)/prevQtr.revenue)*100:null;
-        let epsQoQ=(prevQtr&&prevQtr.eps)?((eps-prevQtr.eps)/prevQtr.eps)*100:null;
+        let revQoQ=growth(rev,prevQtr?num(prevQtr.revenue):null);
+        let epsQoQ=growth(eps,prevQtr?num(prevQtr.eps):null);
         revQoQRow.push(revQoQ!=null?N(revQoQ,1)+'%':'—');
         epsQoQRow.push(epsQoQ!=null?N(epsQoQ,1)+'%':'—');
     });
