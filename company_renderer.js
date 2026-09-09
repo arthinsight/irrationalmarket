@@ -83,12 +83,115 @@ const list=(v,n=8)=>{const xs=items(v);return xs.length?'<ul class="intel-list">
    `h` is the ORIGINAL header list whose FIRST entry is the period label ('Year'/'Quarter'); rows
    are period-major. Transposing here rather than at the data layer keeps every caller's row shape
    untouched. */
+/* SHORT PERIOD HEADERS + DUPLICATE-COLUMN GUARD (owner 2026-09-09: "why Margins, returns and
+   balance-sheet efficiency has dup column", "Balance-sheet trajectory ... same year column with
+   different heading", and "H1FY26 (6m ended 2025-09-30, not annualised)" -> "only H1FY2026 is
+   enough").
+
+   A transposed table gives each period a NARROW column, so a header like
+   `H1FY2026 (six months ended September 30, 2025; annualised)` is unreadable there and squeezes
+   every other column. `periodLabel` reduces a label to its period CODE -- FY26, H1FY26, 9MFY26,
+   Q1FY26 -- which is the whole of the owner's instruction.
+
+   WHAT IS NOT DISCARDED. A parenthetical that merely restates the period ("six months ended
+   September 30, 2025", "as at 2025-12-31") is redundant once the code is shown. But two qualifiers
+   CHANGE WHAT THE NUMBER MEANS and are kept as a short marker plus a footnote:
+     * annualised -- ICICIAMC carries `H1FY2025 (...; annualised)` beside `H1FY2026 (...)`. Cut to
+       bare `H1FY25`/`H1FY26`, a reader compares an annualised figure against a raw one.
+     * basis -- LCL carries two FY2024 rows, 'Restated Standalone' and 'Special Purpose Combined
+       and Carve-Out'. Two real, different figures for one year; the marker is what keeps them
+       distinguishable instead of looking like one year measured twice.
+
+   THE DEDUPE HERE IS DEFENCE IN DEPTH, NOT THE FIX. The cause was in the producers and is fixed
+   there (`factual_populate` used two label vocabularies for the same three years;
+   `schema_contract._merge_key` keyed per-year rows on the RAW `fy` so 'FY24' and 'FY2024' never
+   collided and both rows survived). This guard only ensures a future producer regression degrades
+   to a merged column rather than silently reprinting a year. It merges cells rather than dropping
+   a column, so no real value can be lost: a later non-empty cell fills an earlier em-dash, and a
+   genuine disagreement keeps BOTH columns so the reader can see it. */
+/* MUST AGREE WITH `schema_contract.canon_period` (Python). That function decides which rows MERGE
+   in the store; this one decides which columns MERGE on the page. If they disagree, the page can
+   fold two periods the store deliberately kept apart -- so the hyphenated span and the basis
+   vocabulary below are deliberately the same rules, and `qa/period_column_gate.py` cross-checks
+   this function's output against the Python one. */
+const PERIOD_HYPHEN_RE = /^\s*(9M|6M|3M|H1|H2|Q[1-4])?[\s\-_]*FY\s*20(\d{2})\s*[-\/]\s*(\d{2})(?!\d)/i;
+const PERIOD_RE = /^\s*(9M|6M|3M|H1|H2|Q[1-4])?[\s\-_]*FY\s*(\d{2,4})/i;
+const periodLabel = s => {
+  const raw = String(s == null ? '' : s).trim();
+  // `FY2023-24` / `FY 2023-24` spans two calendar years and names the ENDING one -- FY24, not
+  // FY23. Verified on GVELECTRIC, which stores both forms for identical values:
+  // 'FY 2025-26' revenue 15641.29 == 'FY26' revenue 15641.29. This case must be tested BEFORE the
+  // general rule, which would otherwise match the leading `2023` and label the column a year early.
+  const hy = PERIOD_HYPHEN_RE.exec(raw);
+  let m = hy || PERIOD_RE.exec(raw);
+  // RAW PRINTED CAPTIONS. Several producers store the document's own caption instead of a period
+  // code -- 'As at 31 March 2024', 'As at 31-03-2025', 'Fiscal 2024'. Printed verbatim these are
+  // enormous column headers. A 31-MARCH date is a full Indian fiscal year end and resolves
+  // safely; any OTHER month-end is an interim date whose fiscal year must NOT be assumed
+  // (QUALIANCE stores '30-09-2025', ADISOFT 'Oct 31, 2025'), so those keep their raw label and
+  // their own column. Same rule as `canon_period`'s date branch.
+  if (!m) {
+    const fis = /^\s*fiscal\s*(20\d{2})\b/i.exec(raw);
+    const iso = /\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/.exec(raw);
+    const dmy = /\b(\d{1,2})[-\/.](\d{1,2})[-\/.](20\d{2})\b/.exec(raw);
+    const txt = /\b(\d{1,2})\s*(?:st|nd|rd|th)?\s+(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(20\d{2})\b/i.exec(raw)
+             || /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\s*(?:st|nd|rd|th)?,?\s*(20\d{2})\b/i.exec(raw);
+    let day = null, mon = null, yr4 = null;
+    if (fis) { day = 31; mon = 3; yr4 = +fis[1]; }
+    else if (iso) { yr4 = +iso[1]; mon = +iso[2]; day = +iso[3]; }
+    else if (dmy) { day = +dmy[1]; mon = +dmy[2]; yr4 = +dmy[3]; }
+    else if (txt) {
+      const MON = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+      if (/^\d/.test(txt[1])) { day = +txt[1]; mon = MON[txt[2].toLowerCase()]; yr4 = +txt[3]; }
+      else { mon = MON[txt[1].toLowerCase()]; day = +txt[2]; yr4 = +txt[3]; }
+    }
+    if (yr4 && mon === 3 && (day === 31 || day === null)) {
+      return { label: 'FY' + String(yr4).slice(2), note: '' };
+    }
+    return { label: raw, note: '' };            // interim or unreadable: leave it alone
+  }
+  const yr = hy ? hy[3] : (m[2].length > 2 ? m[2].slice(-2) : m[2]);
+  const code = (m[1] ? m[1].toUpperCase() : '') + 'FY' + yr;
+  // The distinguishing qualifier is not always inside the bracket: ALPINETEX prints
+  // 'FY2026 (Mar 31, 2026) Consolidated' beside 'FY2024 (Mar 31, 2024) Standalone', where the
+  // basis word TRAILS the parenthetical. Read the qualifier from everything after the period code
+  // so a basis cannot be lost -- losing it would let two different bases share one column.
+  const q = raw.slice(m[0].length);
+  let note = '';
+  if (/annuali[sz]ed/i.test(q) && !/not\s+annuali[sz]ed/i.test(q)) note = 'annualised';
+  const basis = /(restated|standalone|consolidated|carve[- ]?out|combined|special purpose|proforma|pro forma)/i.exec(q);
+  if (basis) note = (note ? note + ', ' : '') + basis[1].toLowerCase();
+  return { label: note ? code + '*' : code, note: note };
+};
+const isEmptyCell = v => { const t = String(v == null ? '' : v).replace(/<[^>]*>/g, '').trim();
+  return t === '' || t === '—' || t === '-' || t === 'N/A' || t === 'NaN' || t === 'null'; };
 const tableByPeriod = (h, rows, maxVisibleRows = 10) => {
   if (!rows || !rows.length) return '';
-  const periods = rows.map(r => r[0]);
   const metrics = h.slice(1);
-  const out = metrics.map((m, i) => [m].concat(rows.map(r => r[i + 1])));
-  return table([h[0] === 'Year' ? 'Metric' : h[0]].concat(periods), out, maxVisibleRows);
+  // Shorten each period label, then fold columns that resolve to the SAME label, filling gaps.
+  const cols = [], notes = [];
+  rows.forEach(r => {
+    const p = periodLabel(r[0]);
+    const cells = metrics.map((m, i) => r[i + 1]);
+    const at = cols.findIndex(c => c.label === p.label);
+    if (at === -1) { cols.push({ label: p.label, note: p.note, cells: cells.slice() }); return; }
+    const tgt = cols[at];
+    let clash = false;
+    cells.forEach((v, i) => {
+      if (isEmptyCell(tgt.cells[i])) { tgt.cells[i] = v; return; }
+      if (!isEmptyCell(v) && String(v).trim() !== String(tgt.cells[i]).trim()) clash = true;
+    });
+    // A real disagreement is shown, never silently resolved: keep both columns.
+    if (clash) cols.push({ label: p.label, note: p.note, cells: cells.slice() });
+  });
+  cols.forEach(c => { if (c.note && notes.indexOf(c.note) === -1) notes.push(c.note); });
+  const out = metrics.map((m, i) => [m].concat(cols.map(c => c.cells[i])));
+  const html = table([h[0] === 'Year' ? 'Metric' : h[0]].concat(cols.map(c => c.label)),
+                     out, maxVisibleRows);
+  return notes.length
+    ? html + '<p class="table-note" style="margin:6px 0 0;font-size:11px;color:var(--g700)">* '
+           + E(notes.join('; ')) + '</p>'
+    : html;
 };
 
 const table = (h, rows, maxVisibleRows = 10) => {
@@ -357,7 +460,14 @@ function inExecution(){let o=sec('objects_execution'),intel=sec('intellisense'),
    this without re-running the census -- the number that matters is 119, not 1,140. */
 function govTiles(c,g){let t=[],ph=c.promoter_holding||{},pl=c.pledging||{},b=g.board||{},r=A(g.rpts).length;
     if(ph.pre_pct!=null)t.push({label:'Pre-offer promoter holding',value:N(ph.pre_pct,2)+'%'});
-    if(pl.pledged_pct!=null)t.push({label:'Promoter pledge',value:N(pl.pledged_pct,1)+'%'});
+    /* A ZERO PLEDGE IS THE ABSENCE OF PLEDGING, NOT A FACT WORTH A TILE (2026-09-09). Measured
+       over the 183 published payloads carrying capital_ownership: `pledged_pct` is present on
+       64 and is 0 on 61 of those -- so this tile printed a meaningless '0%' on a third of all
+       company pages, and only 3 companies have a pledge to report. This card's own idiom is
+       already "never a placeholder, never a zero"; a 0 was slipping through because the guard
+       tested `!=null` rather than the value. Surfaced while removing the duplicate pledge card
+       from Offer (owner item 5): QUALIANCE was rendering '0%' on BOTH surfaces. */
+    if(pl.pledged_pct)t.push({label:'Promoter pledge',value:N(pl.pledged_pct,1)+'%'});
     if(b.independent_count&&b.size)t.push({label:'Independent directors',value:E(b.independent_count)+' / '+E(b.size)});
     if(r)t.push({label:'Related-party entries',value:E(r)});
     return t}
@@ -479,7 +589,64 @@ function explorer(){let sets=P.explorer||{},labels={momentum:'Momentum',investin
 function initExplorer(){let sets=P.explorer||{},source=document.getElementById('explorer-source'),search=document.getElementById('explorer-search'),listBox=document.getElementById('explorer-list'),aside=document.querySelector('.stock-explorer');if(!source||!search||!listBox||!aside)return;/* KEEP THE READER WHERE THEY WERE. Clicking a stock is a real navigation (href=/company/?sym=), so every click reloads the page, re-renders this list from scratch and resets its scrollTop to 0 - the row just clicked is then hundreds of rows down and has to be hunted for again (owner 2026-08-31). Centre the selected row INSIDE the list box. Never scrollIntoView(): the list is a nested scroller and that also scrolls the DOCUMENT, throwing the reader to the top of the company page - trading one wrong scroll position for another. Measured off rects rather than offsetTop, which is relative to the offsetParent and silently wrong if the box is not positioned. */function centre(){let sel=listBox.querySelector('.explorer-stock.selected');if(!sel)return;let r=sel.getBoundingClientRect(),b=listBox.getBoundingClientRect();listBox.scrollTop+=(r.top-b.top)-(b.height/2-r.height/2)}function draw(keep){let q=String(search.value||'').toUpperCase(),rows=A(sets[source.value]).filter(r=>!q||String(r.symbol||'').toUpperCase().includes(q)||String(r.name||'').toUpperCase().includes(q));listBox.innerHTML=rows.length?rows.map(r=>'<a class="explorer-stock'+(r.symbol===I.symbol?' selected':'')+'" href="/company/?sym='+encodeURIComponent(r.symbol)+'"><b>'+E(r.symbol)+'</b><span>'+E(r.name||r.meta||'')+'</span><small>'+E(r.meta||'')+'</small></a>').join(''):'<p class="empty">No stocks in this view.</p>';if(keep!==false)centre()}source.onchange=()=>draw();search.oninput=()=>draw(false);document.getElementById('explorer-close').onclick=()=>aside.classList.remove('open');document.getElementById('explorer-open').onclick=()=>aside.classList.add('open');draw()}
 function initStage(){if(!window.M2D)return;window.M2D.init({stocks:M.stock?[M.stock]:[],meta:{hist_sessions:130},datadir:(window.__SCREEN__&&window.__SCREEN__.datadir)||'../data'});/* STAGE HISTORY 2026-09-03. `M2D` exposes setHist() and its histTbl() renders 'Loading stage history...' until histLoaded flips -- but the PUBLIC page never called it, so the panel said Loading forever on both /company/ and /screens/momentum/. The 810 KB data/momentum2_hist.json is published and serves 200; only the caller was missing (the internal dashboard has its own fetch, which is why this was invisible there). Bulk file for ALL symbols by design (DESIGN.md phase-2 split), so it is fetched once, lazily, and a failure leaves the existing empty-state rather than breaking the page. */(function(){var dd=(window.__SCREEN__&&window.__SCREEN__.datadir)||'../data';fetch(dd+'/momentum2_hist.json').then(function(r){return r.ok?r.json():null;}).then(function(h){if(h&&window.M2D&&window.M2D.setHist){window.M2D.setHist(h);if(window.M2D.cur&&window.M2D.cur())window.M2D.select(window.M2D.cur());}}).catch(function(){});})();/* DEPTH-CORRECT DATADIR 2026-09-03. This was hardcoded '../data', which is right for /company/ but WRONG for /screens/momentum/ -- two levels down, so every price fetch resolved to /screens/data/company/<SYM>.json and 404'd. `screens_pages` already publishes the correct prefix as __SCREEN__.datadir ('../../data'); it simply was never read here. Symptom was 'Price unavailable' with a blank chart while Stage rendered fine, because Stage comes from the inline payload and only the CHART needs the fetch. */if(M.stock){window.M2D.select(I.symbol);let bs=document.querySelectorAll('#m2-tf button');bs.forEach(b=>b.onclick=()=>{bs.forEach(x=>x.classList.toggle('active',x===b));window.M2D.setTf(+b.dataset.tf)})}else if(A(M.price).length){window.M2D.setCur(I.symbol)}window.M2D.loadDelVol()}
 function chart(rows){if(!rows||rows.length<2)return'<div class="empty">Price history is not yet sufficient.</div>';let d=rows.slice(-260),W=900,H=300,p=34,c=d.map(x=>+x[1]),v=d.map(x=>+x[2]||0),lo=Math.min(...c),hi=Math.max(...c),vm=Math.max(...v)||1,X=i=>p+i*(W-2*p)/(d.length-1),Y=x=>p+(hi-x)*(H-2*p-52)/(hi-lo||1);return'<div class="market-chart"><svg viewBox="0 0 '+W+' '+H+'">'+d.map((x,i)=>{let z=44*(+x[2]||0)/vm;return'<rect x="'+X(i)+'" y="'+(H-p-z)+'" width="2" height="'+z+'"/>'}).join('')+'<polyline points="'+d.map((x,i)=>X(i)+','+Y(+x[1])).join(' ')+'"/></svg><div><span>'+E(d[0][0])+'</span><b>₹'+N(c.at(-1),2)+'</b><span>'+E(d.at(-1)[0])+'</span></div></div>'}
-function hero(){let st=M.stock,sc=P.scorecard||{},an=P.ipo?.analysis||{},hasDrhp=PM?PM.coverage?.drhp:P.coverage.drhp,hasDeep=PM?PM.coverage?.deepDive:P.coverage.deepDive,f=[['Coverage',hasDeep&&hasDrhp?'Deep Dive + offer research':hasDrhp?'Offer-document research':hasDeep?'Operating deep dive':'Market coverage'],['Market structure',st?st.g+' · '+({1:'Basing',2:'Advancing',3:'Top',4:'Decline'}[st.g]||'Tracked'):'Classification pending']],thesis=PM?.hero?.oneLiner||P.summary.oneLiner;if(!PM&&I.symbol==='INDOMIM')thesis=String(thesis||'').replace(/ in Calendar Year 2025 for the last six years/i,', a leadership position held for six years');if(sc.symbol)f.push(['Business quality',sc.bq_total+' / 100']);if(an.Symbol)f.push(['Market cap','₹'+N(an['Market Cap (Cr)'],0)+' cr']);let hasModel=A(P.projection?.projection).length;return'<section class="company-hero"><p class="eyebrow">Institutional company intelligence</p><div class="title-row"><h1>'+E(I.name)+'</h1><span>'+E(I.symbol)+'</span></div><p class="thesis">'+E(thesis)+'</p><div class="decision-strip">'+f.map(x=>'<div><span>'+E(x[0])+'</span><b>'+E(x[1])+'</b></div>').join('')+'</div><div class="legend">'+badge('Reported fact')+badge('Management guidance','guide')+(hasModel?badge('Model estimate','estimate'):'')+badge('Analytical inference','inference')+'</div></section>'}
+/* HERO MARKET CAP 2026-09-09 (owner: "for HFCL why we don't have mcap in header section above sub
+   nav ... Add mcap across all company as standard"). The gate WAS `if(an.Symbol)`, where
+   `an = P.ipo?.analysis`. That tests whether an IPO ANALYSIS BLOCK EXISTS, not whether a market cap
+   exists -- an IPO-shaped condition on a fact that belongs to every listed company. HFCL (listed, no
+   IPO analysis) therefore showed no tile while its own payload carried `mcap_live: 38381` and
+   `mcap_asof: "2026-09-08"`. A rendering gate, not a data gap.
+
+   Measured over all 3,070 published payloads, replicating company/index.html's own binding
+   (`D = dd.s ? deepdive : drhp`, `an = extra.ipo.analysis`, extra = main merged with the .v.json):
+   975 rendered before, 2,050 after. See output/_scratch/hero_mcap/DESIGN.md.
+
+   ONE FACT, TWO FEEDS -- and they were checked for agreement BEFORE being combined, because this is
+   not the fallback-chain pattern the offer block was just cured of. Where both exist (563 companies)
+   they agree within +/-5% on 563 of 563, every difference being `mcap_live`'s round(), and both are
+   struck on the same date:
+     - `D.mcap_live`  -- security-master snapshot (financials.py::live_mcap), dated by `mcap_asof`;
+       covers 1,662 including every large listed name.
+     - `an['Market Cap (Cr)']` -- the live market feed that also carries Latest Close / Latest Date /
+       ATH / 10-day traded value. It is NOT an at-issue figure: 932 of its 951 usable rows are dated
+       2026-09-08, the same day as the snapshot. It covers 388 companies the security master has no
+       row for at all -- KWICK listed 2026-09-03 and is not in the master, so dropping this feed
+       would have regressed exactly the company the owner cited as working.
+   `D.mcap` (FY-end, yearly master) is deliberately NOT a third rung: it lags by up to a year and is
+   a different quantity. HEG is the example -- FY-end 10,338 against a live 4,990.
+
+   ABSENCE RENDERS NOTHING -- no dash, no zero. 24 companies had `an.Symbol` with an EMPTY
+   'Market Cap (Cr)' and so printed the literal "Market cap \u20b9\u2014 cr" today. 19 of them list
+   between 2026-09-11 and 2026-09-18 (QUALIANCE, GLASSWALL, PRASOLCHEM, RENTOMOJO, STEAMHOUSE ...):
+   pre-listing, no price, therefore no market capitalisation -- the quantity does not exist, and a
+   dash wrongly asserts that it does and is merely unavailable. The other 5 are listed but have no
+   recoverable figure (4 absent from the security master, FARMPEACE has a null `mcap_rs`; 3 have
+   never traded). Both classes now render no tile, which is why the count is not simply additive.
+
+   MAGNITUDE GUARD. Values were verified independently against DELIVERY_VWAP_DAILY_CSV: 2,038 of
+   2,041 comparable land within 0.5x-2.0x. The three that do not are stored defects, not display
+   bugs -- FOCUS (master 415 vs price*shares 1,450 vs feed 157), KALYANI (master 14 on a 1,000,000
+   share count vs feed 666) and SICALLOG (813 vs 2,350). That cross-feed check cannot run in the
+   browser; what CAN run here is the cheap half -- a positive finite number below a ceiling no
+   Indian listed company approaches -- which is what stops a share count landing in a rupee field.
+   The three named above are reported to the owner rather than silently rendered. */
+/* MAGNITUDE QUARANTINE 2026-09-09. These three failed the cross-feed check described above and
+   are NOT rendered, because a market cap that is wrong by 3x-45x is worse than no market cap:
+     FOCUS    stored 415 cr; close 215.00 x 67,444,950 sh = 1,450 cr; delivery feed 157 cr
+     KALYANI  stored  14 cr on a 1,000,000 share count; close 927.95; delivery feed 666 cr
+     SICALLOG stored 813 cr; delivery feed 2,350 cr (feed date 2026-07-31)
+   Each is a defect in `SECURITY_MASTER_CSV`'s share count or mcap, not a display bug -- the fix
+   belongs upstream in that store, and this list should SHRINK to empty, never grow. Re-derive it
+   with output/_scratch/hero_mcap/sanity.py, which is the regression test for this class. */
+const HERO_MCAP_QUARANTINE={FOCUS:1,KALYANI:1,SICALLOG:1};
+let heroMcap=(f,an,D)=>{let d=D||{},a=an||{},v=Number(d.mcap_live),src=1;
+    if(HERO_MCAP_QUARANTINE[String(I&&I.symbol||'').toUpperCase()])return;
+    if(!(isFinite(v)&&v>0)){v=Number(a['Market Cap (Cr)']);src=2;}
+    /* Above ~Rs 30 lakh cr is not a market cap on this exchange; it is a units error or a share
+       count in a rupee field. Reliance, the largest, is ~Rs 17.5 lakh cr. */
+    if(!(isFinite(v)&&v>0&&v<3e7))return;
+    let asof=src===1?(d.mcap_asof||''):(a['Latest Date']||'');
+    f.push(['Market cap','\u20b9'+N(v,0)+' cr',asof?'as of '+asof:'']);};
+function hero(){let st=M.stock,sc=P.scorecard||{},an=P.ipo?.analysis||{},hasDrhp=PM?PM.coverage?.drhp:P.coverage.drhp,hasDeep=PM?PM.coverage?.deepDive:P.coverage.deepDive,f=[['Coverage',hasDeep&&hasDrhp?'Deep Dive + offer research':hasDrhp?'Offer-document research':hasDeep?'Operating deep dive':'Market coverage'],['Market structure',st?st.g+' · '+({1:'Basing',2:'Advancing',3:'Top',4:'Decline'}[st.g]||'Tracked'):'Classification pending']],thesis=PM?.hero?.oneLiner||P.summary.oneLiner;if(!PM&&I.symbol==='INDOMIM')thesis=String(thesis||'').replace(/ in Calendar Year 2025 for the last six years/i,', a leadership position held for six years');if(sc.symbol)f.push(['Business quality',sc.bq_total+' / 100']);heroMcap(f,an,D);let hasModel=A(P.projection?.projection).length;return'<section class="company-hero"><p class="eyebrow">Institutional company intelligence</p><div class="title-row"><h1>'+E(I.name)+'</h1><span>'+E(I.symbol)+'</span></div><p class="thesis">'+E(thesis)+'</p><div class="decision-strip">'+f.map(x=>'<div'+(x[2]?' title="'+E(x[2])+'"':'')+'><span>'+E(x[0])+'</span><b>'+E(x[1])+'</b></div>').join('')+'</div><div class="legend">'+badge('Reported fact')+badge('Management guidance','guide')+(hasModel?badge('Model estimate','estimate'):'')+badge('Analytical inference','inference')+'</div></section>'}
 function investment(){if(D.s)return hfInvestment();let v=sec('verdict'),ip=sec('industry_peers'),strength=v.strengths_observed||ip.swot?.strengths||[],concerns=v.concerns_observed||[],non=concall('non-obvious');return'<div class="layout-2">'+card('Business in one view','<p>'+E(P.summary.business)+'</p>')+card('Why this can compound',list(I.symbol==='HFCL'?concall('optionality'):strength,6),'positive')+card('What the market must be right about',list(concerns,6),'caution')+card('Non-obvious intelligence',badge('Analytical inference','inference')+list(non.length?non:sec('intellisense').growth_durability?.signals,6),'inference-card')+card('What changes the view',list(v.monitorables||concall('risk'),7))+'</div>'}
 function business(){if(D.s)return hfBusiness();let b=sec('business_ops'),ip=sec('industry_peers'),products=b.products||P.products;return'<div class="layout-2">'+card('Revenue engine',list(products,10))+card('End-market architecture',list(b.revenue_split_industry||P.endMarkets,10))+card('Competitive position',(ip.market_position?'<p><strong>'+N(ip.market_position.share_pct,1)+'%</strong> '+E(ip.market_position.positioning||'')+'</p><p>'+E(ip.market_position.basis||'')+'</p>':'')+list(ip.swot?.strengths,5),'positive')+card('Manufacturing footprint',list(b.plants,8))+card('Operating economics',list(concall('margin'),8))+'</div>'}
 function financials(){let f=sec('financials'),p=f.pnl_3yr||[],cash=f.cash_flow||[],rr=f.return_ratios||[],model=P.projection?.projection||[];let reported=tableByPeriod(['Year','Revenue ₹cr','EBITDA ₹cr','PAT ₹cr','EPS'],p.map(x=>[E(x.fy),N(x.revenue/100),N(x.ebitda/100),N(x.pat/100),N(x.eps,2)]))||list(concall('financial scorecard'),10);let cf=tableByPeriod(['Year','CFO ₹cr','RoCE','RoNW'],cash.map((x,i)=>[E(x.fy),N((x.cfo||0)/100),rr[i]?.roce_pct==null?'—':N(rr[i].roce_pct)+'%',rr[i]?.ronw_pct==null?'—':N(rr[i].ronw_pct)+'%']));let estimates=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct)+'%',N(x.pat,0)]));return'<div class="stack">'+card('Reported operating record',badge('Reported fact')+reported)+card('Cash conversion & returns',cf)+card('Forward model',badge('Model estimate','estimate')+estimates,'estimate-card')+card('Model assumptions',list(P.projection?.assumptions,8))+creditRatingCard()+'</div>'}
@@ -1000,13 +1167,56 @@ function render(){devBind();let app=document.getElementById('store-company');if(
    IPOs, even when a final issue price is also present.  Nothing is inferred without a stated
    share count, price or FY PAT. */
 function offerNumber(v){let m=String(v==null?'':v).replace(/,/g,'').match(/\d+(?:\.\d+)?/);return m?Number(m[0]):null}
+/* A SHARE COUNT BELOW MIN_SHARES IS A MISREAD, NOT A QUANTITY (2026-09-09).
+   `offerNumber` takes the FIRST number in a string. Several dilution fields hold the whole
+   prose sentence rather than a parsed figure, and in that prose the first number is the FACE
+   VALUE. LEAPIND's `fresh_shares` is literally
+     'Fresh Issue of up to [.] equity shares of face value of Rs 1 each aggregating up to
+      Rs 4,000.00 million'
+   so the fresh issue was read as 1 share and rendered `Fresh issue Rs 0 cr` -- against a real
+   offer of Rs 400 cr. The share COUNT is genuinely unknown ([.] is a placeholder: this is a
+   pre-priced document), so the honest render is NO TILE.
+   Same root cause as the OFS defect fixed above (a face value read as a share count), reached
+   through a different field -- so the rule lives here, where every share-count read passes,
+   rather than at one call site. Found by the regression sweep AFTER the OFS fix, which is the
+   argument for putting it here: the next field to acquire this shape gets the guard for free.
+   The threshold is a floor on the ABSURD, not a judgement about small issues: the smallest
+   genuine share count anywhere in the published store is five figures, and no real Indian
+   equity offer is under 1,000 shares. Face values (1, 2, 5, 10, 100) all fall far below it. */
+const MIN_SHARES=1000;
+function offerShareCount(v){let n=offerNumber(v);return n!=null&&n>=MIN_SHARES?n:null}
 function offerUpperBand(s){let nums=(String(s['Price Range']||'').match(/\d+(?:\.\d+)?/g)||[]).map(Number);return nums.length?Math.max(...nums):null}
+/* THE PRICE A VALUATION IS BUILT ON: the FINAL ISSUE PRICE where the issue has been priced,
+   the upper end of the band only where it has not (2026-09-09, owner's KWICK reference).
+   Both fields come from the derived IPO registry, so this is a precedence rule WITHIN one
+   source -- not a second source, and not a DRHP fallback (that one was removed 2026-09-08
+   because the DRHP's `upper_price_band_rs` is a figure the DRHP itself disclaims).
+   Measured over the 183 published payloads carrying capital_ownership: 145 hold both, and the
+   two DISAGREE on 2 -- AAATECH (issue price 72 vs band 42) and AARVI (22 vs 54). On those two
+   every derived tile was previously computed at the wrong price. On the other 143 the values
+   coincide, so this changes nothing visible; it is the correctness of the RULE that matters,
+   because a band is a pre-pricing estimate and an issue price is the fact that replaced it.
+   `offerBandUpper` is kept separate so the caller can still tell WHICH it got and label the
+   P/E honestly -- a P/E at the top of a band is not the P/E of a priced issue. */
+function offerIssuePrice(s){return offerNumber(s['Issue Price'])}
+/* A STORED 'ISSUE PRICE' THAT CONTRADICTS THE BAND IS NOT A PRICE (2026-09-09). The same 75
+   contaminated rows behind the timeline dedupe above also feed EVERY derived tile in the Offer
+   block -- market capitalisation, total issue size, fresh issue, offer for sale, EPS and P/E.
+   VIVIANA stores 'Issue Price' 10,000 against a Rs 55 band, so an unguarded preference for the
+   issue price would have rendered a market cap ~180x too large, and it would have looked
+   entirely plausible in a card whose other tiles were fine. The band is the field that survives
+   the contamination, so it wins any disagreement.
+   Same 0.5% tolerance as the reconciliation below: formatting ('Rs.300 to Rs.315' vs '315') is
+   not a disagreement, and a few documents round. */
+function offerPriceAgrees(s){let ip=offerIssuePrice(s),hi=offerUpperBand(s);
+    return ip!=null&&hi!=null?Math.abs(ip-hi)<=0.005*Math.max(hi,1):null}
+function offerPrice(s){return offerPriceAgrees(s)===false?offerUpperBand(s):(offerIssuePrice(s)??offerUpperBand(s))}
 function offerNoteNumber(note,re){let text=String(note||'');if(String(re).includes('Promoters and Promoter Group')){let pm=text.match(/Promoters and Promoter Group[\s\S]*?\bat\s+([\d,]+)\s+Equity Shares/i);return pm?offerNumber(pm[1]):null}let m=text.match(re);return m?offerNumber(m[1]):null}
 function offerPlacementRows(c){return A(c.capital_history).map(x=>{let t=String(x.details||''),is=/private placement/i.test(t);if(!is)return null;let date=(t.match(/(?:on|dated?)\s+(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})/i)||[])[1]||x.date||'';let shares=offerNoteNumber(t,/allotted\s+([\d,]+)\s+Equity shares/i),price=offerNoteNumber(t,/issue price of\s*(?:Rs\.?|₹)?\s*([\d,.]+)/i);return shares&&price?{date,shares,price,amount:shares*price}:null}).filter(Boolean)}
 
 /* Public Offer card: upper band is a calculation input, not a displayed metric. */
 function drhpOfferStructure(c){
-    let d=c.dilution||{}, ofs=A(c.ofs), pledge=c.pledging||{}, s=P.ipo?.summary||{};
+    let d=c.dilution||{}, ofs=A(c.ofs), s=P.ipo?.summary||{};   /* `pledge` binding removed 2026-09-09 with the Promoter pledge card below -- Governance owns the fact. */
     /* PRICE COMES FROM THE REGISTRY ONLY (owner 2026-09-08: "Regardless all should come from ipo
        master in derived"). The `?? offerNumber(d.upper_price_band_rs)` fallback that used to sit here
        reached into the DRHP for a band the DRHP ITSELF disclaims: QUALIANCE carries
@@ -1021,7 +1231,10 @@ function drhpOfferStructure(c){
        unpriced offer shows no price-derived valuation, not a zero and not a placeholder. Nothing
        else is lost — share counts, OFS, promoter holding, lock-in and pledge are DRHP facts with no
        registry equivalent and still render. */
-    let upper=offerUpperBand(s), note=d.note||'', fresh=offerNumber(d.fresh_shares);
+    /* `upper` now means "the price this valuation is struck at" -- issue price if priced,
+       else the top of the band. `pricedAtIssue` records which, so the method note can say so
+       rather than leaving a reader to assume a band figure is a settled price. */
+    let upper=offerPrice(s), pricedAtIssue=offerIssuePrice(s)!=null, note=d.note||'', fresh=offerShareCount(d.fresh_shares);
     /* `d.ofs_shares` JOINS THE CHAIN (2026-09-08). The OFS total was read only from the `c.ofs`
        seller LIST and the note prose, never from `dilution.ofs_shares` where the extractor actually
        puts it when it finds a total without a per-seller breakdown. Measured over the published
@@ -1029,14 +1242,74 @@ function drhpOfferStructure(c){
        sale rendered as nothing at all — GLASSWALL is one, a pure-OFS issue of 2,02,13,722 shares
        that showed no OFS anywhere on its page. Surfaced by gating the card on values (below): the
        card had been rendering an em-dash, which hid the missing figure behind a heading. */
-    let ofsShares=ofs.reduce((n,x)=>n+(offerNumber(x.shares)||0),0)||offerNumber(d.ofs_shares)||offerNoteNumber(note,/Offer for Sale of up to\s*([\d,]+)/i);
-    let total=offerNumber(d.total_offer_shares)||offerNoteNumber(note,/Total Equity Shares offered[^:]*:\s*up to\s*([\d,]+)/i);
-    let post=offerNumber(d.post_issue_shares)||offerNoteNumber(note,/outstanding after the Offer\s*([\d,]+)/i);
-    let pre=offerNumber(d.pre_issue_shares)||offerNoteNumber(note,/outstanding prior to the Offer\s*([\d,]+)/i);
+    /* THE SELLER LIST IS PLAUSIBILITY-GATED BEFORE IT OUTRANKS THE TOTAL (2026-09-09, owner:
+       "Offer for sale Rs 0 cr this is wrong .. do RCA and see how wide spread it is").
+       `capital_ownership.ofs[].shares` is carrying the table's FACE VALUE column, not a share
+       count: every row reads 10 / 5 / 2 / 1 / 100, and on the 6 companies whose note states a
+       face value it EQUALS it exactly (STEAMHOUSE 'face value Rs 2 each' -> shares:2;
+       EXCELSOFT Rs 10 -> 10; LEAPIND Rs 1 -> 1). A column misalignment in the reader.
+       Two defects stacked, and the `||` chain is the second one: a corrupt list summing to a
+       small NON-ZERO number is TRUTHY, so it SHADOWED the `dilution.ofs_shares` fallback added
+       2026-09-08 for exactly this job. The list does not have to be empty to break the page --
+       it only has to be wrong. Measured over the published store: 12 companies, of which 9
+       rendered `Offer for sale Rs 0 cr` (STEAMHOUSE 42 shares x 81 / 1e7 -> 0.00) and 2 were
+       shadowing a real total (AARISHOUTDOORS 7 vs 880,000; ACEVECTOR 640 vs 63,870,763).
+       A share count below MIN_SHARES cannot be a real offer for sale -- the smallest
+       genuine OFS in the store is five figures -- so it is DISCARDED rather than summed, and
+       the chain falls through to the stored total. If nothing survives, no tile renders: a
+       wrong number is worse than a missing one.
+       NOT FIXED HERE: the extractor. This is the consumer-side guard so no page can present a
+       face value as a share count while the reader is repaired at the cause. */
+    let ofsListShares=ofs.reduce((n,x)=>n+(offerNumber(x.shares)||0),0);
+    if(ofsListShares<MIN_SHARES)ofsListShares=0;   /* MIN_SHARES: the shared floor beside offerNumber */
+    let ofsShares=ofsListShares||offerShareCount(d.ofs_shares)||offerNoteNumber(note,/Offer for Sale of up to\s*([\d,]+)/i);
+    if(ofsShares!=null&&ofsShares<MIN_SHARES)ofsShares=null;
+    let total=offerShareCount(d.total_offer_shares)||offerNoteNumber(note,/Total Equity Shares offered[^:]*:\s*up to\s*([\d,]+)/i);
+    /* THE STORED POST-ISSUE COUNT, RECONCILED -- NOT DERIVED (2026-09-09, owner's KWICK
+       reference). KWICK stores 21,436,440 and pre(16,874,840) + fresh(4,561,600) sums to
+       exactly that, which is what makes it trustworthy. The rule is: use the STORED count, and
+       where pre and fresh are BOTH known, require them to reconcile with it.
+       A DISAGREEMENT IS A REFUSAL, NOT A PICK. This is the check that catches the failure a
+       sibling agent measured -- `post_issue_shares_cr` matching neither pre nor pre+fresh on
+       31 of 53 companies, and a derived `pre + fresh` rule disagreeing with the DRHP's own
+       stated count on 9 of 61, ALWAYS understating (up to 44%) because an absent `fresh` reads
+       as zero dilution. Suppressing both tiles on a contradiction is the only safe answer: a
+       market cap that is quietly 44% low is worse than no market cap.
+       NOTE AN OFS DOES NOT ENTER THIS SUM. An offer for sale transfers EXISTING shares between
+       holders; only a fresh issue creates new ones. `total_offer_shares` (fresh + ofs) is the
+       size of the OFFER, never the change in the share count.
+       TOLERANCE: 0.5%, not exact equality -- a few documents round the stated count to the
+       nearest hundred. Nothing near the 26-44% errors this guard exists to reject.
+       Where pre or fresh is absent there is nothing to reconcile against, so the stored count
+       is used as-is: it is the document's own STATED figure, which the prior art measured as
+       the trustworthy branch (52/61 self-consistent; PRASOLCHEM's Rs 4,000.8 cr checks out
+       exactly against it). */
+    let postStored=offerShareCount(d.post_issue_shares)||offerNoteNumber(note,/outstanding after the Offer\s*([\d,]+)/i);
+    let preRaw=offerShareCount(d.pre_issue_shares)||offerNoteNumber(note,/outstanding prior to the Offer\s*([\d,]+)/i);
+    let postSum=preRaw!=null&&fresh!=null?preRaw+fresh:null;
+    let postReconciles=postStored!=null&&postSum!=null?Math.abs(postStored-postSum)<=0.005*postSum:null;
+    let post=postReconciles===false?null:postStored;
+    let pre=preRaw;   /* computed above for the post-issue reconciliation (2026-09-09) */
     let promoterPre=offerNoteNumber(c.promoter_holding?.note,/Promoters and Promoter Group[^\d]*([\d,]+)\s+Equity Shares/i);
     let promoterPost=promoterPre!=null&&ofsShares!=null?promoterPre-ofsShares:null;
     let promoterPostPct=promoterPost!=null&&post?100*promoterPost/post:null;
-    let fy26=A(sec('financials').pnl_3yr).find(x=>String(x.fy)==='FY26')||{};
+    /* FY26 AND FY2026 ARE THE SAME YEAR (2026-09-09). The match was `String(x.fy)==='FY26'`,
+       exact, while the store spells the label both ways -- measured over the 183 published
+       payloads carrying capital_ownership: latest label `FY26` on 46 and `FY2026` on 29. The
+       29 were skipped silently, so their EPS and P/E tiles never rendered even with a good PAT
+       and a good post-issue count. (Only 2 of them, ANAWIL and SHANTIINOR, also hold a stated
+       post-issue count, so this recovers 2 pages today -- but it removes a defect that would
+       otherwise silently drop every future FY2026-spelled company.)
+       A PART-YEAR LABEL MUST NEVER MATCH. 20 published companies carry `H1FY26`, `H1 FY26`,
+       `9MFY26`, `9M_FY26` or `Q1FY26` as their LATEST row. Six or nine months of PAT divided
+       by the post-issue share count is not a full-year EPS, and the P/E built on it would be
+       roughly double the true figure -- so the pattern is anchored (^) and closed ($) and
+       accepts only the two full-year spellings. It is deliberately NOT a /26/ substring test.
+       Whitespace is tolerated because the store carries ' FY26 ' on some rows; nothing else is.
+       The fiscal-label defects found this week (ACCORDTS, PRIORITY, PALUCK shifted; STEAMHOUSE
+       scrambled) are a STORE problem and are NOT compensated for here -- a renderer cannot tell
+       a mislabelled year from a correct one, and guessing would be the same class of error. */
+    let fy26=A(sec('financials').pnl_3yr).find(x=>/^\s*FY(26|2026)\s*$/i.test(String(x.fy)))||{};
     let pat=offerNumber(fy26.pat), eps=pat!=null&&post?pat*100000/post:null, mcap=upper!=null&&post?upper*post:null, facts=[];
     /* STATED FACTS FIRST, then the derived ones (owner 2026-09-03: "available factual inputs
        should still be visible even when no full valuation can be calculated"). Every fact below was
@@ -1046,6 +1319,17 @@ function drhpOfferStructure(c){
        Offer data and rendered NOTHING; ESDS was one. These two stand alone; the derived rows below
        are OMITTED when they cannot be computed -- never a placeholder, never a zero. */
     if(pre!=null)facts.push({label:'Pre-issue shares',value:N(pre,0)});
+    /* POST-ISSUE SHARES beside the pre-issue count (2026-09-09, owner: "Offer at a glance: add
+       post shares -- we have Pre-issue shares"). `post` was already computed here as the input
+       to market cap / EPS / P-E; it simply never had a tile of its own.
+       ONLY THE DOCUMENT'S STATED COUNT. The tempting fallback -- post = pre + fresh -- was
+       measured against the DRHPs' own stated post counts and disagrees on 9 of 61, ALWAYS
+       understating (up to 44%), because an absent `fresh_shares` reads as zero dilution.
+       Renders on 64 of 183 published companies; the rest state no post-issue count because a
+       pre-priced DRHP/RHP cannot -- the count is a function of an Offer Price fixed later, and
+       those documents print it as [.]. Push-only, so those pages show no tile rather than a
+       dash. See output/_scratch/ipo_band_dedup/DESIGN.md and offer_glance/mcap/. */
+    if(post!=null)facts.push({label:'Post-issue shares',value:N(post,0)});
     /* NO `Upper price band` TILE (2026-09-08). `upper` is now registry-only, so this tile
        merely restated the `Issue price` tile that `drhpListingGeneric` renders from the SAME
        registry field -- the same label-twice problem as `Pre-issue shares`. Worse, on the
@@ -1057,10 +1341,33 @@ function drhpOfferStructure(c){
     if(total&&upper!=null)facts.push({label:'Total issue size',value:'₹'+N(total*upper/10000000,2)+' cr'});
     if(fresh&&upper!=null)facts.push({label:'Fresh issue',value:'₹'+N(fresh*upper/10000000,2)+' cr'});
     if(ofsShares&&upper!=null)facts.push({label:'Offer for sale',value:'₹'+N(ofsShares*upper/10000000,2)+' cr'});
+    /* POST-ISSUE PROMOTER HOLDING % (2026-09-09, owner: "from governance move this to Offer at
+       a glance -- add post shares promoter holding %, we have Pre-offer promoter holding %").
+       Reads the STORE's `promoter_holding.post_pct`, not the local `promoterPostPct` computed
+       below for the 'Promoter holding' table -- that one is a renderer derivation
+       (promoterPre - ofsShares) and is labelled `(derived)` where it renders.
+       GUARDED TO (0,100]. A sibling agent measured promoter percentages that are provably
+       wrong in the store -- ACTIVEINFR `pre_pct 125.03%` (the table reader summed rows named
+       'Public' and 'Non-Promoter'), ACMEUNIVERSAL a share COUNT stored as a percentage -- and
+       `post_pct` is DERIVED from `pre_pct`, so a bad pre value propagates. A percentage outside
+       (0,100] is impossible, so it is suppressed rather than shown.
+       Renders on 19 of 183 published companies (11%), and that is the CORRECT outcome, not a
+       gap to be closed by deriving one: 43 of the 84 nulls are documents that cannot state a
+       post-issue holding at all. Push-only -- never a dash.
+       Evidence: output/_scratch/promoter_holding/DESIGN.md. */
+    let postPct=c.promoter_holding?.post_pct;
+    if(typeof postPct==='number'&&postPct>0&&postPct<=100)facts.push({label:'Post-issue promoter holding',value:N(postPct,2)+'%'});
     if(mcap!=null)facts.push({label:'Market capitalisation',value:'₹'+N(mcap/10000000,2)+' cr'});
     if(eps!=null)facts.push({label:'Post-issue EPS (FY26)',value:'₹'+N(eps,2)});
     if(eps&&upper!=null)facts.push({label:'P/E (FY26, post-issue)',value:N(upper/eps,2)+'x'});
-    let html=facts.length?card('Offer at a glance',kpis(facts)+'<p class="method-note">Derived using the stated upper price band and stated share counts.</p>'):'';
+    let html=facts.length?card('Offer at a glance',kpis(facts)+'<p class="method-note">Derived using the stated upper price band and stated share counts. '
+        /* THE P/E IS AT THE TOP OF THE BAND, AND SAYS SO (2026-09-09). `upper` is the upper end
+           of the registry price range, so the P/E is the P/E an applicant pays at the cut-off,
+           not "the" P/E -- at the lower end it is materially smaller. A reader anchors on this
+           number harder than on any other tile in the block, so the basis is stated rather than
+           left to be inferred from the tile label. */
+        +(pricedAtIssue?'Market capitalisation, EPS and P/E are struck at the final issue price; EPS uses the latest stated full year.'
+                      :'Market capitalisation, EPS and P/E are at the upper end of the price band, not a settled price; EPS uses the latest stated full year.')+'</p>'):'';
     let holding=[];
     if(promoterPre!=null)holding.push(['Pre-issue promoter + promoter group',N(promoterPre,0),c.promoter_holding?.pre_pct==null?'—':N(c.promoter_holding.pre_pct,2)+'%']);
     if(promoterPost!=null)holding.push(['Post-issue promoter + promoter group (derived)',N(promoterPost,0),N(promoterPostPct,2)+'%']);
@@ -1087,7 +1394,20 @@ function drhpOfferStructure(c){
     if(unlockRows.length)html+=card('Lock-in release schedule',table(['Release date','Shares','Lock-in'],
         unlockRows.map(x=>[E(x.date),N(x.shares,0),E(x.tenure||'—')]))+
         '<p class="method-note">Source: NSE lock-in circular. Tranches releasing on the same date under the same lock-in are combined; shares already free of lock-in are not listed.</p>');
-    if(pledge.pledged_pct!=null)html+=card('Promoter pledge',kpis([{label:'Shares pledged',value:N(pledge.pledged_pct,2)+'%'}]));
+    /* 'Promoter pledge' card REMOVED from Offer 2026-09-09 (owner: "Promoter pledge / Shares
+       pledged 65.88% : should move to section ownership governance for all IPO, currently its
+       in Offer"). A pledge is an OWNERSHIP fact, not a term of the offer.
+       IT IS A DELETION, NOT A MOVE -- the destination already renders it. `govTiles` in the
+       Ownership & Governance 'Governance snapshot' reads the SAME
+       `capital_ownership.pledging.pledged_pct` field, so the page was showing one fact twice
+       under two labels. Measured live in Chromium on STEAMHOUSE before the change:
+       Offer 'Shares pledged 65.88%' beside Governance 'Promoter pledge 65.9%' -- the same
+       number, differing only by N(...,2) vs N(...,1) rounding, NOT two sources.
+       The label difference is why this survived: a duplicate check keyed on the tile LABEL
+       cannot see it. The gate now keys on the FACT (card title + label):
+       output/_scratch/offer_glance/assert_glance.js G4.
+       `pledge` is no longer read in this function and its binding went with it, so nothing
+       computes a value nothing renders. Restoring the card is a one-line change. */
     return html;
 }
 /* RHP peer cards may contain only issuer-disclosed comparables.  The legacy peer_panel
@@ -1105,5 +1425,39 @@ function drhpPeersGeneric(){
     return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">The RHP does not disclose a listed peer set for this company. No keyword-derived companies are shown as comparables.</div>';
 }
 /* Offer owns composition; Execution exclusively owns the detailed use-of-funds table. */
-function drhpListingGeneric(){let s=P.ipo?.summary||{},c=sec('capital_ownership'),listed=(function(d){if(!d)return false;var t=Date.parse(String(d).slice(0,10));return !isNaN(t)&&t<=Date.now();})(s['Date Of Listing']);let tiles=[];if(String(s['Price Range']||'').trim())tiles.push({label:'Price band',value:E(s['Price Range'])});if(String(s['Issue Price']||'').trim())tiles.push({label:'Issue price',value:'₹'+N(s['Issue Price'])});if(String(s['Issue Start Date']||'').trim())tiles.push({label:'Issue opens',value:E(s['Issue Start Date'])});if(String(s['Issue End Date']||'').trim())tiles.push({label:'Issue closes',value:E(s['Issue End Date'])});if(String(s['Date Of Listing']||'').trim())tiles.push({label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing'])});let timeline=tiles.length?card(listed?'Offer and listing timeline':'Offer timeline',kpis(tiles)):'';return'<div class="stack">'+timeline+drhpOfferStructure(c)+'</div>'}
+function drhpListingGeneric(){let s=P.ipo?.summary||{},c=sec('capital_ownership'),listed=(function(d){if(!d)return false;var t=Date.parse(String(d).slice(0,10));return !isNaN(t)&&t<=Date.now();})(s['Date Of Listing']);let tiles=[];
+    /* ONE PRICE ROW, NOT TWO (2026-09-09, owner: "we don't need both just keep one for all
+       IPO"). Both fields are populated together on 970 of 970 published companies -- there is
+       no coverage argument for either, so this is purely a redundancy question, EXCEPT where
+       the two contradict each other.
+       THE CONTRADICTION IS REAL AND MUST NOT BE HIDDEN BY THE DEDUPE. Normalising both sides
+       (a naive compare reports 642 differences that are almost all 'Rs.300 to Rs.315' vs '315'
+       -- the same number wearing a prefix), 75 of 970 genuinely disagree. 70 of those 75 listed
+       BEFORE 2026, and the outliers show the stored `Issue Price` is not always an issue price:
+         VIVIANA  band 55  'issue price' 10,000    <- an application/lot amount
+         MWL      band 101 'issue price' 100,000   <- an application/lot amount
+         SOLEX    band 52  'issue price' 1,694     <- a market price
+         HITECH   band 50  'issue price' 380       <- a market price
+       and 5 range-band cases (HAL, PARAGMILK, MSTCLTD, ICEMAKE, RADIANTCMS) store the band's
+       LOW end as the issue price, which is a different defect again.
+       So the rule is: show the issue price when it AGREES with the band (the common case, and
+       the number every derived tile is computed from); show the BAND when they contradict,
+       because the band is the field that survives this contamination; show the band alone when
+       the issue is not yet priced. Never both, and never a silent pick between two numbers
+       that disagree -- the contradiction is labelled instead, so it stays visible and
+       diagnosable rather than being resolved by whichever tile happened to render.
+       The registry carries the same disagreement, so this is NOT a payload-layer loss; the
+       upstream defect is recorded in output/_scratch/offer_glance/DESIGN.md for a producer-side
+       fix. This guard stops a wrong price REACHING a reader in the meantime.
+       NO 'unverified' PLACEHOLDER TILE. Falling back to the band IS the disclosure -- a priced
+       issue that shows a band is showing what it can stand behind. A tile reading 'Not
+       verified' would be a non-numeric value in a KPI row whose every other entry is a number,
+       and this card's idiom is already "never a placeholder". The contradiction is recorded in
+       the scratch RCA and belongs in a producer-side gate, not in a reader's eyeline. */
+    let bandTxt=String(s['Price Range']||'').trim(), ipTxt=String(s['Issue Price']||'').trim();
+    let bandNums=(bandTxt.match(/\d+(?:\.\d+)?/g)||[]).map(Number), ipNum=offerNumber(ipTxt);
+    let bandHi=bandNums.length?Math.max(...bandNums):null;
+    let priceAgrees=ipNum!=null&&bandHi!=null?Math.abs(ipNum-bandHi)<=0.005*Math.max(bandHi,1):null;
+    if(ipTxt&&priceAgrees!==false)tiles.push({label:'Issue price',value:'₹'+N(ipTxt)});
+    else if(bandTxt)tiles.push({label:'Price band',value:E(bandTxt)});if(String(s['Issue Start Date']||'').trim())tiles.push({label:'Issue opens',value:E(s['Issue Start Date'])});if(String(s['Issue End Date']||'').trim())tiles.push({label:'Issue closes',value:E(s['Issue End Date'])});if(String(s['Date Of Listing']||'').trim())tiles.push({label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing'])});let timeline=tiles.length?card(listed?'Offer and listing timeline':'Offer timeline',kpis(tiles)):'';return'<div class="stack">'+timeline+drhpOfferStructure(c)+'</div>'}
 render();})();
