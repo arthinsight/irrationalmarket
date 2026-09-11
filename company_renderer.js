@@ -558,7 +558,15 @@ function inOwnership(){
 }
 function inRisks(){let r=sec('risks'),find=(bucket,re)=>A(r[bucket]).find(x=>re.test(x.title||'')),items=[find('internal_operational',/No definitive purchase commitments/i),find('internal_operational',/High import dependence/i),find('internal_operational',/quality.*recalls/i),find('financial_valuation',/Pricing pressure/i),find('financial_valuation',/Restrictive covenants/i),find('financial_valuation',/Currency exchange/i),find('compliance_legal',/Environmental law/i),find('compliance_legal',/Majority of Directors/i),find('compliance_legal',/sanctioned countries/i),find('strategy_growth',/Acquisitions.*joint ventures/i),find('strategy_growth',/structural threats/i),find('strategy_growth',/R&D investment/i)].filter(Boolean),lit=r.litigation_summary||{},cont=r.contingent_liabilities||{};return'<div class="stack"><div class="analysis-strip"><div><span>Litigation exposure</span><b>₹'+N(lit.total_amount_lakhs/100,0)+'cr · '+N(lit.pct_of_networth,1)+'% of net worth</b></div><div><span>Contingent liabilities</span><b>₹'+N(cont.amount_lakhs/100,0)+'cr · '+N(cont.pct_of_networth,1)+'% of net worth</b></div><div><span>Risk architecture</span><b>Operating · financial · compliance · strategy</b></div></div><p class="method-note">Balanced risk register — three decision-relevant risks from each risk family.</p><div class="risk-grid">'+items.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title)+'</h3><p>'+E(x.detail)+'</p><small>'+E(x.evidence||'')+'</small></div></article>').join('')+'</div>'+card('Approvals pending',list(r.approvals_pending,10))+'</div>'}
 function inPeers(){let pp=D.peer_panel||{},target=pp.target||{},ip=sec('industry_peers'),intel=sec('intellisense'),exact=A(ip.peers_drhp),size=intel.valuation?.size_mismatch||{},refs=A(ip.peers_internal).filter(x=>['PTCIL','STEELCAS','HAPPYFORGE','INVPRECQ'].includes(x.symbol)),barrier=pipe(D.strengths).find(x=>/barriers|qualification/i.test(x));let structure=list([ip.market_position?.basis,barrier].filter(Boolean),4);let t=table(['Company','FY','Revenue ₹cr','Growth','PAT ₹cr','PAT growth'],[['INDO-MIM',E(target.fy),N(target.rev,0),N(target.rev_growth,1)+'%',N(target.pat,0),N(target.pat_growth,1)+'%']]);let global=table(['Company','Period','Revenue ₹cr','RoNW','Relative scale'],exact.map(x=>[E(x.name),E(x.fy),N((x.total_income||0)/10,0),N(x.ronw,1)+'%',N(size.peer_to_issuer_x,1)+'x INDO-MIM']));let operating=table(['Symbol','Company','Treatment'],refs.map(x=>[E(x.symbol),E(x.company),'Operating reference — not a MIM valuation peer']));return'<div class="stack">'+card('MIM industry structure',structure,'positive')+card('INDO-MIM operating scale',t)+card('Closest disclosed global comparable',global)+card('Operating references — not valuation peers',operating)+'<p class="method-note">There is no listed Indian end-to-end MIM equivalent. Jiangsu Gian is the sole disclosed global comparable and is materially larger; valuation interpretation belongs to the Verdict tab.</p></div>'}
-function inListing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{},intel=sec('intellisense'),ins=intel.insider||{},c=sec('capital_ownership'),o=sec('objects_execution'),note=c.dilution?.note||'',ofs=(note.match(/Offer for Sale of up to ([\d,]+)/i)||[])[1],employee=(note.match(/Employee Reservation Portion of up to ([\d,]+)/i)||[])[1],sellers=table(['Selling shareholder','Shares disclosed'],A(c.ofs).map(x=>[E(x.seller),x.shares?E(x.shares):'Not separately disclosed']));return'<div class="stack"><div class="analysis-strip"><div><span>Latest close</span><b>₹'+N(a['Latest Close'],2)+' · '+N(a['Return From Listing %'],1)+'% from open</b></div><div><span>Supply calendar</span><b>'+E(A(ins.supply_calendar).length)+' identified release events</b></div></div>'+card('Offer composition',kpis([{label:'Fresh issue',value:'₹'+N(o.project?.funding_mix?.fresh_issue_lakhs/100,0)+'cr'},{label:'Offer-for-sale shares',value:E(ofs||'—')},{label:'Employee reservation',value:E(employee||'—')}])+sellers)+card('Supply calendar',table(['Date','Holder','Event','Equity'],A(ins.supply_calendar).map(x=>[E(x.date),E(x.holder),E(x.event),x.pct_equity==null?'—':N(x.pct_equity,2)+'%'])))+anchorCard()+'</div>'}
+function inListing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{},intel=sec('intellisense'),ins=intel.insider||{},c=sec('capital_ownership'),o=sec('objects_execution'),note=c.dilution?.note||'',
+    /* OFS READS THE STORED FIELD (2026-09-11). This regex was the SECOND browser-side extractor of
+       `ofs_shares` -- `inListing` is a different renderer path from `drhpOfferStructure`, which is why
+       the same defect had to be fixed twice. `offerShareCount` applies the same >=1000 floor the
+       producer uses, so a face value cannot render as a share count.
+       `employee` STAYS a regex: no stored field carries the employee reservation, so this is the only
+       source. It is a candidate for the producer in a later pass, not dead code to delete now. */
+    ofs=(()=>{let n=offerShareCount(c.dilution?.ofs_shares);return n!=null?N(n,0):null})(),
+    employee=(note.match(/Employee Reservation Portion of up to ([\d,]+)/i)||[])[1],sellers=table(['Selling shareholder','Shares disclosed'],A(c.ofs).map(x=>[E(x.seller),x.shares?E(x.shares):'Not separately disclosed']));return'<div class="stack"><div class="analysis-strip"><div><span>Latest close</span><b>₹'+N(a['Latest Close'],2)+' · '+N(a['Return From Listing %'],1)+'% from open</b></div><div><span>Supply calendar</span><b>'+E(A(ins.supply_calendar).length)+' identified release events</b></div></div>'+card('Offer composition',kpis([{label:'Fresh issue',value:'₹'+N(o.project?.funding_mix?.fresh_issue_lakhs/100,0)+'cr'},{label:'Offer-for-sale shares',value:E(ofs||'—')},{label:'Employee reservation',value:E(employee||'—')}])+sellers)+card('Supply calendar',table(['Date','Holder','Event','Equity'],A(ins.supply_calendar).map(x=>[E(x.date),E(x.holder),E(x.event),x.pct_equity==null?'—':N(x.pct_equity,2)+'%'])))+anchorCard()+'</div>'}
 
 function inVerdict(){let v=sec('verdict'),intel=sec('intellisense'),f=sec('financials'),pe=intel.true_pe||{},scenarios=intel.scenarios||{},pct=intel.percentiles||{},ins=intel.insider||{},gd=intel.growth_durability||{},scores=A(v.parameter_scores),openQuestions=A(v.open_questions).filter(x=>!/What price band/i.test(x)),monitorables=A(v.monitorables).filter(x=>!/Post-issue debt|US tariff|Triax Industries/i.test(x)),dataGaps=A(v.data_gaps).filter(x=>!/Price band, lot size and P\/E|FY26 RoCE/i.test(x)),last=A(f.pnl_3yr).at(-1)||{},norm=A(pe.lines).find(x=>x.label==='normalized')||{},stance=String(v.stance||'Not rated').split(/\s+-\s+/)[0];let bars='<div class="analytical-scores">'+scores.map(x=>{let s=Number(x.score_1_10)||0,band=s>=7?'strong':s>=4?'watch':'weak',filingStage=/Valuation clarity/i.test(x.parameter||'')&&intel.ipo_price,basis=filingStage?'Stored filing-stage score: pricing was unavailable in the source document. Final issue pricing is now available; the score is retained and not automatically re-rated.':x.basis;return'<div class="analytical-score"><div class="score-head"><b>'+E(x.parameter)+'</b><strong>'+N(s,0)+' / 10</strong></div><div class="score-track"><i class="'+band+'" style="width:'+Math.max(0,Math.min(100,s*10))+'%"></i></div><p>'+E(basis||'')+'</p></div>'}).join('')+'</div>';let price=Number(intel.ipo_price)||0,valuationRows=[['Reported','FY2026','—',N(last.revenue/100,0),N(last.pat_margin_pct,2)+'%',N(last.eps,2),N(pe.reported,2)+'x'],['Diluted','FY2026','—',N(last.revenue/100,0),N(last.pat_margin_pct,2)+'%',N(price/pe.diluted,2),N(pe.diluted,2)+'x'],['Normalized','FY2026','—',N(last.revenue/100,0),N(norm.inputs?.avg_margin_pct,2)+'%',N(price/pe.normalized,2),N(pe.normalized,2)+'x']];['bear','base','bull'].forEach(k=>{let x=scenarios[k],a=x?.assumptions||{};if(x)valuationRows.push([k,'FY2027',N(a.revenue_growth_pct,1)+'%',N(a.revenue_cr,0),N(a.pat_margin_pct,2)+'%',N(x.eps,2),N(x.fwd_pe,2)+'x'])});let percentileRows=[['Revenue growth',pct.revenue_growth],['PAT margin',pct.pat_margin],['Margin expansion',pct.margin_expansion]].filter(x=>x[1]).map(x=>[x[0],N(x[1].value,2)+'%',ordinal(x[1].pct),E(x[1].n||intel.n_cohort)]);let warns=A(intel.forensic).filter(x=>/WARN/i.test(x.verdict||'')),saving=pe.forward?.interest_saved_cr??scenarios.base?.assumptions?.interest_saving_cr,synthesis=[gd.verdict?'Growth durability is '+String(gd.verdict).toUpperCase()+'; the valuation model applies '+(pe.forward?.growth_adjusted?'an evidence-based growth haircut.':'the stored achievable growth rate without an additional haircut.'):'',saving!=null?'Debt repayment is estimated to add ₹'+N(saving,1)+'cr to annual after-tax earnings capacity.':'',warns.length?warns.length+' forensic warning'+(warns.length===1?' remains':'s remain')+' open; the underlying checks stay in Financials.':'No forensic warning remains open.',ins.ipo_price_multiple!=null?'The issue price was '+N(ins.ipo_price_multiple,1)+'x the stored promoter average acquisition cost.':'',intel.valuation?.size_mismatch?.flag?'The disclosed global comparable is '+N(intel.valuation.size_mismatch.peer_to_issuer_x,1)+'x larger by revenue, so its multiple is not used as a clean anchor.':''].filter(Boolean);return'<div class="stack verdict-stack"><section class="verdict-group"><div class="verdict-group-head"><span>01</span><div><p class="eyebrow">Verdict framework</p><h3>Assessment</h3></div></div><div class="verdict-banner"><div><span>Current stance</span><b>'+E(stance)+'</b></div><p>'+E(v.our_read||'')+'</p></div>'+card('Analytical scores',bars,'inference-card')+'</section><section class="verdict-group"><div class="verdict-group-head"><span>02</span><div><p class="eyebrow">Questions before conviction</p><h3>Due diligence</h3></div></div><div class="layout-2">'+card('Open questions for due diligence',list(openQuestions,10),'inference-card')+card('Red flags',list(v.red_flags,10),'caution')+card('Monitorables',list(monitorables,10))+card('Data gaps',list(dataGaps,10))+'</div></section><section class="verdict-group"><div class="verdict-group-head"><span>03</span><div><p class="eyebrow">Integrated analytical read</p><h3>Intelligence synthesis</h3></div></div>'+card('Valuation and scenario frame',badge('Analytical inference','inference')+table(['Basis','Period','Growth','Revenue ₹cr','PAT margin','EPS','P/E'],valuationRows)+'<p class="method-note">'+E(scenarios.assumptions_note||'')+'</p>','inference-card')+card('Cross-DRHP percentiles',table(['Measure','Company','Percentile','Cohort'],percentileRows))+card('What the evidence means',list(synthesis,10),'positive')+'</section></div>'}
 function exInvestment(){let y=D.pnl?.year||{},last=A(D.actuals).at(-1)||{},margin=ddBlock('latest_quarter','margin'),non=ddBlock('bull_bear','non-obvious'),opt=ddBlock('outlook','growth vertical');let facts=[{label:'Annual revenue',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('Revenue'))?.cur,0)+'cr'},{label:'Annual PAT',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('PAT'))?.cur,0)+'cr'},{label:'Operating margin',value:N(y.rows?.find(x=>x.metric.startsWith('OPM'))?.cur,1)+'%'},{label:'Latest revenue growth',value:N(last.rev_yoy,1)+'%'},{label:'Lithium-ion investment',value:'₹4,802cr'},{label:'Planned cell capacity',value:'12 GWh'},{label:'Recycled lead input',value:'~79%'}];return kpis(facts)+'<div class="layout-2">'+card('Core earnings engine','<p>'+E(ddBlock('business','segment').body)+'</p>','positive')+card('Transformation thesis','<p>'+E(opt.body)+'</p>','inference-card')+card('Margin defence','<p>'+E(margin.body)+'</p>','caution')+card('Non-obvious read',badge('Analytical inference','inference')+'<p>'+E(non.body)+'</p>','inference-card')+card('Decision tension','<p>The established lead-acid franchise funds a large greenfield cell-manufacturing transition. The key underwriting question is whether customer validation and utilisation arrive quickly enough to lift returns above the current 6% ROE.</p>','caution')+'</div>'}
@@ -1211,7 +1219,34 @@ function offerIssuePrice(s){return offerNumber(s['Issue Price'])}
 function offerPriceAgrees(s){let ip=offerIssuePrice(s),hi=offerUpperBand(s);
     return ip!=null&&hi!=null?Math.abs(ip-hi)<=0.005*Math.max(hi,1):null}
 function offerPrice(s){return offerPriceAgrees(s)===false?offerUpperBand(s):(offerIssuePrice(s)??offerUpperBand(s))}
-function offerNoteNumber(note,re){let text=String(note||'');if(String(re).includes('Promoters and Promoter Group')){let pm=text.match(/Promoters and Promoter Group[\s\S]*?\bat\s+([\d,]+)\s+Equity Shares/i);return pm?offerNumber(pm[1]):null}let m=text.match(re);return m?offerNumber(m[1]):null}
+/* `offerNoteNumber` NO LONGER EXTRACTS OFFER FACTS (2026-09-11, owner: "move all to one place producer
+   side"). It kept a PARALLEL EXTRACTOR in the browser: five stored numeric fields -- ofs_shares,
+   total_offer_shares, pre_issue_shares, post_issue_shares and the promoter share count -- were
+   re-derived here by regexing the prose `note`, with no identity check, no refusal path and no
+   provenance. That made the page a THIRD producer after `factual_store._OFFER_PATTERNS` and
+   `drhp/note_recover`.
+
+   MEASURED ACROSS ALL 3,107 PUBLISHED PAYLOADS before removal:
+     total_offer_shares  fallback fired on   0
+     post_issue_shares   fallback fired on   0
+     pre_issue_shares    fallback fired on   0
+     ofs_shares          fallback fired on  11   <- and 10 of those 11 are ALREADY in the store
+     promoter share      fallback fired on   2
+   Three of the five were dead code. The eleven are exactly the companies `drhp/note_recover` typed
+   into the store on 2026-09-10 (AMAGI, CMRGREEN, LCL, PINELABS, SBIFUNDS, SEDEMAC, VIVIDEL, JPAN,
+   KNACK, PUSHPBRAND) -- the payloads were merely stale. The twelfth, DEVSON, is a REFUSAL the store
+   makes deliberately: its stored `total_offer_shares` contradicts its own note, so showing a number
+   here was showing an unvalidated figure.
+
+   AND THE PROMOTER BRANCH WAS ALREADY KNOWN BROKEN. `drhp/factual_store._promoter_post_pct`'s
+   docstring records this exact regex failing on KWICK: `[^\d]*` cannot cross the "8" in "(8
+   shareholders)", so it returned null on a company whose numbers are all present. That was fixed in
+   Python on 2026-09-03 and left standing here for three months. `promoter_holding.pre_pct` is stored
+   on 104 payloads; this regex reached 2.
+
+   Kept, deliberately: `offerPlacementRows` below parses PER-ROW `capital_history` prose for which no
+   stored field exists -- a different case from re-deriving a field we already hold. */
+function offerNoteNumber(note,re){let text=String(note||'');let m=text.match(re);return m?offerNumber(m[1]):null}
 function offerPlacementRows(c){return A(c.capital_history).map(x=>{let t=String(x.details||''),is=/private placement/i.test(t);if(!is)return null;let date=(t.match(/(?:on|dated?)\s+(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})/i)||[])[1]||x.date||'';let shares=offerNoteNumber(t,/allotted\s+([\d,]+)\s+Equity shares/i),price=offerNoteNumber(t,/issue price of\s*(?:Rs\.?|₹)?\s*([\d,.]+)/i);return shares&&price?{date,shares,price,amount:shares*price}:null}).filter(Boolean)}
 
 /* Public Offer card: upper band is a calculation input, not a displayed metric. */
@@ -1262,9 +1297,12 @@ function drhpOfferStructure(c){
        face value as a share count while the reader is repaired at the cause. */
     let ofsListShares=ofs.reduce((n,x)=>n+(offerNumber(x.shares)||0),0);
     if(ofsListShares<MIN_SHARES)ofsListShares=0;   /* MIN_SHARES: the shared floor beside offerNumber */
-    let ofsShares=ofsListShares||offerShareCount(d.ofs_shares)||offerNoteNumber(note,/Offer for Sale of up to\s*([\d,]+)/i);
+    /* STORED FIELDS ONLY (2026-09-11) -- the prose fallbacks that stood here are gone; see the note
+       on `offerNoteNumber`. The seller-list sum stays FIRST because it is per-holder evidence, not a
+       re-derivation of `ofs_shares`. */
+    let ofsShares=ofsListShares||offerShareCount(d.ofs_shares);
     if(ofsShares!=null&&ofsShares<MIN_SHARES)ofsShares=null;
-    let total=offerShareCount(d.total_offer_shares)||offerNoteNumber(note,/Total Equity Shares offered[^:]*:\s*up to\s*([\d,]+)/i);
+    let total=offerShareCount(d.total_offer_shares);
     /* THE STORED POST-ISSUE COUNT, RECONCILED -- NOT DERIVED (2026-09-09, owner's KWICK
        reference). KWICK stores 21,436,440 and pre(16,874,840) + fresh(4,561,600) sums to
        exactly that, which is what makes it trustworthy. The rule is: use the STORED count, and
@@ -1284,15 +1322,36 @@ function drhpOfferStructure(c){
        is used as-is: it is the document's own STATED figure, which the prior art measured as
        the trustworthy branch (52/61 self-consistent; PRASOLCHEM's Rs 4,000.8 cr checks out
        exactly against it). */
-    let postStored=offerShareCount(d.post_issue_shares)||offerNoteNumber(note,/outstanding after the Offer\s*([\d,]+)/i);
-    let preRaw=offerShareCount(d.pre_issue_shares)||offerNoteNumber(note,/outstanding prior to the Offer\s*([\d,]+)/i);
+    let postStored=offerShareCount(d.post_issue_shares);
+    let preRaw=offerShareCount(d.pre_issue_shares);
     let postSum=preRaw!=null&&fresh!=null?preRaw+fresh:null;
     let postReconciles=postStored!=null&&postSum!=null?Math.abs(postStored-postSum)<=0.005*postSum:null;
     let post=postReconciles===false?null:postStored;
     let pre=preRaw;   /* computed above for the post-issue reconciliation (2026-09-09) */
-    let promoterPre=offerNoteNumber(c.promoter_holding?.note,/Promoters and Promoter Group[^\d]*([\d,]+)\s+Equity Shares/i);
-    let promoterPost=promoterPre!=null&&ofsShares!=null?promoterPre-ofsShares:null;
-    let promoterPostPct=promoterPost!=null&&post?100*promoterPost/post:null;
+    /* PROMOTER PRE/POST NOW COME FROM THE STORE (2026-09-11). This line regexed the promoter note
+       with a pattern already known to fail -- `[^\d]*` cannot cross the "8" in KWICK's "(8
+       shareholders)" -- and it reached 2 of the 104 payloads that store `pre_pct`.
+       `factual_store._promoter_post_pct` derives `post_pct` in Python, subtracting the OFS shares
+       ATTRIBUTED to promoters by name (`promoter_ofs_shares`) rather than the whole OFS, and REFUSES
+       when attribution is unknown. Reading its output replaces a broken extractor with a checked one.
+       The share counts stay derived from the stored percentage so the tiles keep working where only
+       the percentage is known -- but the PERCENTAGE itself is never recomputed here. */
+    let promoterPrePct=offerNumber(c.promoter_holding?.pre_pct);
+    let promoterPostPct=offerNumber(c.promoter_holding?.post_pct);
+    /* PREFER A STORED SHARE COUNT OVER ONE DERIVED FROM THE PERCENTAGE (2026-09-11). Deriving
+       `pct/100 * pre` reproduces KWICK's promoter holding as 1,49,39,296 against the document's
+       printed 1,49,38,624 -- a 672-share rounding artifact of the 2-decimal percentage, already
+       noted in `_promoter_post_pct`'s docstring. Where the producer stores the COUNT
+       (`promoter_shares_pre_issue`, or the sum of the promoter holder rows), that is the document's
+       own figure and outranks our arithmetic. The percentage-derived value stays as the fallback so
+       the tiles still populate for the ~100 companies that store only a percentage. */
+    let phHolders=A(c.promoter_holding?.holders).reduce((n,x)=>n+(offerNumber(x.shares)||0),0);
+    let promoterPre=offerShareCount(c.promoter_holding?.promoter_shares_pre_issue)
+        ||(phHolders>=MIN_SHARES?phHolders:null)
+        ||(promoterPrePct!=null&&pre?Math.round(promoterPrePct/100*pre):null);
+    let promoterOfs=offerShareCount(c.promoter_holding?.promoter_ofs_shares);
+    let promoterPost=(promoterPre!=null&&promoterOfs!=null?promoterPre-promoterOfs:null)
+        ??(promoterPostPct!=null&&post?Math.round(promoterPostPct/100*post):null);
     /* FY26 AND FY2026 ARE THE SAME YEAR (2026-09-09). The match was `String(x.fy)==='FY26'`,
        exact, while the store spells the label both ways -- measured over the 183 published
        payloads carrying capital_ownership: latest label `FY26` on 46 and `FY2026` on 29. The
@@ -1309,7 +1368,25 @@ function drhpOfferStructure(c){
        The fiscal-label defects found this week (ACCORDTS, PRIORITY, PALUCK shifted; STEAMHOUSE
        scrambled) are a STORE problem and are NOT compensated for here -- a renderer cannot tell
        a mislabelled year from a correct one, and guessing would be the same class of error. */
-    let fy26=A(sec('financials').pnl_3yr).find(x=>/^\s*FY(26|2026)\s*$/i.test(String(x.fy)))||{};
+    /* THE LABEL MAY CARRY A PARENTHETICAL, AND A SPACED/HYPHENATED FORM IS THE SAME YEAR
+       (2026-09-10). The match required the label to be EXACTLY `FY26`/`FY2026`, so a row whose
+       year is spelled `FY2026 (year ended March 31, 2026)` or `FY 2025-26` was skipped and the
+       company lost BOTH its EPS and its P/E tile even holding a good PAT and a good post-issue
+       count. Measured over the published payloads: of 68 companies carrying a stated
+       `post_issue_shares`, 31 matched here while 54 hold PAT on SOME row -- and of that gap,
+       PHYCHEM (`FY2026 (year ended March 31, 2026)`, PAT 408.9) and SUSAN (`FY 2025-26`,
+       PAT 1824.64) are the current-year rows lost purely to label SPELLING. Both reconcile:
+       PHYCHEM 7,540,000 pre + 2,700,000 fresh = 10,240,000 post, exactly the stored count.
+       DELIBERATELY STILL NARROW -- this widens the SPELLING of the current year, never the YEAR.
+       The other 21 companies in that gap are genuinely OLD (AARVI's latest PAT is FY17,
+       AAPLUSTRAD FY20, PRASOLCHEM/LCCPROJECT FY25/FY24) and MUST keep losing the tile: printing
+       an FY24 profit under a label reading `Post-issue EPS (FY26)` would be a false statement,
+       not a recovered one. A part-year label must still never match, so `H1`/`9M`/`Q1` remain
+       excluded by anchoring the prefix -- the parenthetical is allowed only AFTER the year.
+       NOT ACCEPTED: `as_stated` and `(Rs in Lakhs)` (PPEL, SSPRL) -- a column header that leaked
+       into the `fy` field is not a year, and LCL's competing `(Restated Consolidated)` /
+       `(Carve-Out)` bases for the same year are a basis choice a renderer must not make. */
+    let fy26=A(sec('financials').pnl_3yr).find(x=>/^\s*FY\s*(?:26|2026|2025-26)\s*(?:\(|$)/i.test(String(x.fy)))||{};
     let pat=offerNumber(fy26.pat), eps=pat!=null&&post?pat*100000/post:null, mcap=upper!=null&&post?upper*post:null, facts=[];
     /* STATED FACTS FIRST, then the derived ones (owner 2026-09-03: "available factual inputs
        should still be visible even when no full valuation can be calculated"). Every fact below was
@@ -1358,7 +1435,19 @@ function drhpOfferStructure(c){
     let postPct=c.promoter_holding?.post_pct;
     if(typeof postPct==='number'&&postPct>0&&postPct<=100)facts.push({label:'Post-issue promoter holding',value:N(postPct,2)+'%'});
     if(mcap!=null)facts.push({label:'Market capitalisation',value:'₹'+N(mcap/10000000,2)+' cr'});
-    if(eps!=null)facts.push({label:'Post-issue EPS (FY26)',value:'₹'+N(eps,2)});
+    /* A ZERO EPS IS NOT AN EPS (2026-09-10). The two lines below disagreed with each other about
+       the SAME value: `eps!=null` PRINTED it while `eps&&…` suppressed the P/E built on it, so a
+       zero was simultaneously trusted enough to publish and not trusted enough to divide by.
+       That asymmetry is the tell, and MANIKA is the case -- the store holds
+       `FY2026 {pat: 0.0, pat_amount_rs: 0, pat_margin_pct: 0.0}` against revenue of Rs 295.58 cr,
+       an extraction failure rather than a company that earned exactly nothing (the same payload
+       carries two conflicting label families and a duplicated revenue figure, so the row is
+       known-corrupt). The page rendered `Post-issue EPS (FY26) Rs 0.00` beside a real market
+       capitalisation, which reads as a stated fact about a company's profitability.
+       A zero-profit year, were it real, is also the one case where a P/E does not exist -- so
+       suppressing the pair is right whether the zero is corrupt OR genuine. The two lines now
+       share ONE predicate, which is what keeps them from drifting apart again. */
+    if(eps)facts.push({label:'Post-issue EPS (FY26)',value:'₹'+N(eps,2)});
     if(eps&&upper!=null)facts.push({label:'P/E (FY26, post-issue)',value:N(upper/eps,2)+'x'});
     let html=facts.length?card('Offer at a glance',kpis(facts)+'<p class="method-note">Derived using the stated upper price band and stated share counts. '
         /* THE P/E IS AT THE TOP OF THE BAND, AND SAYS SO (2026-09-09). `upper` is the upper end
@@ -1370,7 +1459,11 @@ function drhpOfferStructure(c){
                       :'Market capitalisation, EPS and P/E are at the upper end of the price band, not a settled price; EPS uses the latest stated full year.')+'</p>'):'';
     let holding=[];
     if(promoterPre!=null)holding.push(['Pre-issue promoter + promoter group',N(promoterPre,0),c.promoter_holding?.pre_pct==null?'—':N(c.promoter_holding.pre_pct,2)+'%']);
-    if(promoterPost!=null)holding.push(['Post-issue promoter + promoter group (derived)',N(promoterPost,0),N(promoterPostPct,2)+'%']);
+    /* Label changed 2026-09-11: the percentage is now the STORE's `promoter_holding.post_pct`, derived
+       in Python with the OFS attributed to promoters by name and refused when unattributable -- no
+       longer a renderer derivation, so "(derived)" would misattribute where it came from. The SHARE
+       count is still computed from that percentage, which the row's own header makes plain. */
+    if(promoterPost!=null)holding.push(['Post-issue promoter + promoter group',N(promoterPost,0),N(promoterPostPct,2)+'%']);
     if(holding.length)html+=card('Promoter holding',table(['Holding','Shares','%'],holding));
     /* SUPPRESS AN EMPTY CARD, RENDER A PARTIAL ONE -- the predicate from the Offer-timeline fix
        (`output/_scratch/ipo_offer_audit/patch_bareheading.py`), reused rather than reinvented:
