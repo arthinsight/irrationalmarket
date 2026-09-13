@@ -919,7 +919,15 @@ if(!window.M2D){window.M2D=(function(){
                 if(v&&v.drhp&&v.drhp.grades!==undefined)
                   c.drhp=Object.assign({},b.drhp||{},{grades:v.drhp.grades});
                 return c;})
-      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m; PRICE[sym]=m.price||[];
+      /* `marketFallback` is the SECOND price source and must be honoured here too. It is the bhav
+         series `company_public_page.build_sidecars` plants for a company the Stage engine could not
+         judge -- and, since 2026-09-09, for one that HAS a stage but whose momentum row carried no
+         series (ADCINDIA/FORBESCO/SPELS and 5 more rendered the full stage view above the words
+         "No NSE price history for this symbol." while 669 bars sat in the same file). Precedence is
+         `momentum.price` first, exactly as `screens_pages.js:74` and the company shell already do --
+         one fact, one order, three readers. */
+      .then(c=>{const m=(c&&c.momentum)||{}; COMP[sym]=m;
+                PRICE[sym]=(m.price&&m.price.length?m.price:((c&&c.marketFallback)||[]));
                 DEV[sym]=((c&&c.developments&&c.developments.rows)||[]); return m;})
       .catch(e=>{delete COMPQ[sym]; throw e;});
     return COMPQ[sym];
@@ -1098,6 +1106,23 @@ function devCss(){
     return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
   }
   function devPane(sym){
+    /* FETCH ON DEMAND, like chart() does. `DEV[sym]` is populated ONLY by fetchCompany, but
+       select_detail reaches recOf(sym) from the INLINE payload for the ~195 member symbols and
+       never fetches their file -- so for exactly those stocks DEV[sym] was undefined and this pane
+       stayed hidden, which reads as "this company has no filings" rather than "not loaded yet".
+       `DEV[sym]` (not `rows.length`) is the honest "we have looked" flag: an empty ARRAY means
+       fetched-and-none, `undefined` means never fetched. */
+    if (DEV[sym] === undefined) {
+      // HIDE FIRST. Returning early with the card still showing leaves the PREVIOUS company's
+      // filings on screen under the new company's heading -- the same class of bug the chart pane
+      // records ("a throw used to skip everything after it, leaving the previous stock's volume
+      // table on screen"). Blank it, then let the fetch re-enter.
+      _set('m2-dev', '');
+      var c0 = document.getElementById('m2-dev-card');
+      if (c0) c0.style.display = 'none';
+      fetchCompany(sym).then(function(){ if (cur === sym) devPane(sym); }).catch(function(){});
+      return;
+    }
     var rows = DEV[sym] || [];
     var h = devList(rows);
     _set('m2-dev', h ? '<div class="m2sec">Recent developments</div>' + h : '');
@@ -1123,6 +1148,11 @@ function devCss(){
              ' &mdash; it is not in the stage universe.</div>');
         _set('m2-data',''); _set('m2-data-ext',''); _set('m2-hist','');
         _set('m2-chart',''); _set('m2-vol-table','');
+        // DEVELOPMENTS STILL RENDER HERE. A company outside the stage universe has no momentum
+        // record but can still have filings -- DEV[sym] is populated by fetchCompany from the SAME
+        // file, independently of `momentum`. Blanking every pane on this branch (as it did) would
+        // hide the one thing this company does have.
+        devPane(sym);
         return;
       }
       _set('m2-head','<span class="sym">'+esc(sym)+'</span>');
@@ -1134,6 +1164,8 @@ function devCss(){
     }
     _set('m2-head','<span class="sym">'+esc(r.s)+'</span>'+stg(r.g)+
          (r.c?'<span class="chip">'+esc(catLabel(r.c))+'</span>':'')+mcapCell(r.m));
+    // Directly after the heading box, before every other pane -- the owner's placement (2026-09-07).
+    devPane(sym);
     _set('m2-insights',insights(r));
     _set('m2-data',kv(r));
     _set('m2-data-ext',kvExt(r));
@@ -1168,7 +1200,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=c5f0d4c542';
+  script.src='../../company_renderer.js?v=380e8cb792';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
@@ -1249,6 +1281,20 @@ Promise.all([get('../../data/index.json'),get('../../data/company_explorer.json'
       fail('That company could not be loaded.');
     });
   };
+  /* BACK MOVES BETWEEN SYMBOLS, NOT OFF THE PAGE (design 3e step 3). `loadSymbol` pushState()s each
+     switch, so without this the history entries exist but going Back leaves the address bar on the
+     previous ?sym= while the page still shows the last-rendered company. `replace=true` because a
+     popstate is already a history move -- pushing again would trap the reader on this page. */
+  var landed=selected;
+  addEventListener('popstate',function(){
+    /* FALL BACK TO THE LANDING SYMBOL, not to nothing. The first entry in this page's history has no
+       `?sym=` (the reader arrived at a bare /screens/<name>/), so Back from the first switch gives an
+       empty sym(). Without `||landed` that left the address bar on the bare URL while the page still
+       showed the company clicked a moment ago -- the two disagreeing, which is what pushState is
+       supposed to prevent. */
+    var s=sym()||landed;
+    if(s)loadSymbol(s,index,explorer,true).catch(function(){fail('That company could not be loaded.');});
+  });
   return loadSymbol(selected,index,explorer,true);
 })
 .catch(function(e){fail(e&&e.message==='empty screen'
