@@ -724,7 +724,31 @@ function stagePending(){
 function stage(){if(M.stock)return'<div id="tab-momentum2"><div class="m2card"><div class="m2chartbar"><div class="m2tf" id="m2-tf"><button data-tf="1" class="active">1Y</button><button data-tf="3">3Y</button><button data-tf="5">5Y</button><button data-tf="0">Max</button></div><div class="m2hover" id="m2-hover"></div></div><div id="m2-chart"></div></div><div class="m2card"><div class="m2sec">Stage analysis</div><div id="m2-data"></div><div id="m2-data-ext"></div></div><div class="m2card"><div class="m2sec">Stage history</div><div id="m2-hist"></div></div><div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"></div></div></div>';return stagePending()+(A(M.price).length>1?chart(M.price)+'<div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"><div class="m2empty">Loading volume analysis&hellip;</div></div></div>':'')}
 function drhpRiskRows(){let r=sec('risks'),all=[...A(r.internal_operational),...A(r.financial_valuation),...A(r.compliance_legal),...A(r.strategy_growth)];let generic=/general economic|political condition|natural disaster|pandemic|competition may|changes in law|force majeure/i;let score=x=>{let text=[x.title,x.risk,x.detail,x.evidence].join(' '),n=0;if(/[₹%]|\b\d[\d,.]*\b/.test(text))n+=4;if(/customer|supplier|data cent|cloud|cyber|power|capacity|receivable|government|technology|order|vendor/i.test(text))n+=3;if(x.evidence)n+=2;if(generic.test(text))n-=4;return n};return unique(all).sort((a,b)=>score(b)-score(a)).slice(0,10)}
 function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o=sec('overview'),rows=A(f.pnl_3yr),last=rows.at(-1)||{},rr=A(f.return_ratios).find(x=>x.fy===last.fy)||{},facts=A(b.other_material_facts).filter(x=>['technology_ip','vertical_integration','repeat_business','customer_qualification'].includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,240)).slice(0,6),risks=drhpRiskRows().slice(0,5);return kpis([{label:'Revenue',value:last.revenue==null?'—':rsAmount(last.revenue_amount_rs||last.revenue*100000)},{label:'EBITDA margin',value:rr.ebitda_margin_pct==null?'—':N(rr.ebitda_margin_pct,1)+'%'},{label:'PAT',value:last.pat==null?'—':rsAmount(last.pat_amount_rs||last.pat*100000)},{label:'RoCE',value:rr.roce_pct==null?'—':N(rr.roce_pct,1)+'%'}])+'<div class="layout-2">'+card('Business in one view','<p>'+E(concise(o.business_model||P.summary.business||'',520))+'</p>')+card('Evidence-backed differentiation',list(facts,6),'positive')+card('Key concerns to underwrite',list(risks.map(x=>concise(x.title||x.risk||value(x),220)),5),'caution')+card('What to monitor',list([A(b.capacity_utilization).length?'Capacity addition and utilisation':'',sec('objects_execution').orders_not_placed?.status?'Conversion of quotations into firm equipment orders':''].filter(Boolean),6))+'</div>'}
-function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let schedule=table(['Equipment / infrastructure','FY2027','FY2028'],deployment.map(x=>[E(x.item),rsAmount(x.amount_rs_by_fy?.FY27),rsAmount(x.amount_rs_by_fy?.FY28)]));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));return'<div class="stack">'+card('Use of funds',uses)+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'')+'</div>'}
+/* 'Use of funds' now DEFERS to the Offer section (2026-09-14, owner: "Can we add in offer section /
+   For proceed / Proceed utilization"). It rendered the SAME `objects_execution.objects` rows that
+   `netProceedsCard()` renders as 'Use of proceeds' in Offer, so once that card existed the page
+   showed one dataset under two headings -- MEASURED in Chromium on MAHARAJAANDSPEEDEXINDIA: an
+   Execution 'Use of funds' table of the same three objects sat beside the new Offer table, and the
+   two even disagreed cosmetically (this card prints '₹24.1 cr' via `rsAmount`, the Offer card
+   '₹24.10 cr').
+   DEFER, NOT DELETE -- and this is the whole point. Deleting it outright was measured first and is
+   WRONG for 11 symbols (AARADHYA, ABRFL, ABSMARINE, ADCOUNTY, ADMACH, DEVSON, INDOSMC, MILLWORKS,
+   SHREEJISPG, SRTL, XTRANET): they carry objects but have NO listing section, because the approved
+   lifecycle rule in company_coverage_model hides Offer once a company is staged or listed more than
+   6 months. For them Execution is the only surface left, so an unconditional removal would delete
+   the table rather than move it. Measured over the 144 `drhpGenericExecution` payloads: 98 have an
+   Offer section (table MOVES), 11 do not (table STAYS here), 32 have no objects at all (this card
+   was already empty and renders nothing either way).
+   The predicate is `objectsRenderElsewhere()`, which mirrors the established
+   `anchorsRenderElsewhere()` idiom two hundred lines up -- test the SECTION'S PRESENCE, not a list
+   of renderer names, so it cannot drift out of sync with the dispatch table.
+   THIS REVERSES THE STANDING RULE stated at `drhpListingGeneric` ("Execution exclusively owns the
+   detailed use-of-funds table") for the companies that have an Offer section; the comment there has
+   been updated to match, so the two no longer contradict each other.
+   `deployment`, `capacity_changes` and `orders_not_placed` are Execution facts (a deployment
+   SCHEDULE and a capacity delta, not an amount split) and are unconditionally kept. */
+function objectsRenderElsewhere(){return PM?A(PM.sections).some(s=>s.id==='listing'):false}
+function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let schedule=table(['Equipment / infrastructure','FY2027','FY2028'],deployment.map(x=>[E(x.item),rsAmount(x.amount_rs_by_fy?.FY27),rsAmount(x.amount_rs_by_fy?.FY28)]));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
 function drhpRisksGeneric(){let rows=drhpRiskRows();if(!rows.length)return'<div class="empty">No company-specific risk disclosures are stored.</div>';return'<p class="method-note">Showing the most company-specific, evidence-backed risks. The complete risk register remains stored for audit.</p><div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(concise(x.title||x.risk||value(x),220))+'</h3><p>'+E(concise(x.detail||x.note||'',260))+'</p></div></article>').join('')+'</div>'}
 function drhpPeersGeneric(){let ip=sec('industry_peers'),sk=Q.sk||{},pp=Q.peer_panel||P.peers||{},facts=A(ip.other_material_facts).map(x=>x.value||x),position=[ip.market_position?.positioning,ip.market_position?.basis].filter(Boolean),metrics=A(sk.market_size||sk.cagrs),drivers=A(sk.drivers||sk.growth_drivers),peers=A(ip.peers_drhp).length?A(ip.peers_drhp):A(pp.peers);let peerRows=peers.map(x=>[E(x.name||x.company||x.s),E(x.fy||x.period||'—'),x.revenue_cr==null&&x.rev==null?'—':N(x.revenue_cr??x.rev,2),x.ebitda_margin==null?'—':N(x.ebitda_margin,2)+'%',x.pe==null?'—':N(x.pe,2)+'x']);let cards='';if(position.length||facts.length)cards+=card('Industry position',list([...position,...facts],8),'positive');if(metrics.length)cards+=card('Market size and growth',list(metrics,8));if(drivers.length)cards+=card('Growth drivers',list(drivers,8));if(peerRows.length)cards+=card('Disclosed and operating peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">Industry evidence is not yet structured for this filing.</div>'}
 function drhpListingWithAnchors(){let html=drhpListingGeneric(),anchors=anchorCard();if(!anchors)return html;let at=html.lastIndexOf('</div>');return at<0?html+anchors:html.slice(0,at)+anchors+html.slice(at)}
@@ -1517,7 +1541,80 @@ function drhpPeersGeneric(){
     if(peerRows.length)cards+=card('RHP-disclosed peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));
     return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">The RHP does not disclose a listed peer set for this company. No keyword-derived companies are shown as comparables.</div>';
 }
-/* Offer owns composition; Execution exclusively owns the detailed use-of-funds table. */
+/* NET-PROCEEDS UTILISATION, IN THE OFFER SECTION (2026-09-14, owner: "Can we add in offer section
+   / For proceed / Proceed utilization").
+
+   WHY THIS READS `sec('objects_execution')` AND NOT `P.topics.offer_structure`.
+   The content map DOES route `objects_execution.objects` to topic `offer_structure` (label "Use of
+   proceeds"), but `company_public_page._topic_index` drops every entry whose `body` is empty, and
+   `company_evidence` emits this one as STRUCTURED (`obj=<rows>`, `body=""`) by construction. So
+   `topics.offer_structure` is unreachable without relaxing that filter -- and MEASURED across the
+   159 published payloads that carry objects, relaxing it un-gates 21 OTHER structured topics at the
+   same time (capital_history 159, financials 151, litigation 142, ownership 141, valuation 133,
+   forensic 133, industry/anchors 109, board 108 ...), every one of which would arrive at a consumer
+   expecting prose. That is a broad change to sections nobody asked about, so it is NOT made here.
+   `R` is `P.report` = `drhp.rpt`, which this renderer already reads for `capital_ownership`, so the
+   rows are ALREADY in hand: no delivery-path change is needed at all.
+
+   UNITS. `amount_rs` is rupees and is CANONICAL; `amount_lakhs` is the legacy field. Crore =
+   amount_rs/1e7, with a lakhs/100 fallback -- the same rule as the internal dashboard's `crObj()`
+   (drhp/dashboard.py:1458), because the store is mid-migration row by row: measured, GLASSWALL
+   carries the new schema and MAHARAJAANDSPEEDEXINDIA carries only the old one. Preferring the
+   canonical field while tolerating the old one is what keeps the figure right DURING the migration;
+   reading `amount_lakhs` as rupees would print every number 100,000x small.
+
+   UNPRICED ROWS RENDER, THEY DO NOT DISAPPEAR. General Corporate Purposes is printed as `[●]` in a
+   pre-priced RHP -- a real line item with no number yet. Dropping it would misrepresent the offer's
+   objects; printing `0` would be a false figure. It renders with a dash. `is_placeholder` exists on
+   only the 132 new-schema rows and on ZERO legacy rows, so a row with no amount and no
+   `is_placeholder` key is treated as unpriced too, rather than as an error.
+
+   NO TOTAL ROW, DELIBERATELY. With GCP unpriced the column does not add up to the net proceeds, so
+   a printed total would read as a disclosed figure and be wrong. The rows stand alone.
+
+   LABELS. `purpose_short` is the display label where it exists, but measured it is present on only
+   132 of 745 store rows (17.7%), so the `purpose` fallback is the COMMON path and carries long
+   prose (median 55, p90 141 chars). Rendered through the shared `table()`, whose first column is
+   already `white-space:normal; overflow-wrap:anywhere` with a phone-width `@media(max-width:700px)`
+   rule in company_store_prototype.css -- so wrapping is inherited, not re-invented here. */
+function netProceedsCr(o){
+    var rs=o.amount_rs, lk=o.amount_lakhs, n;
+    if(rs!=null&&rs!==''){n=Number(String(rs).replace(/,/g,''));if(isFinite(n))return n/10000000;}
+    if(lk!=null&&lk!==''){n=Number(String(lk).replace(/,/g,''));if(isFinite(n))return n/100;}
+    return null;
+}
+function netProceedsCard(){
+    let objects=A(sec('objects_execution').objects);
+    if(!objects.length)objects=A(Q.objects);        /* the flat key, for payloads with no deep report */
+    let rows=objects.map(function(x){
+        let cr=netProceedsCr(x),
+            label=String(x.purpose_short||x.purpose||'').trim()||'—',
+            /* A child row is indented under its parent. The extractor already excludes a child whose
+               parent is priced, so this renders what it is given and only marks the nesting. */
+            indent=String(x.parent||'').trim()?' style="padding-left:26px"':'';
+        /* TWO DECIMALS ALWAYS, IN A MONEY COLUMN. The shared `N(v,2)` sets only
+           `maximumFractionDigits`, so it renders 50.00 as "50" and 24.10 as "24.1" -- measured on
+           GLASSWALL and MAHARAJAANDSPEEDEXINDIA respectively. In a KPI tile that is fine; in a
+           column of figures the reader compares down, and ragged precision ("50" above "21.42")
+           reads as a different order of accuracy rather than the same figure. `N()` is shared by
+           32+ call sites and is NOT changed here -- the fixed precision is applied locally. */
+        return['<span'+indent+'>'+E(label)+'</span>',
+               cr==null?'—':'₹'+cr.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' cr'];
+    });
+    if(!rows.length)return'';
+    let unpriced=objects.some(function(x){return netProceedsCr(x)==null});
+    return card('Use of proceeds',table(['Object of the offer','Amount'],rows)
+        +'<p class="method-note">Net proceeds as disclosed in the offer document'
+        +(unpriced?'. Objects shown without an amount are not yet priced in the offer document, so the column is not totalled.':', in ₹ crore.')
+        +'</p>');
+}
+/* Offer owns composition AND the net-proceeds utilisation table (moved here 2026-09-14 at the
+   owner's request; see `netProceedsCard` above and the removal note at `drhpExecutionGeneric`).
+   Execution keeps the deployment SCHEDULE and the capacity delta, and still renders the use-of-funds
+   table for the 11 measured symbols that have NO Offer section (see the deferral note there). The
+   previous version of this line read "Execution exclusively owns the detailed use-of-funds table" --
+   that is no longer true, and leaving it would have been the only record of an ownership rule the
+   code had already stopped following. */
 function drhpListingGeneric(){let s=P.ipo?.summary||{},c=sec('capital_ownership'),listed=(function(d){if(!d)return false;var t=Date.parse(String(d).slice(0,10));return !isNaN(t)&&t<=Date.now();})(s['Date Of Listing']);let tiles=[];
     /* ONE PRICE ROW, NOT TWO (2026-09-09, owner: "we don't need both just keep one for all
        IPO"). Both fields are populated together on 970 of 970 published companies -- there is
@@ -1552,5 +1649,5 @@ function drhpListingGeneric(){let s=P.ipo?.summary||{},c=sec('capital_ownership'
     let bandHi=bandNums.length?Math.max(...bandNums):null;
     let priceAgrees=ipNum!=null&&bandHi!=null?Math.abs(ipNum-bandHi)<=0.005*Math.max(bandHi,1):null;
     if(ipTxt&&priceAgrees!==false)tiles.push({label:'Issue price',value:'₹'+N(ipTxt)});
-    else if(bandTxt)tiles.push({label:'Price band',value:E(bandTxt)});if(String(s['Issue Start Date']||'').trim())tiles.push({label:'Issue opens',value:E(s['Issue Start Date'])});if(String(s['Issue End Date']||'').trim())tiles.push({label:'Issue closes',value:E(s['Issue End Date'])});if(String(s['Date Of Listing']||'').trim())tiles.push({label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing'])});let timeline=tiles.length?card(listed?'Offer and listing timeline':'Offer timeline',kpis(tiles)):'';return'<div class="stack">'+timeline+drhpOfferStructure(c)+'</div>'}
+    else if(bandTxt)tiles.push({label:'Price band',value:E(bandTxt)});if(String(s['Issue Start Date']||'').trim())tiles.push({label:'Issue opens',value:E(s['Issue Start Date'])});if(String(s['Issue End Date']||'').trim())tiles.push({label:'Issue closes',value:E(s['Issue End Date'])});if(String(s['Date Of Listing']||'').trim())tiles.push({label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing'])});let timeline=tiles.length?card(listed?'Offer and listing timeline':'Offer timeline',kpis(tiles)):'';return'<div class="stack">'+timeline+netProceedsCard()+drhpOfferStructure(c)+'</div>'}
 render();})();
