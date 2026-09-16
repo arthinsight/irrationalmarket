@@ -232,6 +232,15 @@ body{margin:0;background:var(--bg);color:var(--txt);
 #tab-momentum2 .mmhist th:first-child,#tab-momentum2 .mmhist td:first-child{text-align:left}
 #tab-momentum2 .mmhist td{text-align:right;padding:3px 9px;border-top:1px solid rgba(255,255,255,.06)}
 #tab-momentum2 .mmhwrap{max-height:340px;overflow:auto}
+/* Momentum membership markers. DELIBERATELY UNPREFIXED: `histRows` lives in the shared M2D lib and
+   renders into the Momentum tab (#tab-momentum2), the Momentum tab's sibling (#tab-momentum) and the
+   standalone Company page, which is a separate html file with its own stylesheet. A `#tab-momentum2`
+   prefix here would style the marker in one of the three and leave it unstyled in the others. */
+.mmev{display:inline-block;white-space:nowrap;font-size:var(--fs-xs,11px);font-weight:700;
+      padding:1px 6px;border-radius:9px;line-height:1.5}
+.mmev-a{background:rgba(46,204,113,.16);color:#2ecc71}
+.mmev-r{background:rgba(231,76,60,.16);color:#e74c3c}
+.mmhist tr.mmrow-ev td{background:rgba(255,255,255,.035)}
 /* Volume analysis: same section furniture as Stage analysis (.m2sec header, .mmhist table), no
    inline font sizes, and NO inner scroll box — the months read as one table (owner 2026-08-15). */
 #tab-momentum2 .m2vol-h{cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px}
@@ -783,7 +792,7 @@ if(!window.M2D){window.M2D=(function(){
   // passes its inline members and the bulk history it already fetches; the Company page passes an
   // empty member list and its own relative data dir. Everything else (the price and company caches)
   // belongs to the renderers and is private, so two hosts cannot corrupt each other's cache.
-  let STK=[], META={}, DATADIR='data', HIST={}, histLoaded=false;
+  let STK=[], META={}, DATADIR='data', HIST={}, histLoaded=false, MEV={};
   const PRICE={};
   const fileOf=s=>String(s).toUpperCase().replace(/[^A-Za-z0-9_.-]/g,'_')+'.json';
 
@@ -860,12 +869,31 @@ if(!window.M2D){window.M2D=(function(){
     // Members come from the bulk file (it is already loaded for the 30-day feed); anyone else from
     // their own per-company file, which is the only place their history exists.
     const own=COMP[sym]&&COMP[sym].hist;
-    if(!HIST[sym]&&own) return histRows(own);
+    if(!HIST[sym]&&own) return histRows(own,sym);
     if(!histLoaded) return '<div class="mmhcap">Loading stage history&hellip;</div>';
-    return histRows(HIST[sym]||[]);
+    return histRows(HIST[sym]||[],sym);
   }
-  function histRows(src){
+  function histRows(src,sym){
+    // Membership events for this symbol, ANCHORED to a session that exists in `src`. A removal
+    // caused by a stale stage (DESIGN.md L3.16) has no row on its own date by construction, so it
+    // snaps back to the last earlier session rather than being dropped.
+    // Bulk map (Momentum tab) OR the symbol's own file (Company page, which inits with no stocks).
+    const ev=(sym&&((MEV&&MEV[sym])||(COMP[sym]&&COMP[sym].mev)))||[], mark={};
+    if(ev.length&&src&&src.length){
+      const ds=src.map(x=>x[0]);
+      for(const [d,k] of ev){
+        let at=d;
+        if(ds.indexOf(d)<0){
+          let prev=null;
+          for(const c of ds){ if(c<=d) prev=c; else break; }
+          if(prev===null) continue;                         // before this table's window: no marker
+          at=prev;
+        }
+        (mark[at]=mark[at]||[]).push(k);
+      }
+    }
     const h=(src||[]).filter(x=>{            // x = [date, close, stage, dur, transition, signal]
+      if(mark[x[0]]) return true;                           // a membership event is always shown
       if(x[3]===1) return true;                             // Duration==1 (stage-change day): always include, any signal
       if(x[5]==='Advancing (S2)'||x[5]==='Repeat') return false;   // otherwise drop the continuation rows
       if(!x[5]) return false;                               // otherwise drop blank-signal rows
@@ -879,8 +907,14 @@ if(!window.M2D){window.M2D=(function(){
     // caption that says less.
     const _win = (META && META.hist_sessions) ? ` &middot; within last ${META.hist_sessions}` : '';
     let t=`<div class="mmhcap">${rows.length} sessions (all Dur=1 rows + signals, excl. Advancing (S2)/Repeat${_win})</div><div class="mmhwrap"><table class="mmhist">`+
-      '<tr><th>Date</th><th>Close</th><th>Stage</th><th>Dur</th><th>Transition</th><th>Signal</th></tr>';
-    for(const x of rows) t+=`<tr><td>${esc(x[0])}</td><td>${x[1]==null?'—':Number(x[1]).toFixed(2)}</td><td>${x[2]==null?'—':esc(STG[x[2]]||x[2])}</td><td>${x[3]==null?'—':x[3]}</td><td>${x[4]?esc(x[4]):'—'}</td><td>${sigCell(x[5],x[3])}</td></tr>`;
+      '<tr><th>Date</th><th>Close</th><th>Stage</th><th>Dur</th><th>Transition</th><th>Signal</th><th>Momentum</th></tr>';
+    for(const x of rows){
+      const mk=mark[x[0]]||[];
+      const mcell=mk.map(k=>k==='a'
+        ? '<span class="mmev mmev-a">&#9733; Added to Momentum</span>'
+        : '<span class="mmev mmev-r">&#10006; Removed from Momentum</span>').join(' ');
+      t+=`<tr${mk.length?' class="mmrow-ev"':''}><td>${esc(x[0])}</td><td>${x[1]==null?'—':Number(x[1]).toFixed(2)}</td><td>${x[2]==null?'—':esc(STG[x[2]]||x[2])}</td><td>${x[3]==null?'—':x[3]}</td><td>${x[4]?esc(x[4]):'—'}</td><td>${sigCell(x[5],x[3])}</td><td>${mcell||'—'}</td></tr>`;
+    }
     return t+'</table></div>';
   }
 
@@ -1175,8 +1209,9 @@ function devCss(){
     catch(e){ _set('m2-chart','<div class="m2empty">Chart unavailable for '+esc(sym)+'.</div>'); }
   }
 
-  return {init:function(o){o=o||{};STK=o.stocks||[];META=o.meta||{};DATADIR=o.datadir||'data';},
+  return {init:function(o){o=o||{};STK=o.stocks||[];META=o.meta||{};DATADIR=o.datadir||'data';MEV=o.mev||MEV;},
           setHist:function(h){HIST=h||{};histLoaded=true;},
+          setMev:function(m){MEV=m||{};},
           select:select_detail, chart:chart, recOf:recOf, fetchCompany:fetchCompany,
           histTbl:histTbl, renderVol:renderVolAnalysis, loadDelVol:loadDelVol,
           insights:insights, kv:kv, kvExt:kvExt, mcapCell:mcapCell,
@@ -1200,7 +1235,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=380e8cb792';
+  script.src='../../company_renderer.js?v=caaa6f40fe';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
@@ -1214,7 +1249,7 @@ function buildPayload(company,explorer,extra,row,selected){
     currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},
     projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},
     wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,
-    market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},
+    market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],mev:mo.mev||null,classificationPending:!mo.stock},
     coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},
     pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',
       coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},
@@ -1257,6 +1292,10 @@ Promise.all([get('../../data/index.json'),get('../../data/company_explorer.json'
      built from the MOMENTUM payload, because the company store's `momentum.stock` is empty for
      these symbols. Loaded once here and keyed by symbol, so a switch costs no extra fetch. */
   ((seed[2]||{}).stocks||[]).forEach(function(r){ if(r&&r.s&&r.ins)INS[String(r.s).toUpperCase()]=r.ins; });
+  /* Membership events + the history depth, published on the SAME payload and read by initStage
+     (company_store_prototype.js) when it calls M2D.init. A global because the renderer runs from a
+     separate <script> that cannot see this closure -- the same reason __SCREEN__ is one. */
+  window.__SCREEN_INSIGHTS__={mev:(seed[2]||{}).mev||{},meta:(seed[2]||{}).meta||{}};
   var list=explorer[SCREEN.explorer]||[];
   var selected=sym();
   if(!selected){

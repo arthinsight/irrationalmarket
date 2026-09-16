@@ -1285,7 +1285,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=7c8af2dd5a';
+  script.src='../../company_renderer.js?v=caaa6f40fe';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
@@ -1299,7 +1299,7 @@ function buildPayload(company,explorer,extra,row,selected){
     currentContext:extra.currentContext||{},topics:extra.topics||{},scorecard:extra.scorecard||{},
     projection:{},segments:extra.segments||[],themes:extra.themes||[],ipo:extra.ipo||{},
     wtt:dd.wtt||{},commitments:(dd.track&&dd.track.open)||dr.promises||[],peers:peer,
-    market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],classificationPending:!mo.stock},
+    market:{stock:mo.stock||null,price:marketPrice,history:mo.hist||[],mev:mo.mev||null,classificationPending:!mo.stock},
     coverage:extra.coverage||{deepDive:!!dd.s,drhp:!!dr.s,stage:!!mo.stock},
     pageModel:extra.pageModel||{schemaVersion:'company-page/1.0',layout:'vertical',
       coverage:{stage:!!mo.stock,priceHistory:!!marketPrice.length},
