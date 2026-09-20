@@ -184,6 +184,36 @@ const tableByPeriod = (h, rows, maxVisibleRows = 10) => {
     // A real disagreement is shown, never silently resolved: keep both columns.
     if (clash) cols.push({ label: p.label, note: p.note, cells: cells.slice() });
   });
+  // PERIODS READ OLDEST TO NEWEST, WITH THE LATEST AS THE LAST COLUMN (owner, 2026-09-18).
+  // The producers do not agree on direction and never did: measured across the store's published
+  // rows, `pnl_3yr` is 117 ascending / 79 descending, `balance_sheet_key` 64 / 97, `cash_flow`
+  // 25 / 90, and 79 companies have one block running opposite to another in the SAME payload --
+  // SPEEDEX renders its P&L FY24->FY26 and its cash flow FY26->FY24 on one page. Some rows are in
+  // no order at all (30 across the four blocks), because a fallback appended a year the table
+  // reader had not produced.
+  //
+  // Sorting HERE rather than in each producer is what makes that irrelevant: every financial table
+  // on the page goes through this one function, so the page is consistent whatever order a reader
+  // emits, and a new extraction path cannot reintroduce the problem.
+  //
+  // An interim period sorts AFTER the full year it falls inside -- Q1FY27 follows FY26 -- because
+  // its own fiscal year is the later one, which `periodSortKey` reads from the label. A column
+  // whose label carries no resolvable year keeps its position relative to the others by falling to
+  // the end, rather than being silently reordered against a year it cannot be compared with.
+  const periodSortKey = label => {
+    const s = String(label || '');
+    const m = /FY(\d{2,4})/i.exec(s);
+    if (!m) return [Number.POSITIVE_INFINITY, 0];
+    const y = m[1].length > 2 ? +m[1] : 2000 + +m[1];
+    // Within one fiscal year the full year comes first, then the interim periods in span order.
+    const cov = /^(Q1|Q2|Q3|H1|H2|9M|\d+M)FY/i.exec(s);
+    const rank = cov ? ({ Q1: 1, H1: 2, Q2: 2, '9M': 3, Q3: 3, H2: 3 }[cov[1].toUpperCase()] || 4) : 0;
+    return [y, rank];
+  };
+  cols.sort((a, b) => {
+    const ka = periodSortKey(a.label), kb = periodSortKey(b.label);
+    return ka[0] - kb[0] || ka[1] - kb[1];
+  });
   cols.forEach(c => { if (c.note && notes.indexOf(c.note) === -1) notes.push(c.note); });
   const out = metrics.map((m, i) => [m].concat(cols.map(c => c.cells[i])));
   const html = table([h[0] === 'Year' ? 'Metric' : h[0]].concat(cols.map(c => c.label)),
@@ -340,9 +370,53 @@ function hfFinancialsRich(){let a=A(D.actuals),last=a.at(-1)||{},prior=a.at(-5)|
 function hfExecution(){let w=D.wtt||{},track=D.track||{},cap=table(['Milestone','Target','Promise','State'],A(D.capex).map(x=>[E(x.item),E(x.timeline||'—'),E(x.pv||'—'),status(x.status)]));let verdict=table(['Commitment','Made','Checked','Outcome'],A(track.verdicts).map(x=>[E(x.item)+'<small class="row-note">'+E(x.note||'')+'</small>',E(x.made||'—'),E(x.checked||'—'),status(x.status)]));let open=table(['Forward commitment','Horizon','Category'],A(track.open).filter(x=>/FY27|Q[1-4]FY27|CY2026/i.test(x.horizon||'')).map(x=>[E(x.item),E(x.horizon),E((x.category||'').replaceAll('_',' '))]));return'<div class="credibility"><div class="grade">'+E(w.credibility_grade||'—')+'</div><div><h3>Walk the Talk</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.guidance_hit_rate||'—')+'%</b> guidance hit</span><span><b>'+E(w.projects_ontime||'—')+'/'+(Number(w.projects_ontime||0)+Number(w.projects_slipped||0))+'</b> projects on time</span><span><b>'+E(w.reconciled_n||track.verdicts_total||'—')+'</b> commitments reconciled</span></div></div><div class="stack">'+card('Capacity and capex milestones',cap)+card('Near-term forward commitments',badge('Management guidance','guide')+open,'guide-card')+card('Commitment outcomes',verdict)+card('Management tone — latest assessment',prose(w.tone_latest),'inference-card')+'</div>'}
 function hfRisks(){let risk=ddBlock('bull_bear','risks'),tone=ddBlock('bull_bear','management quality'),rows=[{title:'Thesis risks',detail:risk.body},{title:'Management framing risk',detail:tone.body},{title:'Balance-sheet and working-capital pressure',detail:'Receivable days '+((D.ratios||[]).find(x=>x.label==='Receivable d')?.value||'—')+' and inventory days '+((D.ratios||[]).find(x=>x.label==='Inventory d')?.value||'—')+' keep cash conversion and funding cost central to the thesis.'},{title:'Execution credibility',detail:(D.wtt?.summary||'')+' The page should underwrite delivery, not merely the size of the opportunity.'}];return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title)+'</h3><p>'+E(x.detail)+'</p></div></article>').join('')+'</div>'}
 function hfPeers(){let pp=D.peer_panel||{},all=[pp.target,...A(pp.peers)].filter(Boolean),groups={};all.forEach(x=>(groups[x.s===I.symbol?I.symbol:(x.group||'Reference')]??=[]).push(x));return'<div class="stack">'+Object.keys(groups).map(g=>card(g,table(['Company','FY','Revenue ₹cr','Growth','EBITDA margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],groups[g].map(x=>[E(x.name),E(x.fy),N(x.rev,0),x.rev_growth==null?'—':N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),x.pat_growth==null?'—':N(x.pat_growth,1)+'%',x.pe==null?'—':N(x.pe,1)+'x',N(x.mcap,0)])))).join('')+'<p class="method-note">'+E(I.symbol)+' is shown separately. Stored operating peer groups remain distinct lenses rather than one blended reference set.</p></div>'}
-function inInvestment(){let f=sec('financials'),b=sec('business_ops'),ip=sec('industry_peers'),v=sec('verdict'),last=A(f.pnl_3yr).at(-1)||{},cf=A(f.cash_flow).at(-1)||{},rr=A(f.return_ratios).at(-1)||{},mix=b.domestic_export_mix?.export_pct_by_fy||{},cc=b.customer_concentration?.top10_pct_by_fy||{};let facts=[{label:'Global MIM share',value:N(ip.market_position?.share_pct,1)+'%'},{label:'Revenue',value:'₹'+N((last.revenue||0)/100,0)+'cr'},{label:'PAT',value:'₹'+N((last.pat||0)/100,0)+'cr'},{label:'Operating cash flow',value:'₹'+N((cf.cfo||0)/100,0)+'cr'},{label:'RoNW',value:N(rr.ronw_pct,1)+'%'},{label:'Export revenue',value:N(mix.FY2026,1)+'%'},{label:'Top-10 customers',value:N(cc.FY2026,1)+'%'}];return kpis(facts)+card('Our read','<p>'+E(v.our_read)+'</p>','inference-card')}
+function inInvestment(){let f=sec('financials'),b=sec('business_ops'),ip=sec('industry_peers'),v=sec('verdict'),last=A(f.pnl_3yr).at(-1)||{},cf=A(f.cash_flow).at(-1)||{},rr=A(f.return_ratios).at(-1)||{},mix=b.domestic_export_mix?.export_pct_by_fy||{},cc=b.customer_concentration?.top10_pct_by_fy||{};let facts=[{label:'Global MIM share',value:N(ip.market_position?.share_pct,1)+'%'},{label:'Revenue',value:crMoney(last,'revenue')},{label:'PAT',value:crMoney(last,'pat')},{label:'Operating cash flow',value:crMoney(cf,'cfo')},{label:'RoNW',value:N(rr.ronw_pct,1)+'%'},{label:'Export revenue',value:N(mix.FY2026,1)+'%'},{label:'Top-10 customers',value:N(cc.FY2026,1)+'%'}];return kpis(facts)+card('Our read','<p>'+E(v.our_read)+'</p>','inference-card')}
 function mixTable(rows){let pct=(x,short,long)=>{let v=x.pct_by_fy?.[short];if(v==null)v=x.pct_by_fy?.[long];return v==null?'—':N(v,1)+'%'};return table(['Revenue mix','FY2024','FY2025','FY2026'],A(rows).map(x=>[E(x.name),pct(x,'FY24','FY2024'),pct(x,'FY25','FY2025'),pct(x,'FY26','FY2026')]))}
 function rsAmount(value){let amount=Number(value);if(!Number.isFinite(amount))return'—';return Math.abs(amount)>100000?'₹'+N(amount/10000000,2)+' cr':'₹'+N(amount,0)}
+/* WE STORE IN RUPEES AND RENDER IN CRORE (owner, 2026-09-19).
+   Every money field in the statement blocks now carries a companion `<field>_amount_rs` holding
+   ABSOLUTE RUPEES as an integer. The bare field stays in LAKHS for backward compatibility while
+   the producers migrate row by row, so BOTH must be read: rupees when present (crore = rs/1e7),
+   lakhs otherwise (crore = lakhs/100). Measured across the published store, `revenue_amount_rs`
+   is on 326 of 729 revenue rows and the balance sheet carries none yet -- a renderer that read
+   only one of the two would blank half the page or print it 100,000x wrong.
+
+   `crVal` returns a NUMBER in crore or null; `crCell` formats it for a table cell. Null renders
+   as an em-dash and NEVER as 0: an absent field is not a company that earned nothing.
+   SIGNS ARE PRESERVED -- a cash outflow is negative in rupees exactly as in lakhs, so nothing
+   here may take an absolute value. */
+function crVal(row,field){
+    if(!row)return null;
+    const num=v=>{if(v==null||v==='')return null;let n=Number(String(v).replace(/,/g,''));return isFinite(n)?n:null};
+    // Rupees first, under either spelling of the companion. The statement blocks name it
+    // `<field>_amount_rs`; the older object blocks whose legacy field is `<field>_lakhs`
+    // (debt_profile loans, one_offs, receivables_aging) name it `<field>_rs`.
+    let rs=num(row[field+'_amount_rs']);
+    if(rs==null)rs=num(row[field+'_rs']);
+    if(rs==null&&/_lakhs$/.test(field))rs=num(row[field.replace(/_lakhs$/,'')+'_amount_rs']);
+    if(rs!=null)return rs/10000000;
+    // Then the legacy LAKHS field, under either spelling.
+    let lk=num(row[field]);
+    if(lk==null)lk=num(row[field+'_lakhs']);
+    return lk==null?null:lk/100;
+}
+const crCell=(row,field,d=2)=>{let v=crVal(row,field);return v==null?'—':N(v,d)};
+/* PER-SHARE AND RATIO FIELDS ARE NEVER UNIT-SCALED. EPS is already an absolute rupee figure per
+   share, percentages are percentages and day counts are days -- dividing any of them by 100 or
+   1e7 is the known 10x/100000x defect class, so they are read raw through `rawVal`, and no
+   `_amount_rs` companion exists or may be invented for them. */
+const rawVal=(row,field)=>{if(!row)return null;let v=row[field];if(v==null||v==='')return null;let n=Number(v);return isFinite(n)?n:null};
+const numCell=(v,d=2,suffix='')=>v==null?'—':N(v,d)+suffix;
+const crMoney=(row,field,d=2)=>{let v=crVal(row,field);return v==null?'—':'₹'+N(v,d)+' cr'};
+/* ONE FISCAL IDENTITY FOR JOINING ACROSS BLOCKS.
+   HEROMOTORS keys its P&L rows `FY24/FY25/FY26` and its balance sheet `FY2024/FY2025/FY2026` --
+   the same three years in two spellings, because different readers produced them. A join between
+   blocks that compares the raw `fy` strings therefore MISSES every row. `periodLabel` already
+   folds both spellings to one COLUMN label, and this reuses it as the JOIN key so the two agree
+   by construction. A genuine stub keeps its own identity: JINDALSUPREMEINDIA's `Q1FY27` resolves
+   to 'Q1FY27', not to 'FY27', and so never merges with the full year it falls inside. */
+const fyKey=row=>periodLabel(row&&row.fy!=null?row.fy:row&&row.period).label;
+const byFy=rows=>{let m={};A(rows).forEach(r=>{let k=fyKey(r);if(k&&!(k in m))m[k]=r});return m};
 function concise(value,limit=280){let text=String(value||'').replace(/\s+/g,' ').trim();if(text.length<=limit)return text;let cut=text.slice(0,limit),stop=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('; '));if(stop>Math.floor(limit*.55))cut=cut.slice(0,stop+1);else cut=cut.replace(/\s+\S*$/,'');return cut.replace(/[,:;\s]+$/,'')+'…'}
 function inBusiness(){let b=sec('business_ops'),o=sec('overview'),cc=b.customer_concentration||{},sc=b.supplier_concentration||{},products=A(b.products);let prod=products.map(x=>{let note=String(x.note||'').replace(/ supplied in Fiscal 2026/gi,'').replace(/ in Fiscal 2026/gi,'');return'<article class="product-card"><h3>'+E(x.category)+'</h3><p>'+E(A(x.items).join(' · '))+'</p><small>'+E(note)+'</small></article>'}).join('');let concentration=table(['Concentration','FY2024','FY2025','FY2026'],[['Top customer',N(cc.top1_pct_by_fy?.FY2024,1)+'%',N(cc.top1_pct_by_fy?.FY2025,1)+'%',N(cc.top1_pct_by_fy?.FY2026,1)+'%'],['Top five customers',N(cc.top5_pct_by_fy?.FY2024,1)+'%',N(cc.top5_pct_by_fy?.FY2025,1)+'%',N(cc.top5_pct_by_fy?.FY2026,1)+'%'],['Top ten customers',N(cc.top10_pct_by_fy?.FY2024,1)+'%',N(cc.top10_pct_by_fy?.FY2025,1)+'%',N(cc.top10_pct_by_fy?.FY2026,1)+'%'],['Top ten suppliers',N(sc.top10_pct_by_fy?.FY2024,1)+'%',N(sc.top10_pct_by_fy?.FY2025,1)+'%',N(sc.top10_pct_by_fy?.FY2026,1)+'%']]);let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};return'<div class="stack">'+card('How the business makes money','<p>'+E(o.business_model||P.summary.business)+'</p>')+card('Product-group architecture','<div class="product-grid">'+prod+'</div>')+card('Revenue mix by product group',mixTable(b.revenue_split_product))+card('Geographic revenue mix',mixTable(b.revenue_split_geography))+card('Customer and supplier concentration',concentration)+card('Manufacturing footprint',table(['Location','Facility','Tenure'],A(b.plants).map(x=>[E(city(x)),E(x.role),E(x.ownership||'—')])))+card('Vertical integration','<p>'+E(b.supply_chain_integration)+'</p>')+card('Qualification stack',list(b.certifications,12))+'</div>'}
 function drhpBusinessGeneric(){
@@ -383,37 +457,355 @@ function drhpBusinessGeneric(){
    all-dash column reads as a company that reported nothing, not as a statement we could not
    parse. `opts.ratios` and `opts.years` supply margins when the row itself lacks them; `opts.eps`
    appends the EPS column for the callers that show it. */
+/* THE P&L BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Sales, Expenses, Operating Profit, OPM %, Other Income, Interest, Depreciation,
+     Profit before tax, Tax %, Net Profit, EPS in Rs.
+   Money reads `<field>_amount_rs` and renders CRORE, per `crVal`. Two lines are DERIVED because
+   the store holds no field for them, and each is derived only from figures the same row actually
+   carries -- never part-invented:
+     Expenses      = total income (or sales+other income) - operating profit
+     Tax %         = tax / PBT, the effective rate the filing implies
+   `Operating Profit` is EBITDA: operating earnings before interest and depreciation, which is
+   what the store's `ebitda` holds and what the owner's `OPM %` is computed against. When the
+   inputs for a derived line are absent the cell is an em-dash, never 0. */
 function pnlSpineTable(rows,opts){opts=opts||{};let ratios=opts.ratios||{},years=opts.years||{};
-    let cols=[['Revenue ₹cr',x=>x.revenue],['Other income ₹cr',x=>x.other_income],
-        ['Total income ₹cr',x=>x.total_income],['EBITDA ₹cr',x=>x.ebitda],['Margin',null],
-        ['Finance cost ₹cr',x=>x.finance_cost],['Depreciation ₹cr',x=>x.depreciation],
-        ['PBT ₹cr',x=>x.pbt],['Tax ₹cr',x=>x.tax],['PAT ₹cr',x=>x.pat],['PAT margin',null]];
-    if(opts.margins===0)cols=cols.filter(c=>c[0]!=='Margin'&&c[0]!=='PAT margin');
-    if(opts.eps)cols.push(['EPS',null]);
-    /* A derived column (margin, EPS) has no accessor, so it cannot be tested for emptiness the
-       way the statement lines are -- it is kept whenever the caller asked for it. */
-    let keep=cols.filter(c=>!c[1]||rows.some(x=>c[1](x)!=null));
+    // [label, value(row, ctx) -> number|null, decimals, suffix]. A column survives only if some
+    // row produces a value for it, so a company reporting no interest gets no interest COLUMN
+    // rather than a column of dashes that reads as "reported nil".
+    const sales=x=>crVal(x,'revenue'),
+          otherInc=x=>crVal(x,'other_income'),
+          totalInc=x=>{let t=crVal(x,'total_income');if(t!=null)return t;let s=sales(x);if(s==null)return null;let o=otherInc(x);return o==null?s:s+o},
+          op=x=>crVal(x,'ebitda'),
+          expenses=x=>{let t=totalInc(x),o=op(x);return t==null||o==null?null:t-o};
+    let cols=[
+        ['Sales ₹cr',sales,2,''],
+        ['Expenses ₹cr',expenses,2,''],
+        ['Operating Profit ₹cr',op,2,''],
+        ['OPM %',(x,c)=>c.opm,2,'%'],
+        ['Other Income ₹cr',otherInc,2,''],
+        ['Interest ₹cr',x=>crVal(x,'finance_cost'),2,''],
+        ['Depreciation ₹cr',x=>crVal(x,'depreciation'),2,''],
+        ['Profit before tax ₹cr',x=>crVal(x,'pbt'),2,''],
+        ['Tax %',(x,c)=>c.taxPct,2,'%'],
+        ['Net Profit ₹cr',x=>crVal(x,'pat'),2,''],
+    ];
+    if(opts.margins===0)cols=cols.filter(c=>c[0]!=='OPM %');
+    // EPS IS A PER-SHARE RUPEE FIGURE AND IS NEVER UNIT-SCALED.
+    if(opts.eps)cols.push(['EPS in Rs',x=>rawVal(x,'eps'),2,'']);
     if(!rows.length)return '';
-    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),rows.map(x=>{
-        let r=ratios[x.fy]||ratios['FY20'+String(x.fy||'').slice(2)]||{};
-        let em=x.ebitda_margin_pct??r.ebitda_margin_pct??years[x.fy]?.ebitda_margin_pct;
-        let pm=x.pat_margin_pct??r.pat_margin_pct;
-        return [E(x.fy)].concat(keep.map(c=>{
-            if(c[0]==='Margin')return em==null?'—':N(em,1)+'%';
-            if(c[0]==='PAT margin')return pm==null?'—':N(pm,1)+'%';
-            if(c[0]==='EPS')return x.eps==null?'—':N(x.eps,2);
-            let v=c[1](x);return v==null?'—':N(v/100,1);
-        }));
-    }));}
-function inFinancials(){let f=sec('financials'),intel=sec('intellisense'),years=D.kpi?.years||{},recv=f.receivables_aging||{};let pnl=pnlSpineTable(A(f.pnl_3yr),{years:years,eps:1});let bs=tableByPeriod(['Year','Net worth ₹cr','Debt ₹cr','Cash ₹cr','Inventory ₹cr','Receivables ₹cr'],A(f.balance_sheet_key).map(x=>[E(x.fy),N(x.networth/100,1),N(x.total_debt/100,1),N(x.cash/100,1),N(x.inventory/100,1),N(x.trade_receivables/100,1)]));let rr=f.return_ratios||[],cf=tableByPeriod(['Year','CFO ₹cr','CFO / PAT','RoCE','RoNW'],A(f.cash_flow).map((x,i)=>{let pat=A(f.pnl_3yr)[i]?.pat||0;return[E(x.fy),N(x.cfo/100,1),N(x.cfo/pat,2)+'x',rr[i]?.roce_pct==null?'—':N(rr[i].roce_pct,1)+'%',N(rr[i]?.ronw_pct,1)+'%']}));let debt=table(['Borrowing type','Amount ₹cr','Purpose'],A(f.debt_profile?.loans).map(x=>[E(x.type),N(x.amount_lakhs/100,1),E(x.purpose)]));let oneoffs=table(['Year','Item','Amount ₹cr','Interpretation'],A(f.one_offs).map(x=>[E(x.fy),E(x.item),N(x.amount_lakhs/100,1),E(x.note)]));let checks=table(['Check','Result','Evidence'],A(intel.forensic).filter(x=>!/objects_total|CFO_vs_PAT/i.test(x.check||'')).map(x=>[E(x.check),status(x.verdict),E(x.note)]));return'<div class="stack">'+card('Three-year operating record',badge('Reported fact')+pnl)+card('Cash conversion and returns',cf,'positive')+card('Balance-sheet trajectory',bs)+card('Debt composition at offer date',debt)+card('Exceptional and non-operating items',oneoffs,'caution')+card('Receivables quality',kpis([{label:'Over one year',value:'₹'+N(recv.gt_1yr_amount_lakhs/100,1)+'cr'},{label:'Share of net worth',value:N(recv.gt_1yr_pct_networth,2)+'%'}]))+card('Forensic checks',checks)+creditRatingCard()+'</div>'}
+    // Context per row: the margins, which prefer the stored percentage over a recomputation so the
+    // page shows what the filing reported rather than our arithmetic on rounded inputs.
+    const ctx=x=>{
+        let r=ratios[x.fy]||ratios[periodLabel(x.fy).label]||ratios['FY20'+String(x.fy||'').slice(2)]||{};
+        let opm=x.ebitda_margin_pct??r.ebitda_margin_pct??years[x.fy]?.ebitda_margin_pct;
+        if(opm==null){let s=sales(x),o=op(x);if(s!=null&&o!=null&&s!==0)opm=100*o/s;}
+        /* A STORED `tax_pct` IS PREFERRED OVER THE DERIVATION, exactly as OPM % above prefers a
+           stored `ebitda_margin_pct`. This read ONLY tax/pbt, so a producer that supplies the
+           percentage without the tax AMOUNT had the row dropped entirely -- measured 2026-09-20:
+           120 rows across 26 companies, every screener-filled company among them, because
+           screener's card prints `Tax %` and no tax figure. LENSKART carried tax_pct on all seven
+           years and rendered no Tax % row at all.
+           Same shape as the ROCE wiring and the day counts: a value sitting in the payload that
+           the renderer had no path to. The derivation stays as the fallback, so every company
+           rendering today is unaffected. */
+        let pbt=crVal(x,'pbt'),tax=crVal(x,'tax');
+        let taxPct=rawVal(x,'tax_pct');
+        if(taxPct==null)taxPct=r?rawVal(r,'tax_pct'):null;
+        if(taxPct==null&&pbt!=null&&tax!=null&&pbt!==0)taxPct=100*tax/pbt;
+        return {opm:opm==null?null:Number(opm),taxPct:taxPct};
+    };
+    const ctxs=rows.map(ctx);
+    /* EVERY SPEC LINE IS PRINTED, dashed where there is no figure (owner, 2026-09-20). The four
+       tables each used to drop a line that no period filled, so the shape of the block changed from
+       company to company: measured over all 6,248 published pages, only 41 showed all 33 lines, and
+       `Tax %` alone vanished from 86 of the 224 rendered P&Ls. The earlier note here argued an
+       all-dash line reads as "reported nothing" -- but a line that is simply absent says nothing at
+       all, and the owner's call is that a dash stating "no figure" is the more honest of the two.
+       `keep` is retained as the name so the emit below is untouched; the wholly-empty table still
+       returns '' and the card shows its blank placeholder. */
+    let keep=cols;
+    if(!cols.some(c=>rows.some((x,i)=>c[1](x,ctxs[i])!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),rows.map((x,i)=>
+        [E(x.fy)].concat(keep.map(c=>numCell(c[1](x,ctxs[i]),c[2],c[3])))));}
+
+/* THE BALANCE SHEET BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Equity Capital, Reserves, Borrowings, Other Liabilities, Total Liabilities,
+     Fixed Assets, CWIP, Investments, Other Assets, Total Assets.
+   The store's vocabulary is narrower than these ten lines, so each is mapped to the field that
+   actually holds it and left ABSENT when nothing does -- measured over the published store,
+   `equity_share_capital` appears on 3 rows against `networth` on 491. Two lines are derived from
+   what the row carries, and only when every input is present:
+     Reserves          = net worth - equity capital (the reserves inside the stored net worth)
+     Other Liabilities = total liabilities - borrowings, once a total is known
+   Nothing here is back-solved from a figure the row does not have: an absent cell is an em-dash. */
+function balanceSheetTable(rows){
+    rows=A(rows); if(!rows.length)return '';
+    const equity=x=>crVal(x,'equity_share_capital'),
+          nw=x=>crVal(x,'networth'),
+          reserves=x=>{let r=crVal(x,'other_equity');if(r!=null)return r;let n=nw(x),e=equity(x);return n==null||e==null?null:n-e},
+          borrow=x=>{let t=crVal(x,'total_debt');if(t!=null)return t;
+              let l=crVal(x,'long_term_borrowings'),s=crVal(x,'short_term_borrowings');
+              if(l==null)l=crVal(x,'non_current_borrowings');
+              if(s==null)s=crVal(x,'current_borrowings');
+              return l==null&&s==null?null:(l||0)+(s||0)},
+          totalLia=x=>{let t=crVal(x,'total_liabilities');if(t!=null)return t;return crVal(x,'total_assets')},
+          // Same rule as `Other Assets`: a residual that comes out negative is proof the inputs
+          // disagree, not a liability balance, so it is left blank rather than published.
+          otherLia=x=>{let t=totalLia(x),b=borrow(x),e=equity(x),r=reserves(x);
+              if(t==null||b==null||e==null||r==null)return null;
+              let rest=t-b-e-r;return rest<0?null:rest},
+          totalAssets=x=>crVal(x,'total_assets');
+    let cols=[
+        ['Equity Capital ₹cr',equity],
+        ['Reserves ₹cr',reserves],
+        ['Borrowings ₹cr',borrow],
+        ['Other Liabilities ₹cr',otherLia],
+        ['Total Liabilities ₹cr',totalLia],
+        ['Fixed Assets ₹cr',x=>crVal(x,'net_fixed_assets')],
+        ['CWIP ₹cr',x=>crVal(x,'cwip')],
+        ['Investments ₹cr',x=>crVal(x,'investments')],
+        /* A DERIVED RESIDUAL IS ONLY PUBLISHED WHEN IT IS POSSIBLE.
+           `Other Assets` is what is left of the total after the named asset lines, so it can only
+           be >= 0. HEROMOTORS stores `total_assets` 281.95 cr against `net_fixed_assets` 360.31 cr
+           alone -- the stored total is smaller than one of its own components, so the residual
+           comes out at -137.96 cr. That is an upstream extraction defect (the bs producers own
+           `total_assets`), and the honest render of an arithmetic that cannot be true is a BLANK:
+           printing a negative asset balance would assert, in our own voice, something no filing
+           says. The named lines beside it still render, so nothing the store does hold is lost. */
+        ['Other Assets ₹cr',x=>{let t=totalAssets(x),fa=crVal(x,'net_fixed_assets'),cw=crVal(x,'cwip'),iv=crVal(x,'investments');
+            if(t==null||fa==null)return null;
+            let rest=t-fa-(cw||0)-(iv||0);
+            return rest<0?null:rest}],
+        ['Total Assets ₹cr',totalAssets],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`. The emptiness
+    // test now asks the DATA, because `keep` is always full and `!keep.length` could never fire.
+    let keep=cols;
+    if(!cols.some(c=>rows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        rows.map(x=>[E(x.fy)].concat(keep.map(c=>numCell(c[1](x),2)))));
+}
+
+/* THE CASH FLOW BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Cash from Operating Activity, Cash from Investing Activity, Cash from Financing Activity,
+     Net Cash Flow, Free Cash Flow, CFO/OP.
+   CASH FLOWS ARE SIGNED. An outflow is negative in rupees exactly as it is in lakhs, so no cell
+   here may take an absolute value -- HEROMOTORS' FY25 net cash flow is -33.20 cr and must print
+   as a negative number, because a page that shows 33.20 reports the opposite of what happened.
+   `Free Cash Flow` and `CFO/OP` are rendered from the store when it carries them and left absent
+   otherwise: capex has not landed yet, and a blank is honest where a zero would be a fabrication.
+   `CFO/OP` joins the cash flow to the P&L BY FISCAL IDENTITY, never by array position -- the two
+   blocks are stored in opposite directions (HEROMOTORS' cash flow descends while its P&L ascends),
+   so an index join silently divides FY26's cash flow by FY24's operating profit. */
+function cashFlowTable(rows,pnlRows){
+    rows=A(rows); if(!rows.length)return '';
+    const pnlBy=byFy(pnlRows);
+    const cfo=x=>crVal(x,'cfo'),cfi=x=>crVal(x,'cfi'),cff=x=>crVal(x,'cff'),
+          capex=x=>crVal(x,'capex'),
+          netcf=x=>{let n=crVal(x,'net_cash_flow');if(n!=null)return n;
+              n=crVal(x,'net_change_in_cash');if(n!=null)return n;
+              let o=cfo(x),i=cfi(x),f=cff(x);
+              return o==null||i==null||f==null?null:o+i+f},
+          fcf=x=>{let v=crVal(x,'free_cash_flow');if(v!=null)return v;
+              let o=cfo(x),c=capex(x);
+              // capex is stored as the outflow it is; free cash flow is CFO net of it.
+              return o==null||c==null?null:o-Math.abs(c)},
+          cfoOp=x=>{let o=cfo(x),p=pnlBy[fyKey(x)];if(o==null||!p)return null;
+              let op=crVal(p,'ebitda');return op==null||op===0?null:o/op};
+    let cols=[
+        ['Cash from Operating Activity ₹cr',cfo,2,''],
+        ['Cash from Investing Activity ₹cr',cfi,2,''],
+        ['Cash from Financing Activity ₹cr',cff,2,''],
+        ['Net Cash Flow ₹cr',netcf,2,''],
+        ['Free Cash Flow ₹cr',fcf,2,''],
+        ['CFO/OP',cfoOp,2,''],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`.
+    let keep=cols;
+    if(!cols.some(c=>rows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        rows.map(x=>[E(x.fy)].concat(keep.map(c=>numCell(c[1](x),c[2],c[3])))));
+}
+
+/* THE RATIOS BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Debtor Days, Inventory Days, Days Payable, Cash Conversion Cycle, Working Capital Days, ROCE %.
+   DAY COUNTS AND PERCENTAGES ARE NEVER UNIT-SCALED -- they are days and percent, not money, so
+   `_amount_rs` neither exists nor applies to them. The day counts are derived where the store
+   does not carry them, against the SAME year's sales joined by fiscal identity rather than array
+   position (the balance sheet spells HEROMOTORS' years `FY2024` while the P&L spells them `FY24`,
+   so a raw-string or positional join finds nothing). Sales is the denominator for all four, which
+   is the convention the owner's screener figures follow; cost of goods is not stored.
+     Cash Conversion Cycle = debtor days + inventory days - days payable
+     Working Capital Days  = debtor days + inventory days - days payable  (net operating cycle) */
+function ratiosTable(bsRows,pnlRows,rrRows){
+    bsRows=A(bsRows); if(!bsRows.length)return '';
+    const pnlBy=byFy(pnlRows),rrBy=byFy(rrRows);
+    const salesOf=x=>{let p=pnlBy[fyKey(x)];return p?crVal(p,'revenue'):null};
+    const days=(x,field)=>{let s=salesOf(x),v=crVal(x,field);
+        return s==null||v==null||s===0?null:v/s*365};
+    /* A STORED DAY COUNT IS PREFERRED OVER A DERIVED ONE, and every one of the five must have
+       that path -- not just Debtor Days. Only `dso_days` was read, so a producer supplying
+       `inventory_days` or `payable_days` had them silently ignored and the rows rendered from
+       balance-sheet residuals instead, or not at all.
+       Measured 2026-09-20 on the screener fill: its ratios card carries all five day counts
+       directly (MALA FY2022 debtor 194, inventory 92, payable 153, cycle 132, working capital 49)
+       and supplies NO `trade_receivables`/`inventory`/`trade_payables`, so a derive-only reader
+       saw four blank rows on a company whose figures were sitting in the payload. The same held
+       for 16 of the 31 cached companies.
+       The derivation stays as the fallback for every company that has the balance-sheet lines and
+       no stored counts, which is how the DRHP path works today -- so nothing that renders now
+       changes. `rrBy` is consulted too: the producer writes ratio rows into `return_ratios`
+       keyed by the same fiscal identity. */
+    /* THREE PLACES, NOT TWO. The producer writes the day counts and ROCE onto the `pnl_3yr` rows
+       (`factual_populate` ~3801), and this looked only at the balance-sheet row and
+       `return_ratios` -- so a value it had computed was invisible to the table that exists to
+       show it. Measured 2026-09-20: `debtor_days` sits in pnl_3yr for 105 of 226 companies,
+       inventory_days 72, working_capital_days 68, payable_days 56, cash_conversion_cycle 52,
+       roce_pct 83. That is the same wiring mismatch as the ROCE fix, the four derive-only day
+       counts and the Tax % row -- a stored figure with no path to the page, four times over. */
+    const stored=(x,f)=>{let v=rawVal(x,f);if(v!=null)return v;
+        let r=rrBy[fyKey(x)];v=r?rawVal(r,f):null;if(v!=null)return v;
+        let p=pnlBy[fyKey(x)];return p?rawVal(p,f):null};
+    const debtor=x=>{let d=stored(x,'dso_days');if(d==null)d=stored(x,'debtor_days');
+              return d!=null?d:days(x,'trade_receivables')},
+          invd=x=>{let d=stored(x,'inventory_days');return d!=null?d:days(x,'inventory')},
+          payd=x=>{let d=stored(x,'payable_days');return d!=null?d:days(x,'trade_payables')},
+          cycle=x=>{let d=stored(x,'cash_conversion_cycle_days');if(d!=null)return d;
+              let a=debtor(x),b=invd(x),c=payd(x);
+              return a==null||b==null||c==null?null:a+b-c},
+          wcd=x=>{let d=stored(x,'working_capital_days');return d!=null?d:cycle(x)};
+    let cols=[
+        ['Debtor Days',debtor],
+        ['Inventory Days',invd],
+        ['Days Payable',payd],
+        ['Cash Conversion Cycle',cycle],
+        /* WAS `cycle` TOO -- two labels rendering one number. Now reads its own stored
+           `working_capital_days` where a producer supplies it (screener does), falling back to
+           the cycle only when it does not, which preserves every page that renders today. */
+        ['Working Capital Days',wcd],
+        /* ROCE IS WRITTEN INTO `pnl_3yr`, AND THIS READ ONLY `return_ratios`.
+           The producer derives `roce_pct` onto the P&L row (factual_populate, 19.6.12's ratio
+           block); `return_ratios` is an older, separately-populated block. Measured on the store:
+           44 companies carry roce_pct in `pnl_3yr` and NOT in `return_ratios`, so their ROCE row
+           could never render, while 26 carry it in both and 49 in `return_ratios` alone. Reading
+           `return_ratios` FIRST keeps those 49 exactly as they were and adds the 44 that were
+           invisible; a company with neither still renders no ROCE row, because the column is
+           dropped when no year produces a value.
+           A per-symbol reconciler for this already existed (`inFinancialsReconciled`) but was
+           wired to INDOMIM alone, so every other company fell through to the unreconciled path --
+           the fix belongs at the lookup, not in another special case. */
+        ['ROCE %',x=>{let k=fyKey(x),r=rrBy[k],v=r?rawVal(r,'roce_pct'):null;
+            if(v!=null)return v;
+            let p=pnlBy[k];return p?rawVal(p,'roce_pct'):null}],
+        /* ROE SITS IN THE STORE ON 147 OF 224 COMPANIES AND WAS RENDERED NOWHERE (owner, 2026-09-20).
+           The producer writes it as PAT over CLOSING net worth (factual_populate 19.6.12), under two
+           names: an Indian filing says Return on Net Worth, a screener-style page says ROE, and
+           `ronw_pct` and `roe_pct` are set to the same number so neither consumer needs the other's
+           word for it. Both are read here for that reason.
+           Same three-place lookup as ROCE and the day counts -- the row itself, then `return_ratios`,
+           then `pnl_3yr` -- because a value the producer computed was invisible to the table that
+           exists to show it, four times over. The derivation is the LAST resort and repeats the
+           producer's convention exactly (closing, not average or opening net worth) so a rendered
+           figure never disagrees with a stored one; net worth prefers the printed split
+           `equity_share_capital + other_equity` over the stored total, as the producer does. */
+        ['ROE %',x=>{let v=stored(x,'roe_pct');if(v!=null)return v;
+            v=stored(x,'ronw_pct');if(v!=null)return v;
+            let k=fyKey(x),p=pnlBy[k],pat=p?crVal(p,'pat'):null;
+            if(pat==null)return null;
+            let eq=crVal(x,'equity_share_capital'),oe=crVal(x,'other_equity'),
+                nw=(eq!=null&&oe!=null)?eq+oe:crVal(x,'networth');
+            return (nw==null||nw<=0)?null:100*pat/nw}],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`.
+    let keep=cols;
+    if(!cols.some(c=>bsRows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        /* Percent formatting keys on the LABEL, not on one hard-coded name. It read `ROCE %`
+           literally, so adding `ROE %` would have printed a bare number at day-count precision --
+           the second percentage line proves the rule that the first one only implied. Day counts
+           stay at 1dp, percentages at 2dp with the suffix. */
+        bsRows.map(x=>[E(x.fy)].concat(keep.map(c=>{let pc=/%$/.test(c[0]);
+            return numCell(c[1](x),pc?2:1,pc?'%':'')}))));
+}
+function inFinancials(){let f=sec('financials'),intel=sec('intellisense'),years=D.kpi?.years||{},recv=f.receivables_aging||{};
+    /* THE FOUR BLOCKS, IN THE OWNER'S ORDER: P&L, Balance sheet, Cash flow, Ratios.
+       Every money figure reads `<field>_amount_rs` and renders CRORE (`crVal`), falling back to
+       the legacy lakhs field only where the rupee companion has not landed. */
+    let pnlRows=A(f.pnl_3yr),bsRows=A(f.balance_sheet_key),cfRows=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let pnl=pnlSpineTable(pnlRows,{years:years,eps:1});
+    let bs=balanceSheetTable(bsRows);
+    let cf=cashFlowTable(cfRows,pnlRows);
+    let ratios=ratiosTable(bsRows,pnlRows,rrRows);
+    let debt=table(['Borrowing type','Amount ₹cr','Purpose'],A(f.debt_profile?.loans).map(x=>[E(x.type),numCell(crVal(x,'amount'),2),E(x.purpose)]));
+    let oneoffs=table(['Year','Item','Amount ₹cr','Interpretation'],A(f.one_offs).map(x=>[E(x.fy),E(x.item),numCell(crVal(x,'amount'),2),E(x.note)]));
+    let checks=table(['Check','Result','Evidence'],A(intel.forensic).filter(x=>!/objects_total|CFO_vs_PAT/i.test(x.check||'')).map(x=>[E(x.check),status(x.verdict),E(x.note)]));
+    return'<div class="stack">'
+        +card('Profit & loss',badge('Reported fact')+pnl)
+        +card('Balance sheet',bs)
+        +card('Cash flow',cf,'positive')
+        +card('Ratios',ratios)
+        +creditRatingCard()+'</div>'}
 function inFinancialsReconciled(){let f=sec('financials'),years=D.kpi?.years||{};A(f.pnl_3yr).forEach(x=>{if(x.pat_margin_pct==null&&x.revenue)x.pat_margin_pct=100*x.pat/x.revenue});A(f.return_ratios).forEach(x=>{if(x.roce_pct==null&&years[x.fy]?.roce_pct!=null)x.roce_pct=years[x.fy].roce_pct});return inFinancials()}
+/* THE FINANCIAL SECTION, IDENTICAL FOR EVERY COMPANY (owner, 2026-09-20: "this should appear
+   same across all symbols we have", "for all company I want to standardise this section").
+
+   Four cards, always in the owner's order: Profit & loss, Balance sheet, Cash flow, Ratios.
+
+   WHY A SHARED FUNCTION RATHER THAN A CONVENTION. The section was produced by FOUR different
+   renderers picked per company -- `opFinancials` on 2,034 public pages, `drhpFinancials` on 142,
+   `transitionFinancials` on 81, `segmentFinancials` on 1 -- plus per-symbol hand-written variants
+   for HFCL, INDOMIM, EXIDEIND, CUMMINSIND and WELCORP. Each emitted its own card list, so
+   HINDZINC showed an eight-quarter trajectory and a five-year valuation history while NSE showed
+   the four tables. That is a code-path difference, not a data one, and no amount of extraction
+   work would have made the two pages agree.
+
+   A CARD IS KEPT EVEN WHEN ITS TABLE IS EMPTY (owner: "if no data for any table it can stay
+   blank"). `card()` returns '' for an empty body, which DROPS the card entirely -- so a company
+   with no cash flow silently lost the heading and a reader could not tell "no data" from "we do
+   not show this". The placeholder says which it is.
+
+   THE COLUMN COUNT IS NOT FIXED (owner: "number of years could be different based on years or
+   quarters are available"). Measured across the opFinancials pages that carry a P&L: 1, 3, 4 and
+   5 years all occur. `tableByPeriod` already derives the columns from the rows, so nothing here
+   constrains them. */
+function standardFinancials(){
+    let f=sec('financials');
+    let pnlRows=A(f.pnl_3yr),bsRows=A(f.balance_sheet_key),
+        cfRows=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let ratios={};rrRows.forEach(x=>{ratios[x.fy]=x;ratios[fyKey(x)]=x});
+    const blank='<p class="method-note">No data available for this table.</p>';
+    /* FIVE-YEAR VALUATION AND QUALITY HISTORY is the fifth standard card (owner, 2026-09-20: "we
+       should add this table to standard"). It came from the per-symbol renderers, which printed it
+       under three different headings -- "... and quality history", "... and returns history",
+       "... and balance-sheet history" -- over two different column sets. One heading and the
+       richer six-column set now apply everywhere.
+
+       It reads `deepdive.val5`, which 1,990 of 3,334 public payloads carry; the rest get the same
+       blank placeholder as any other empty table. Row counts run 1 to 5, so the "five-year" title
+       is the table's NAME and not a promise about its width. */
+    let val=tableByPeriod(['Year','Market cap ₹cr','P/E','ROE','OPM','D/E'],
+        A(D&&D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.roe,1)+'%',
+                             N(x.opm,1)+'%',N(x.de,2)+'x']));
+    const cards=[
+        ['Profit & loss',  pnlSpineTable(pnlRows,{ratios:ratios,eps:1})],
+        ['Balance sheet',  balanceSheetTable(bsRows)],
+        ['Cash flow',      cashFlowTable(cfRows,pnlRows)],
+        ['Ratios',         ratiosTable(bsRows,pnlRows,rrRows)],
+        ['Five-year valuation and quality history', val],
+    ];
+    return '<div class="stack">'+cards.map(x=>card(x[0],x[1]||blank)).join('')+'</div>';
+}
+
+
 function drhpFinancialsGeneric(){
     let f=sec('financials'),intel=sec('intellisense');
-    let ratios=Object.fromEntries(A(f.return_ratios).map(x=>[x.fy,x]));
-    let pnl=pnlSpineTable(A(f.pnl_3yr),{ratios:ratios});
-    let efficiency=tableByPeriod(['Year','RoE','RoCE','DSO days','Debt / equity','DSCR'],A(f.return_ratios).map(x=>[E(x.fy),x.roe_pct==null?'—':N(x.roe_pct,1)+'%',x.roce_pct==null?'—':N(x.roce_pct,1)+'%',x.dso_days==null?'—':N(x.dso_days,0),x.debt_equity==null?'—':N(x.debt_equity,2),x.dscr==null?'—':N(x.dscr,2)]));
-    let bsRows=A(f.balance_sheet_key).map(x=>[E(x.fy),x.networth==null?'—':N(x.networth/100,2),x.total_debt==null?'—':N(x.total_debt/100,2),x.cash==null?'—':N(x.cash/100,2),x.trade_receivables==null?'—':N(x.trade_receivables/100,2),x.inventory==null?'—':N(x.inventory/100,2)]);
-    let cfRows=A(f.cash_flow).map(x=>[E(x.fy),x.cfo==null?'—':N(x.cfo/100,2),x.cfi==null?'—':N(x.cfi/100,2),x.cff==null?'—':N(x.cff/100,2)]);
+    /* Ratios are keyed by BOTH the raw `fy` and its canonical label, because the return-ratio
+       rows and the P&L rows do not always spell the same year the same way. */
+    let pnlRows=A(f.pnl_3yr),bsRows2=A(f.balance_sheet_key),cfRows2=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let ratios={};rrRows.forEach(x=>{ratios[x.fy]=x;ratios[fyKey(x)]=x});
+    let pnl=pnlSpineTable(pnlRows,{ratios:ratios,eps:1});
+    let bsBlock=balanceSheetTable(bsRows2),cfBlock=cashFlowTable(cfRows2,pnlRows),ratioBlock=ratiosTable(bsRows2,pnlRows,rrRows);
+
     /* DEBT COMPOSITION -- summary, not bank-by-bank. 2026-09-04 (owner: "show only debt profile
        like total debt or short term or long term, not all detailed row e.g. it has bank wise which
        is not needed").
@@ -443,7 +835,7 @@ function drhpFinancialsGeneric(){
     if(sums.other>0&&(sums.short>0||sums.long>0))debtRows.push(['Other / unclassified',cr(sums.other)]);
     if(loans.length)debtRows.push(['Facilities',N(loans.length,0)+(loans.length===1?' facility':' facilities')]);
     let checks=table(['Check','Result','Evidence'],A(intel.forensic).map(x=>[E(x.check),status(x.verdict),E(x.note)]));
-    return'<div class="stack">'+card('Three-year operating record',badge('Reported fact')+pnl)+/* SPLIT INTO TWO CARDS 2026-09-02 (owner). They were one card holding two unrelated tables:
+    return'<div class="stack">'+card('Profit & loss',badge('Reported fact')+pnl)+/* SPLIT INTO TWO CARDS 2026-09-02 (owner). They were one card holding two unrelated tables:
    a balance sheet is a POSITION at a date, a cash-flow statement is a MOVEMENT over a period.
    Stacking them under one heading invited reading a net-worth figure as a flow. Both now use
    `tableByPeriod`, so the year is a COLUMN and each metric is a row.
@@ -456,8 +848,12 @@ function drhpFinancialsGeneric(){
    KWICK and ESDSSOFTWARESOLUTION). A comment must never separate a binary operator from its
    right-hand operand. Found by qa/raw_syntax_check.js, which is exactly the class of defect it
    was written to catch. */
-card('Margins, returns and balance-sheet efficiency',efficiency,'positive')
-+(bsRows.length?card('Balance-sheet trajectory',tableByPeriod(['Year','Net worth ₹cr','Debt ₹cr','Cash ₹cr','Receivables ₹cr','Inventory ₹cr'],bsRows)):'')+(cfRows.length?card('Cash flow',tableByPeriod(['Year','CFO ₹cr','Investing CF ₹cr','Financing CF ₹cr'],cfRows)):'')+(debtRows.length?card('Debt composition',table(['Measure','Amount'],debtRows)):'')+(A(intel.forensic).length?card('Forensic checks',checks):'')+creditRatingCard()+'</div>'
+/* `Margins, returns and balance-sheet efficiency` RETIRED 2026-09-20 (owner: "we dont need this
+   any more"). It printed RoE / RoCE / DSO days / Debt-equity / DSCR off `return_ratios`, which
+   duplicates the Ratios card below -- ROCE % and Debtor Days are both in the owner's six-line
+   ratio spec, and the other three were never part of it. The `efficiency` builder that fed it is
+   removed with it; nothing else referenced either. */
+(bsBlock?card('Balance sheet',bsBlock):'')+(cfBlock?card('Cash flow',cfBlock):'')+(ratioBlock?card('Ratios',ratioBlock):'')+creditRatingCard()+'</div>'
 }
 function inExecution(){let o=sec('objects_execution'),intel=sec('intellisense'),gd=intel.growth_durability||{},w=P.wtt||{},all=A(P.commitments),pick=re=>[...all].reverse().find(x=>re.test(x.item||'')),prom=[pick(/joint venture.*foldable hinge/i),pick(/Arms Components/i),pick(/45 to 50 new tools/i)].filter(Boolean);let uses=table(['Use','₹cr'],A(o.objects).map(x=>[E(x.purpose),x.amount_lakhs==null?'—':N(x.amount_lakhs/100,0)]));let promises=table(['Strategic commitment','Horizon','Evidence marker'],prom.map(x=>[E(x.item),E(x.horizon),E([x.promised_value,x.unit].filter(z=>z&&z!=='None').join(' ')||'Qualitative')]));let evidence=table(['Evidence test','State','What the store shows'],A(gd.signals).map(x=>[E((x.signal||'').replaceAll('_',' ')),status(x.status),E(x.note)]));let credibility=w.symbol?'<div class="credibility"><div class="grade compact">'+E(w.credibility_grade||'N/A')+'</div><div><h3>Walk the Talk is not scored yet</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||1)+'</b> quarter logged</span><span><b>'+E(w.open_commitments||0)+'</b> tracked across page</span><span><b>'+E(w.reconciled_n||0)+'</b> reconciled</span></div></div>':'';return credibility+'<div class="stack">'+card('Use of fresh issue',uses)+card('Growth evidence',badge('Analytical inference','inference')+'<div class="scoreline"><strong>'+E(gd.score||'—')+'</strong><span> / evidence score</span></div>'+evidence,'inference-card')+card('Unique strategic commitments',promises)+'</div>'}
 /* EMPTY KPI CARDS SUPPRESSED 2026-09-08 (owner-approved follow-up to the Governance-snapshot
@@ -602,7 +998,7 @@ function inListing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{},intel=sec('i
     ofs=(()=>{let n=offerShareCount(c.dilution?.ofs_shares);return n!=null?N(n,0):null})(),
     employee=(note.match(/Employee Reservation Portion of up to ([\d,]+)/i)||[])[1],sellers=table(['Selling shareholder','Shares disclosed'],A(c.ofs).map(x=>[E(x.seller),x.shares?E(x.shares):'Not separately disclosed']));return'<div class="stack"><div class="analysis-strip"><div><span>Latest close</span><b>₹'+N(a['Latest Close'],2)+' · '+N(a['Return From Listing %'],1)+'% from open</b></div><div><span>Supply calendar</span><b>'+E(A(ins.supply_calendar).length)+' identified release events</b></div></div>'+card('Offer composition',kpis([{label:'Fresh issue',value:'₹'+N(o.project?.funding_mix?.fresh_issue_lakhs/100,0)+'cr'},{label:'Offer-for-sale shares',value:E(ofs||'—')},{label:'Employee reservation',value:E(employee||'—')}])+sellers)+card('Supply calendar',table(['Date','Holder','Event','Equity'],A(ins.supply_calendar).map(x=>[E(x.date),E(x.holder),E(x.event),x.pct_equity==null?'—':N(x.pct_equity,2)+'%'])))+anchorCard()+'</div>'}
 
-function inVerdict(){let v=sec('verdict'),intel=sec('intellisense'),f=sec('financials'),pe=intel.true_pe||{},scenarios=intel.scenarios||{},pct=intel.percentiles||{},ins=intel.insider||{},gd=intel.growth_durability||{},scores=A(v.parameter_scores),openQuestions=A(v.open_questions).filter(x=>!/What price band/i.test(x)),monitorables=A(v.monitorables).filter(x=>!/Post-issue debt|US tariff|Triax Industries/i.test(x)),dataGaps=A(v.data_gaps).filter(x=>!/Price band, lot size and P\/E|FY26 RoCE/i.test(x)),last=A(f.pnl_3yr).at(-1)||{},norm=A(pe.lines).find(x=>x.label==='normalized')||{},stance=String(v.stance||'Not rated').split(/\s+-\s+/)[0];let bars='<div class="analytical-scores">'+scores.map(x=>{let s=Number(x.score_1_10)||0,band=s>=7?'strong':s>=4?'watch':'weak',filingStage=/Valuation clarity/i.test(x.parameter||'')&&intel.ipo_price,basis=filingStage?'Stored filing-stage score: pricing was unavailable in the source document. Final issue pricing is now available; the score is retained and not automatically re-rated.':x.basis;return'<div class="analytical-score"><div class="score-head"><b>'+E(x.parameter)+'</b><strong>'+N(s,0)+' / 10</strong></div><div class="score-track"><i class="'+band+'" style="width:'+Math.max(0,Math.min(100,s*10))+'%"></i></div><p>'+E(basis||'')+'</p></div>'}).join('')+'</div>';let price=Number(intel.ipo_price)||0,valuationRows=[['Reported','FY2026','—',N(last.revenue/100,0),N(last.pat_margin_pct,2)+'%',N(last.eps,2),N(pe.reported,2)+'x'],['Diluted','FY2026','—',N(last.revenue/100,0),N(last.pat_margin_pct,2)+'%',N(price/pe.diluted,2),N(pe.diluted,2)+'x'],['Normalized','FY2026','—',N(last.revenue/100,0),N(norm.inputs?.avg_margin_pct,2)+'%',N(price/pe.normalized,2),N(pe.normalized,2)+'x']];['bear','base','bull'].forEach(k=>{let x=scenarios[k],a=x?.assumptions||{};if(x)valuationRows.push([k,'FY2027',N(a.revenue_growth_pct,1)+'%',N(a.revenue_cr,0),N(a.pat_margin_pct,2)+'%',N(x.eps,2),N(x.fwd_pe,2)+'x'])});let percentileRows=[['Revenue growth',pct.revenue_growth],['PAT margin',pct.pat_margin],['Margin expansion',pct.margin_expansion]].filter(x=>x[1]).map(x=>[x[0],N(x[1].value,2)+'%',ordinal(x[1].pct),E(x[1].n||intel.n_cohort)]);let warns=A(intel.forensic).filter(x=>/WARN/i.test(x.verdict||'')),saving=pe.forward?.interest_saved_cr??scenarios.base?.assumptions?.interest_saving_cr,synthesis=[gd.verdict?'Growth durability is '+String(gd.verdict).toUpperCase()+'; the valuation model applies '+(pe.forward?.growth_adjusted?'an evidence-based growth haircut.':'the stored achievable growth rate without an additional haircut.'):'',saving!=null?'Debt repayment is estimated to add ₹'+N(saving,1)+'cr to annual after-tax earnings capacity.':'',warns.length?warns.length+' forensic warning'+(warns.length===1?' remains':'s remain')+' open; the underlying checks stay in Financials.':'No forensic warning remains open.',ins.ipo_price_multiple!=null?'The issue price was '+N(ins.ipo_price_multiple,1)+'x the stored promoter average acquisition cost.':'',intel.valuation?.size_mismatch?.flag?'The disclosed global comparable is '+N(intel.valuation.size_mismatch.peer_to_issuer_x,1)+'x larger by revenue, so its multiple is not used as a clean anchor.':''].filter(Boolean);return'<div class="stack verdict-stack"><section class="verdict-group"><div class="verdict-group-head"><span>01</span><div><p class="eyebrow">Verdict framework</p><h3>Assessment</h3></div></div><div class="verdict-banner"><div><span>Current stance</span><b>'+E(stance)+'</b></div><p>'+E(v.our_read||'')+'</p></div>'+card('Analytical scores',bars,'inference-card')+'</section><section class="verdict-group"><div class="verdict-group-head"><span>02</span><div><p class="eyebrow">Questions before conviction</p><h3>Due diligence</h3></div></div><div class="layout-2">'+card('Open questions for due diligence',list(openQuestions,10),'inference-card')+card('Red flags',list(v.red_flags,10),'caution')+card('Monitorables',list(monitorables,10))+card('Data gaps',list(dataGaps,10))+'</div></section><section class="verdict-group"><div class="verdict-group-head"><span>03</span><div><p class="eyebrow">Integrated analytical read</p><h3>Intelligence synthesis</h3></div></div>'+card('Valuation and scenario frame',badge('Analytical inference','inference')+table(['Basis','Period','Growth','Revenue ₹cr','PAT margin','EPS','P/E'],valuationRows)+'<p class="method-note">'+E(scenarios.assumptions_note||'')+'</p>','inference-card')+card('Cross-DRHP percentiles',table(['Measure','Company','Percentile','Cohort'],percentileRows))+card('What the evidence means',list(synthesis,10),'positive')+'</section></div>'}
+function inVerdict(){let v=sec('verdict'),intel=sec('intellisense'),f=sec('financials'),pe=intel.true_pe||{},scenarios=intel.scenarios||{},pct=intel.percentiles||{},ins=intel.insider||{},gd=intel.growth_durability||{},scores=A(v.parameter_scores),openQuestions=A(v.open_questions).filter(x=>!/What price band/i.test(x)),monitorables=A(v.monitorables).filter(x=>!/Post-issue debt|US tariff|Triax Industries/i.test(x)),dataGaps=A(v.data_gaps).filter(x=>!/Price band, lot size and P\/E|FY26 RoCE/i.test(x)),last=A(f.pnl_3yr).at(-1)||{},norm=A(pe.lines).find(x=>x.label==='normalized')||{},stance=String(v.stance||'Not rated').split(/\s+-\s+/)[0];let bars='<div class="analytical-scores">'+scores.map(x=>{let s=Number(x.score_1_10)||0,band=s>=7?'strong':s>=4?'watch':'weak',filingStage=/Valuation clarity/i.test(x.parameter||'')&&intel.ipo_price,basis=filingStage?'Stored filing-stage score: pricing was unavailable in the source document. Final issue pricing is now available; the score is retained and not automatically re-rated.':x.basis;return'<div class="analytical-score"><div class="score-head"><b>'+E(x.parameter)+'</b><strong>'+N(s,0)+' / 10</strong></div><div class="score-track"><i class="'+band+'" style="width:'+Math.max(0,Math.min(100,s*10))+'%"></i></div><p>'+E(basis||'')+'</p></div>'}).join('')+'</div>';let price=Number(intel.ipo_price)||0,valuationRows=[['Reported','FY2026','—',numCell(crVal(last,'revenue'),0),N(last.pat_margin_pct,2)+'%',N(last.eps,2),N(pe.reported,2)+'x'],['Diluted','FY2026','—',numCell(crVal(last,'revenue'),0),N(last.pat_margin_pct,2)+'%',N(price/pe.diluted,2),N(pe.diluted,2)+'x'],['Normalized','FY2026','—',numCell(crVal(last,'revenue'),0),N(norm.inputs?.avg_margin_pct,2)+'%',N(price/pe.normalized,2),N(pe.normalized,2)+'x']];['bear','base','bull'].forEach(k=>{let x=scenarios[k],a=x?.assumptions||{};if(x)valuationRows.push([k,'FY2027',N(a.revenue_growth_pct,1)+'%',N(a.revenue_cr,0),N(a.pat_margin_pct,2)+'%',N(x.eps,2),N(x.fwd_pe,2)+'x'])});let percentileRows=[['Revenue growth',pct.revenue_growth],['PAT margin',pct.pat_margin],['Margin expansion',pct.margin_expansion]].filter(x=>x[1]).map(x=>[x[0],N(x[1].value,2)+'%',ordinal(x[1].pct),E(x[1].n||intel.n_cohort)]);let warns=A(intel.forensic).filter(x=>/WARN/i.test(x.verdict||'')),saving=pe.forward?.interest_saved_cr??scenarios.base?.assumptions?.interest_saving_cr,synthesis=[gd.verdict?'Growth durability is '+String(gd.verdict).toUpperCase()+'; the valuation model applies '+(pe.forward?.growth_adjusted?'an evidence-based growth haircut.':'the stored achievable growth rate without an additional haircut.'):'',saving!=null?'Debt repayment is estimated to add ₹'+N(saving,1)+'cr to annual after-tax earnings capacity.':'',warns.length?warns.length+' forensic warning'+(warns.length===1?' remains':'s remain')+' open; the underlying checks stay in Financials.':'No forensic warning remains open.',ins.ipo_price_multiple!=null?'The issue price was '+N(ins.ipo_price_multiple,1)+'x the stored promoter average acquisition cost.':'',intel.valuation?.size_mismatch?.flag?'The disclosed global comparable is '+N(intel.valuation.size_mismatch.peer_to_issuer_x,1)+'x larger by revenue, so its multiple is not used as a clean anchor.':''].filter(Boolean);return'<div class="stack verdict-stack"><section class="verdict-group"><div class="verdict-group-head"><span>01</span><div><p class="eyebrow">Verdict framework</p><h3>Assessment</h3></div></div><div class="verdict-banner"><div><span>Current stance</span><b>'+E(stance)+'</b></div><p>'+E(v.our_read||'')+'</p></div>'+card('Analytical scores',bars,'inference-card')+'</section><section class="verdict-group"><div class="verdict-group-head"><span>02</span><div><p class="eyebrow">Questions before conviction</p><h3>Due diligence</h3></div></div><div class="layout-2">'+card('Open questions for due diligence',list(openQuestions,10),'inference-card')+card('Red flags',list(v.red_flags,10),'caution')+card('Monitorables',list(monitorables,10))+card('Data gaps',list(dataGaps,10))+'</div></section><section class="verdict-group"><div class="verdict-group-head"><span>03</span><div><p class="eyebrow">Integrated analytical read</p><h3>Intelligence synthesis</h3></div></div>'+card('Valuation and scenario frame',badge('Analytical inference','inference')+table(['Basis','Period','Growth','Revenue ₹cr','PAT margin','EPS','P/E'],valuationRows)+'<p class="method-note">'+E(scenarios.assumptions_note||'')+'</p>','inference-card')+card('Cross-DRHP percentiles',table(['Measure','Company','Percentile','Cohort'],percentileRows))+card('What the evidence means',list(synthesis,10),'positive')+'</section></div>'}
 function exInvestment(){let y=D.pnl?.year||{},last=A(D.actuals).at(-1)||{},margin=ddBlock('latest_quarter','margin'),non=ddBlock('bull_bear','non-obvious'),opt=ddBlock('outlook','growth vertical');let facts=[{label:'Annual revenue',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('Revenue'))?.cur,0)+'cr'},{label:'Annual PAT',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('PAT'))?.cur,0)+'cr'},{label:'Operating margin',value:N(y.rows?.find(x=>x.metric.startsWith('OPM'))?.cur,1)+'%'},{label:'Latest revenue growth',value:N(last.rev_yoy,1)+'%'},{label:'Lithium-ion investment',value:'₹4,802cr'},{label:'Planned cell capacity',value:'12 GWh'},{label:'Recycled lead input',value:'~79%'}];return kpis(facts)+'<div class="layout-2">'+card('Core earnings engine','<p>'+E(ddBlock('business','segment').body)+'</p>','positive')+card('Transformation thesis','<p>'+E(opt.body)+'</p>','inference-card')+card('Margin defence','<p>'+E(margin.body)+'</p>','caution')+card('Non-obvious read',badge('Analytical inference','inference')+'<p>'+E(non.body)+'</p>','inference-card')+card('Decision tension','<p>The established lead-acid franchise funds a large greenfield cell-manufacturing transition. The key underwriting question is whether customer validation and utilisation arrive quickly enough to lift returns above the current 6% ROE.</p>','caution')+'</div>'}
 function exInvestmentNoDup(){return exInvestment().replace(/<div class="kpi"><span>Recycled lead input<\/span><b>[^<]*<\/b><\/div>/,'')}
 function exProducts(){let products=(P.products&&typeof P.products==='object'&&!Array.isArray(P.products))?P.products:jsonish(C.products);return Object.keys(products).map(k=>'<article class="product-card"><h3>'+E(k)+'</h3><p>'+E(A(products[k]).join(' · '))+'</p></article>').join('')}
@@ -639,7 +1035,23 @@ function explorer(){let sets=P.explorer||{},labels={momentum:'Momentum',investin
      per-company at render time (buildPayload), not carried in the explorer base. */
   keys=['momentum','investing','investing_complete','investing_building','new','peers']
     .filter(k=>k==='peers'||(sets[k]&&sets[k].length));return'<aside class="stock-explorer"><div class="explorer-title"><div><span>Company Explorer</span><b>Stock list</b></div><button id="explorer-close" aria-label="Close stock list">×</button></div><select id="explorer-source" aria-label="Choose stock screen">'+keys.map(k=>'<option value="'+k+'">'+labels[k]+'</option>').join('')+'</select><input id="explorer-search" type="search" placeholder="Filter stocks…" aria-label="Filter stock list"><div id="explorer-list"></div></aside><button id="explorer-open" class="explorer-open">Stocks</button>'}
-function initExplorer(){let sets=P.explorer||{},source=document.getElementById('explorer-source'),search=document.getElementById('explorer-search'),listBox=document.getElementById('explorer-list'),aside=document.querySelector('.stock-explorer');if(!source||!search||!listBox||!aside)return;/* KEEP THE READER WHERE THEY WERE. On /company/ a click is a real navigation, so it reloads the page, re-renders this list from scratch and resets its scrollTop to 0 - the row just clicked is then hundreds of rows down and has to be hunted for again (owner 2026-08-31). On a SCREEN page the click is intercepted below and no longer reloads, but the renderer still re-runs and rebuilds this list, so the centring matters there too. STAY ON THE SCREEN PAGE 2026-09-11. The href was an unconditional '/company/?sym=', so an explorer click on /screens/<name>/ left the screen entirely and the top table (built OUTSIDE #store-company by screens_pages precisely so it survives a symbol switch) vanished with it -- while the SAME page's top table used a relative '?sym=' and stayed put. Two link styles for one action on one page. On a screen the link is now relative, matching screens_top; /company/ keeps the absolute path. Centre the selected row INSIDE the list box. Never scrollIntoView(): the list is a nested scroller and that also scrolls the DOCUMENT, throwing the reader to the top of the company page - trading one wrong scroll position for another. Measured off rects rather than offsetTop, which is relative to the offsetParent and silently wrong if the box is not positioned. */function centre(){let sel=listBox.querySelector('.explorer-stock.selected');if(!sel)return;let r=sel.getBoundingClientRect(),b=listBox.getBoundingClientRect();listBox.scrollTop+=(r.top-b.top)-(b.height/2-r.height/2)}function draw(keep){let q=String(search.value||'').toUpperCase(),rows=A(sets[source.value]).filter(r=>!q||String(r.symbol||'').toUpperCase().includes(q)||String(r.name||'').toUpperCase().includes(q));listBox.innerHTML=rows.length?rows.map(r=>'<a class="explorer-stock'+(r.symbol===I.symbol?' selected':'')+'" href="'+(window.__SCREEN__?'?sym=':'/company/?sym=')+encodeURIComponent(r.symbol)+'"><b>'+E(r.symbol)+'</b><span>'+E(r.name||r.meta||'')+'</span><small>'+E(r.meta||'')+'</small></a>').join(''):'<p class="empty">No stocks in this view.</p>';if(keep!==false)centre()}/* PIN THE LIST TO THIS SCREEN'S SET (SCREENS_PAGES_DESIGN.md 3b, table at "explorer list").
+function initExplorer(){let sets=P.explorer||{},source=document.getElementById('explorer-source'),search=document.getElementById('explorer-search'),listBox=document.getElementById('explorer-list'),aside=document.querySelector('.stock-explorer');if(!source||!search||!listBox||!aside)return;/* KEEP THE READER WHERE THEY WERE. On /company/ a click is a real navigation, so it reloads the page, re-renders this list from scratch and resets its scrollTop to 0 - the row just clicked is then hundreds of rows down and has to be hunted for again (owner 2026-08-31). On a SCREEN page the click is intercepted below and no longer reloads, but the renderer still re-runs and rebuilds this list, so the centring matters there too. STAY ON THE SCREEN PAGE 2026-09-11. The href was an unconditional '/company/?sym=', so an explorer click on /screens/<name>/ left the screen entirely and the top table (built OUTSIDE #store-company by screens_pages precisely so it survives a symbol switch) vanished with it -- while the SAME page's top table used a relative '?sym=' and stayed put. Two link styles for one action on one page. On a screen the link is now relative, matching screens_top; /company/ keeps the absolute path. Centre the selected row INSIDE the list box. Never scrollIntoView(): the list is a nested scroller and that also scrolls the DOCUMENT, throwing the reader to the top of the company page - trading one wrong scroll position for another. Measured off rects rather than offsetTop, which is relative to the offsetParent and silently wrong if the box is not positioned. */function centre(){let sel=listBox.querySelector('.explorer-stock.selected');if(!sel)return;let r=sel.getBoundingClientRect(),b=listBox.getBoundingClientRect();listBox.scrollTop+=(r.top-b.top)-(b.height/2-r.height/2)}/* THE FILTER CONTRACT, IMPLEMENTER SIDE (owner 2026-09-18: "when i apply filter, the new listing
+   symbol in explorer doesnt change in list"). `screens_top.py:17` has documented this contract since
+   the screens were built and all three screens call `window.__EXPLORER_FILTER__(symbols)` -- but
+   NOTHING EVER DEFINED IT. Every call site is wrapped in `typeof ...==='function'`, so for months the
+   call silently no-opped: the filter narrowed the top table and left this list untouched.
+   `SCREENS_PAGES_DESIGN.md:241` records it as knowingly unbuilt ("the list is static from JSON").
+   A null/absent allow-list means NO FILTER -- the whole set shows -- which is what the screens send
+   when every control is cleared, so clearing a filter restores the list rather than emptying it.
+   Held on `window`, not in this closure, because the renderer re-executes on every symbol switch
+   (see __KEEP_SECTION__ below) and a live filter has to survive that. */
+function allowed(){let f=window.__EXPLORER_ALLOW__;return f&&f.size?f:null}
+function draw(keep){let q=String(search.value||'').toUpperCase(),allow=allowed(),rows=A(sets[source.value]).filter(r=>!q||String(r.symbol||'').toUpperCase().includes(q)||String(r.name||'').toUpperCase().includes(q)).filter(r=>!allow||allow.has(String(r.symbol||'').toUpperCase()));listBox.innerHTML=rows.length?rows.map(r=>'<a class="explorer-stock'+(r.symbol===I.symbol?' selected':'')+'" href="'+(window.__SCREEN__?'?sym=':'/company/?sym=')+encodeURIComponent(r.symbol)+'"><b>'+E(r.symbol)+'</b><span>'+E(r.name||r.meta||'')+'</span><small>'+E(r.meta||'')+'</small></a>').join(''):'<p class="empty">'+(allow?'No stocks match this filter.':'No stocks in this view.')+'</p>';if(keep!==false)centre()}
+/* Re-exposed on EVERY render (this function re-runs on each symbol switch) so the contract is never
+   briefly absent; and the live filter is re-applied by the draw() at the end of initExplorer, so a
+   switch does not silently widen the list back to the full set. The peers set is the reader's own
+   lookup rather than the screen's universe, so a screen filter must not narrow it. */
+window.__EXPLORER_FILTER__=function(syms){window.__EXPLORER_ALLOW__=syms&&syms.length?new Set(syms.map(s=>String(s).toUpperCase())):null;if(source.value!=='peers')draw(false)};/* PIN THE LIST TO THIS SCREEN'S SET (SCREENS_PAGES_DESIGN.md 3b, table at "explorer list").
    `source.value` was NEVER assigned, so the <select> fell to its first <option> -- momentum -- on
    every page. /screens/investing/ and /screens/new-listing/ therefore listed the momentum universe
    (266) instead of their own 135 and 1,983, while the BOOT honoured SCREEN.explorer when it picked
@@ -652,7 +1064,14 @@ function initExplorer(){let sets=P.explorer||{},source=document.getElementById('
    (no __SCREEN__) the momentum-first default is correct and stays. */
 var _pin=(window.__SCREEN__&&window.__SCREEN__.explorer)||'';
 if(_pin&&Object.prototype.hasOwnProperty.call(sets,_pin)&&[...source.options].some(o=>o.value===_pin))source.value=_pin;
-source.onchange=()=>draw();search.oninput=()=>draw(false);document.getElementById('explorer-close').onclick=()=>aside.classList.remove('open');document.getElementById('explorer-open').onclick=()=>aside.classList.add('open');/* SWITCH IN PLACE ON A SCREEN PAGE (design SCREENS_PAGES_DESIGN.md 3e, wired 2026-09-11). `screens_pages` boot has always exported `window.__SCREEN_SELECT__` with the comment "the renderer asks for this by name when an explorer row is clicked" -- and NOTHING EVER ASKED. The consumer half of that contract was missing, so every explorer click was a full navigation: the reader lost their place in the page (Stage analysis scrolled back to the top) and this list reset its scroll to 0. Delegated so it survives the redraws above. The <a href> STAYS a real link (progressive enhancement): middle-click, open-in-new-tab and copy-link keep working, and when there is no in-place handler the navigation is still correct. */listBox.addEventListener('click',ev=>{if(!window.__SCREEN_SELECT__)return;if(ev.defaultPrevented||ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey)return;let a=ev.target.closest&&ev.target.closest('a.explorer-stock');if(!a||!listBox.contains(a))return;let s=(new URLSearchParams((a.getAttribute('href')||'').split('?')[1]||'')).get('sym');if(!s)return;/* GUARD ON THE PINNED SET, NOT ON `M2D.recOf` (design 3e step 4 says recOf; it cannot work here). `M2D.init` is called with `stocks:[M.stock]` -- ONLY the company on screen -- so `STK` holds one row and `recOf` returns null for every OTHER symbol in the list. Using it as the guard let every click fall through to a navigation, which is the bug this handler exists to fix. A row rendered in THIS explorer is in the screen's pinned set by construction, which is the same question step 4 was really asking. `source.value==='peers'` is the one set that is not the screen's universe -- a peer can be any company -- so those keep navigating to the full company page. */if(source.value==='peers')return;ev.preventDefault();listBox.querySelectorAll('.explorer-stock.selected').forEach(x=>x.classList.remove('selected'));a.classList.add('selected');aside.classList.remove('open');window.__SCREEN_SELECT__(s)});draw()}
+source.onchange=()=>draw();search.oninput=()=>draw(false);document.getElementById('explorer-close').onclick=()=>aside.classList.remove('open');document.getElementById('explorer-open').onclick=()=>aside.classList.add('open');/* SWITCH IN PLACE ON A SCREEN PAGE (design SCREENS_PAGES_DESIGN.md 3e, wired 2026-09-11). `screens_pages` boot has always exported `window.__SCREEN_SELECT__` with the comment "the renderer asks for this by name when an explorer row is clicked" -- and NOTHING EVER ASKED. The consumer half of that contract was missing, so every explorer click was a full navigation: the reader lost their place in the page (Stage analysis scrolled back to the top) and this list reset its scroll to 0. Delegated so it survives the redraws above. The <a href> STAYS a real link (progressive enhancement): middle-click, open-in-new-tab and copy-link keep working, and when there is no in-place handler the navigation is still correct. */listBox.addEventListener('click',ev=>{if(!window.__SCREEN_SELECT__)return;if(ev.defaultPrevented||ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey)return;let a=ev.target.closest&&ev.target.closest('a.explorer-stock');if(!a||!listBox.contains(a))return;let s=(new URLSearchParams((a.getAttribute('href')||'').split('?')[1]||'')).get('sym');if(!s)return;/* GUARD ON THE PINNED SET, NOT ON `M2D.recOf` (design 3e step 4 says recOf; it cannot work here). `M2D.init` is called with `stocks:[M.stock]` -- ONLY the company on screen -- so `STK` holds one row and `recOf` returns null for every OTHER symbol in the list. Using it as the guard let every click fall through to a navigation, which is the bug this handler exists to fix. A row rendered in THIS explorer is in the screen's pinned set by construction, which is the same question step 4 was really asking. `source.value==='peers'` is the one set that is not the screen's universe -- a peer can be any company -- so those keep navigating to the full company page. */if(source.value==='peers')return;ev.preventDefault();listBox.querySelectorAll('.explorer-stock.selected').forEach(x=>x.classList.remove('selected'));a.classList.add('selected');aside.classList.remove('open');/* CARRY THE READER'S PLACE ACROSS THE SWITCH (owner 2026-09-18: "if I change symbol from explorer
+   the sub nav should stay on same selected on prev symbol. and scroll should also stay"). The
+   renderer re-EXECUTES on every switch (screens_pages.runRenderer appends a fresh <script>), so the
+   active tab -- held only as a CSS class on the nav anchors -- is destroyed and re-derived from
+   `verticalTabs[0]`, i.e. always the first tab. `window` is the only channel that survives that
+   re-execution, which is why __SCREEN__ and __SCREEN_SELECT__ already live there. Recorded at the
+   CLICK, before the payload swaps, because by the time renderVertical runs the old DOM is gone. */
+if(!window.__KEEP_SECTION__){let act=document.querySelector('.vertical-nav a.active');if(act)window.__KEEP_SECTION__=act.dataset.section}window.__KEEP_SCROLL__=window.scrollY||0;window.__SCREEN_SELECT__(s)});draw()}
 /* HIST_SESSIONS COMES FROM THE PAYLOAD, NEVER A LITERAL. This read `hist_sessions:130` while
    momentum_dashboard.HIST_SESSIONS was raised to 200 (2026-09-16), so the table's own caption
    said "within last 130" over 200 rows of data -- a second copy of a constant that only ever
@@ -720,7 +1139,19 @@ let heroMcap=(f,an,D)=>{let d=D||{},a=an||{},v=Number(d.mcap_live),src=1;
 function hero(){let st=M.stock,sc=P.scorecard||{},an=P.ipo?.analysis||{},hasDrhp=PM?PM.coverage?.drhp:P.coverage.drhp,hasDeep=PM?PM.coverage?.deepDive:P.coverage.deepDive,f=[['Coverage',hasDeep&&hasDrhp?'Deep Dive + offer research':hasDrhp?'Offer-document research':hasDeep?'Operating deep dive':'Market coverage'],['Market structure',st?st.g+' · '+({1:'Basing',2:'Advancing',3:'Top',4:'Decline'}[st.g]||'Tracked'):'Classification pending']],thesis=PM?.hero?.oneLiner||P.summary.oneLiner;if(!PM&&I.symbol==='INDOMIM')thesis=String(thesis||'').replace(/ in Calendar Year 2025 for the last six years/i,', a leadership position held for six years');if(sc.symbol)f.push(['Business quality',sc.bq_total+' / 100']);heroMcap(f,an,D);let hasModel=A(P.projection?.projection).length;return'<section class="company-hero"><p class="eyebrow">Institutional company intelligence</p><div class="title-row"><h1>'+E(I.name)+'</h1><span>'+E(I.symbol)+'</span></div><p class="thesis">'+E(thesis)+'</p><div class="decision-strip">'+f.map(x=>'<div'+(x[2]?' title="'+E(x[2])+'"':'')+'><span>'+E(x[0])+'</span><b>'+E(x[1])+'</b></div>').join('')+'</div><div class="legend">'+badge('Reported fact')+badge('Management guidance','guide')+(hasModel?badge('Model estimate','estimate'):'')+badge('Analytical inference','inference')+'</div></section>'}
 function investment(){if(D.s)return hfInvestment();let v=sec('verdict'),ip=sec('industry_peers'),strength=v.strengths_observed||ip.swot?.strengths||[],concerns=v.concerns_observed||[],non=concall('non-obvious');return'<div class="layout-2">'+card('Business in one view','<p>'+E(P.summary.business)+'</p>')+card('Why this can compound',list(I.symbol==='HFCL'?concall('optionality'):strength,6),'positive')+card('What the market must be right about',list(concerns,6),'caution')+card('Non-obvious intelligence',badge('Analytical inference','inference')+list(non.length?non:sec('intellisense').growth_durability?.signals,6),'inference-card')+card('What changes the view',list(v.monitorables||concall('risk'),7))+'</div>'}
 function business(){if(D.s)return hfBusiness();let b=sec('business_ops'),ip=sec('industry_peers'),products=b.products||P.products;return'<div class="layout-2">'+card('Revenue engine',list(products,10))+card('End-market architecture',list(b.revenue_split_industry||P.endMarkets,10))+card('Competitive position',(ip.market_position?'<p><strong>'+N(ip.market_position.share_pct,1)+'%</strong> '+E(ip.market_position.positioning||'')+'</p><p>'+E(ip.market_position.basis||'')+'</p>':'')+list(ip.swot?.strengths,5),'positive')+card('Manufacturing footprint',list(b.plants,8))+card('Operating economics',list(concall('margin'),8))+'</div>'}
-function financials(){let f=sec('financials'),p=f.pnl_3yr||[],cash=f.cash_flow||[],rr=f.return_ratios||[],model=P.projection?.projection||[];let reported=pnlSpineTable(A(p),{eps:1,margins:0})||list(concall('financial scorecard'),10);let cf=tableByPeriod(['Year','CFO ₹cr','RoCE','RoNW'],cash.map((x,i)=>[E(x.fy),N((x.cfo||0)/100),rr[i]?.roce_pct==null?'—':N(rr[i].roce_pct)+'%',rr[i]?.ronw_pct==null?'—':N(rr[i].ronw_pct)+'%']));let estimates=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct)+'%',N(x.pat,0)]));return'<div class="stack">'+card('Reported operating record',badge('Reported fact')+reported)+card('Cash conversion & returns',cf)+card('Forward model',badge('Model estimate','estimate')+estimates,'estimate-card')+card('Model assumptions',list(P.projection?.assumptions,8))+creditRatingCard()+'</div>'}
+function financials(){let f=sec('financials'),p=A(f.pnl_3yr),cash=A(f.cash_flow),rr=A(f.return_ratios),bsRows=A(f.balance_sheet_key),model=P.projection?.projection||[];
+    /* The same four blocks as the DRHP page, in the owner's order, so a company carried by the
+       deep-dive renderer and one carried by the DRHP renderer show the SAME statements. */
+    let reported=pnlSpineTable(p,{eps:1,margins:0})||list(concall('financial scorecard'),10);
+    let bs=balanceSheetTable(bsRows),cf=cashFlowTable(cash,p),ratios=ratiosTable(bsRows,p,rr);
+    let estimates=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct)+'%',N(x.pat,0)]));
+    return'<div class="stack">'
+        +card('Profit & loss',badge('Reported fact')+reported)
+        +(bs?card('Balance sheet',bs):'')
+        +(cf?card('Cash flow',cf):'')
+        +(ratios?card('Ratios',ratios):'')
+        +card('Forward model',badge('Model estimate','estimate')+estimates,'estimate-card')
+        +card('Model assumptions',list(P.projection?.assumptions,8))+creditRatingCard()+'</div>'}
 function execution(){let o=sec('objects_execution'),hi=P.presentation?.highlights||{},cs=P.commitments||[];let ledger=table(['Commitment','Horizon','Status'],cs.slice(-14).map(x=>[E(x.item||x.commitment||x.promised||'Commitment'),E(x.horizon||x.target_period||'—'),E(x.status||'Open')])),objects=o.objects?table(['Use of proceeds','₹cr'],o.objects.map(x=>[E(x.purpose),x.amount_lakhs==null?'—':N(x.amount_lakhs/100,0)])):'';return'<div class="layout-2">'+card(I.symbol==='HFCL'?'Capacity & capital':'Use of fresh issue',I.symbol==='HFCL'?list(hi.expansion_capex||concall('capex'),8):objects)+card('Execution milestones',ledger||list(o.project?[o.project]:[],6))+card('Management credibility',P.wtt?.symbol?'<div class="grade">'+E(P.wtt.credibility_grade||'Tracked')+'</div><p>'+E(P.wtt.summary||'')+'</p>':'<p class="muted">No mature commitment history yet. This is an evidence gap, not a negative score.</p>')+card('Guidance and dependencies',badge('Management guidance','guide')+list(concall('guidance'),10),'guide-card')+'</div>'}
 function ownership(){let c=sec('capital_ownership'),g=sec('governance');return'<div class="layout-2">'+card('Promoter and dilution',list([c.promoter_holding,c.pledging,c.dilution].filter(Boolean),8))+card('Board and leadership',list(g.promoters_directors,8))+card('Related parties & record gaps',list([...A(g.rpts),...A(g.record_gaps)],8),'caution')+card('Capital history — decision-relevant events',list(c.capital_history,8))+'</div>'}
 function risks(){let r=sec('risks'),v=sec('verdict'),all=[...A(r.internal_operational),...A(r.financial_valuation),...A(r.strategy_growth),...A(v.concerns_observed),...(I.symbol==='HFCL'?concall('risk'):[])];return'<div class="risk-grid">'+all.slice(0,12).map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title||value(x))+'</h3>'+(x.detail?'<p>'+E(x.detail)+'</p>':'')+(x.evidence?'<small>'+E(x.evidence)+'</small>':'')+'</div></article>').join('')+'</div>'}
@@ -757,7 +1188,7 @@ function anchorCard(){
     let note=rows.length>50?'<p class="method-note">Showing the 50 largest of '+rows.length+' anchor allottees.</p>':'';
     return card('Anchor investors ('+(aa.n||rows.length)+')',body+note);
 }
-function listing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{};return s.Symbol?'<div class="stack">'+anchorCard()+'<div class="layout-2">'+card('Offer structure',list(sec('objects_execution').objects,6))+card('Forensic checks',list(sec('intellisense').forensic,8))+'</div></div>':(anchorCard()||'<div class="empty">No offer record applies to this coverage.</div>')}
+function listing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{};return s.Symbol?'<div class="stack">'+anchorCard()+'<div class="layout-2">'+card('Offer structure',list(sec('objects_execution').objects,6))+'</div></div>':(anchorCard()||'<div class="empty">No offer record applies to this coverage.</div>')}
 function pendingVolume(){let d=A(M.price).slice(-20),vol=d.map(x=>Number(x[2])||0).filter(x=>x>0),latest=Number(d.at(-1)?.[2])||0,avg=vol.length?vol.reduce((a,b)=>a+b,0)/vol.length:0;if(!vol.length)return'';return card('Observed volume profile',kpis([{label:'Sessions observed',value:d.length},{label:'Latest volume',value:N(latest,0)},{label:'Observed average',value:N(avg,0)},{label:'Latest / average',value:N(latest/avg,2)+'x'}]))}
 // WHY there is no stage, when the producer said why. An empty/generic section is
 // indistinguishable from a broken pipeline -- the owner had to ASK why ESDS showed no stage
@@ -786,7 +1217,7 @@ function stagePending(){
 }
 function stage(){if(M.stock)return'<div id="tab-momentum2"><div class="m2card"><div class="m2chartbar"><div class="m2tf" id="m2-tf"><button data-tf="1" class="active">1Y</button><button data-tf="3">3Y</button><button data-tf="5">5Y</button><button data-tf="0">Max</button></div><div class="m2hover" id="m2-hover"></div></div><div id="m2-chart"></div></div><div class="m2card"><div class="m2sec">Stage analysis</div><div id="m2-data"></div><div id="m2-data-ext"></div></div><div class="m2card"><div class="m2sec">Stage history</div><div id="m2-hist"></div></div><div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"></div></div></div>';return stagePending()+(A(M.price).length>1?chart(M.price)+'<div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"><div class="m2empty">Loading volume analysis&hellip;</div></div></div>':'')}
 function drhpRiskRows(){let r=sec('risks'),all=[...A(r.internal_operational),...A(r.financial_valuation),...A(r.compliance_legal),...A(r.strategy_growth)];let generic=/general economic|political condition|natural disaster|pandemic|competition may|changes in law|force majeure/i;let score=x=>{let text=[x.title,x.risk,x.detail,x.evidence].join(' '),n=0;if(/[₹%]|\b\d[\d,.]*\b/.test(text))n+=4;if(/customer|supplier|data cent|cloud|cyber|power|capacity|receivable|government|technology|order|vendor/i.test(text))n+=3;if(x.evidence)n+=2;if(generic.test(text))n-=4;return n};return unique(all).sort((a,b)=>score(b)-score(a)).slice(0,10)}
-function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o=sec('overview'),rows=A(f.pnl_3yr),last=rows.at(-1)||{},rr=A(f.return_ratios).find(x=>x.fy===last.fy)||{},facts=A(b.other_material_facts).filter(x=>['technology_ip','vertical_integration','repeat_business','customer_qualification'].includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,240)).slice(0,6),risks=drhpRiskRows().slice(0,5);return kpis([{label:'Revenue',value:last.revenue==null?'—':rsAmount(last.revenue_amount_rs||last.revenue*100000)},{label:'EBITDA margin',value:rr.ebitda_margin_pct==null?'—':N(rr.ebitda_margin_pct,1)+'%'},{label:'PAT',value:last.pat==null?'—':rsAmount(last.pat_amount_rs||last.pat*100000)},{label:'RoCE',value:rr.roce_pct==null?'—':N(rr.roce_pct,1)+'%'}])+'<div class="layout-2">'+card('Business in one view','<p>'+E(concise(o.business_model||P.summary.business||'',520))+'</p>')+card('Evidence-backed differentiation',list(facts,6),'positive')+card('Key concerns to underwrite',list(risks.map(x=>concise(x.title||x.risk||value(x),220)),5),'caution')+card('What to monitor',list([A(b.capacity_utilization).length?'Capacity addition and utilisation':'',sec('objects_execution').orders_not_placed?.status?'Conversion of quotations into firm equipment orders':''].filter(Boolean),6))+'</div>'}
+function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o=sec('overview'),rows=A(f.pnl_3yr),last=rows.at(-1)||{},rr=A(f.return_ratios).find(x=>x.fy===last.fy)||{},facts=A(b.other_material_facts).filter(x=>['technology_ip','vertical_integration','repeat_business','customer_qualification'].includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,240)).slice(0,6),risks=drhpRiskRows().slice(0,5);return kpis([{label:'Revenue',value:crMoney(last,'revenue')},{label:'EBITDA margin',value:rr.ebitda_margin_pct==null?'—':N(rr.ebitda_margin_pct,1)+'%'},{label:'PAT',value:crMoney(last,'pat')},{label:'RoCE',value:rr.roce_pct==null?'—':N(rr.roce_pct,1)+'%'}])+'<div class="layout-2">'+card('Business in one view','<p>'+E(concise(o.business_model||P.summary.business||'',520))+'</p>')+card('Evidence-backed differentiation',list(facts,6),'positive')+card('Key concerns to underwrite',list(risks.map(x=>concise(x.title||x.risk||value(x),220)),5),'caution')+card('What to monitor',list([A(b.capacity_utilization).length?'Capacity addition and utilisation':'',sec('objects_execution').orders_not_placed?.status?'Conversion of quotations into firm equipment orders':''].filter(Boolean),6))+'</div>'}
 /* 'Use of funds' now DEFERS to the Offer section (2026-09-14, owner: "Can we add in offer section /
    For proceed / Proceed utilization"). It rendered the SAME `objects_execution.objects` rows that
    `netProceedsCard()` renders as 'Use of proceeds' in Offer, so once that card existed the page
@@ -1091,17 +1522,17 @@ function opPeers(){
 }
 
 const inVerdictDrhp=inVerdict;inVerdict=()=>I.symbol==='CUMMINSIND'?cuVerdict():inVerdictDrhp();
-const allTabs=[['case','Investment Case',()=>I.symbol==='HFCL'?hfInvestment():I.symbol==='INDOMIM'?inInvestment():I.symbol==='EXIDEIND'?exInvestmentNoDup():I.symbol==='CUMMINSIND'?cuInvestment():I.symbol==='WELCORP'?opInvestment():investment()],['business','Business',()=>I.symbol==='HFCL'?hfBusiness():I.symbol==='INDOMIM'?inBusiness():I.symbol==='EXIDEIND'?exBusinessNoDup():I.symbol==='CUMMINSIND'?cuBusiness():I.symbol==='WELCORP'?opBusiness():business()],['financials','Financials',()=>I.symbol==='HFCL'?hfFinancialsRich():I.symbol==='INDOMIM'?inFinancialsReconciled():I.symbol==='EXIDEIND'?exFinancials():I.symbol==='CUMMINSIND'?cuFinancials():I.symbol==='WELCORP'?opFinancials():financials()],['execution','Execution',()=>I.symbol==='HFCL'?hfExecution():I.symbol==='INDOMIM'?inExecution():I.symbol==='EXIDEIND'?exExecutionDedup():I.symbol==='CUMMINSIND'?cuExecution():I.symbol==='WELCORP'?opExecution():execution()],['ownership',I.symbol==='INDOMIM'?'Ownership & Governance':'Ownership',()=>I.symbol==='INDOMIM'?inOwnership():I.symbol==='EXIDEIND'?exOwnershipNoDup():I.symbol==='CUMMINSIND'?cuOwnership():ownership()],['risks','Risks',()=>I.symbol==='HFCL'?hfRisks():I.symbol==='INDOMIM'?inRisks():I.symbol==='EXIDEIND'?exRisksNoDup():I.symbol==='CUMMINSIND'?cuRisks():I.symbol==='WELCORP'?opRisks():risks()],['peers',I.symbol==='INDOMIM'?'Industry & Peers':I.symbol==='CUMMINSIND'?'Industry & Valuation':'Peers',()=>I.symbol==='HFCL'?hfPeers():I.symbol==='INDOMIM'?inPeers():I.symbol==='EXIDEIND'?exPeers():I.symbol==='CUMMINSIND'?cuPeers():I.symbol==='WELCORP'?opPeers():peers()],['listing','Offer & Listing',()=>I.symbol==='INDOMIM'?inListing():listing()],['verdict','Verdict',inVerdict],['stage','Stage Analysis',stage]];
+const allTabs=[['case','Investment Case',()=>I.symbol==='HFCL'?hfInvestment():I.symbol==='INDOMIM'?inInvestment():I.symbol==='EXIDEIND'?exInvestmentNoDup():I.symbol==='CUMMINSIND'?cuInvestment():I.symbol==='WELCORP'?opInvestment():investment()],['business','Business',()=>I.symbol==='HFCL'?hfBusiness():I.symbol==='INDOMIM'?inBusiness():I.symbol==='EXIDEIND'?exBusinessNoDup():I.symbol==='CUMMINSIND'?cuBusiness():I.symbol==='WELCORP'?opBusiness():business()],['financials','Financials',standardFinancials],['execution','Execution',()=>I.symbol==='HFCL'?hfExecution():I.symbol==='INDOMIM'?inExecution():I.symbol==='EXIDEIND'?exExecutionDedup():I.symbol==='CUMMINSIND'?cuExecution():I.symbol==='WELCORP'?opExecution():execution()],['ownership',I.symbol==='INDOMIM'?'Ownership & Governance':'Ownership',()=>I.symbol==='INDOMIM'?inOwnership():I.symbol==='EXIDEIND'?exOwnershipNoDup():I.symbol==='CUMMINSIND'?cuOwnership():ownership()],['risks','Risks',()=>I.symbol==='HFCL'?hfRisks():I.symbol==='INDOMIM'?inRisks():I.symbol==='EXIDEIND'?exRisksNoDup():I.symbol==='CUMMINSIND'?cuRisks():I.symbol==='WELCORP'?opRisks():risks()],['peers',I.symbol==='INDOMIM'?'Industry & Peers':I.symbol==='CUMMINSIND'?'Industry & Valuation':'Peers',()=>I.symbol==='HFCL'?hfPeers():I.symbol==='INDOMIM'?inPeers():I.symbol==='EXIDEIND'?exPeers():I.symbol==='CUMMINSIND'?cuPeers():I.symbol==='WELCORP'?opPeers():peers()],['listing','Offer & Listing',()=>I.symbol==='INDOMIM'?inListing():listing()],['verdict','Verdict',inVerdict],['stage','Stage Analysis',stage]];
 const HANDLERS={
-case:coverageCase,business,financials:coverageFinancials,execution:coverageExecution,ownership:coverageOwnership,risks:coverageRisks,peers,listing:coverageListing,verdict:coverageVerdict,stage,themes:themeIntelligence,concallHighlights,
-deepDiveCase:coverageCase,deepDiveBusiness:hfBusiness,deepDiveFinancials:hfFinancialsRich,deepDiveExecution:hfExecution,deepDiveRisks:hfRisks,deepDivePeers:peers,
-deepDiveTelecomCase:hfInvestment,deepDiveTelecomBusiness:hfBusiness,deepDiveTelecomFinancials:hfFinancialsRich,deepDiveTelecomExecution:hfExecution,deepDiveTelecomRisks:hfRisks,deepDiveTelecomPeers:hfPeers,
-transitionCase:exInvestmentNoDup,transitionBusiness:exBusinessNoDup,transitionFinancials:exFinancials,transitionExecution:exExecutionDedup,transitionOwnership:exOwnershipNoDup,transitionRisks:exRisksNoDup,transitionPeers:exPeers,
-segmentCase:cuInvestment,segmentBusiness:cuBusiness,segmentFinancials:cuFinancials,segmentExecution:cuExecution,segmentOwnership:cuOwnership,segmentRisks:cuRisks,segmentPeers:cuPeers,segmentVerdict:cuVerdict,
-    drhpCase:inInvestment,drhpBusiness:drhpBusinessGeneric,drhpFinancials:drhpFinancialsGeneric,drhpExecution:inExecution,drhpOwnership:inOwnership,drhpRisks:inRisks,drhpPeers:inPeers,drhpListing:inListing,drhpVerdict:inVerdictDrhp,
+case:coverageCase,business,financials:standardFinancials,execution:coverageExecution,ownership:coverageOwnership,risks:coverageRisks,peers,listing:coverageListing,verdict:coverageVerdict,stage,themes:themeIntelligence,concallHighlights,
+deepDiveCase:coverageCase,deepDiveBusiness:hfBusiness,deepDiveFinancials:standardFinancials,deepDiveExecution:hfExecution,deepDiveRisks:hfRisks,deepDivePeers:peers,
+deepDiveTelecomCase:hfInvestment,deepDiveTelecomBusiness:hfBusiness,deepDiveTelecomFinancials:standardFinancials,deepDiveTelecomExecution:hfExecution,deepDiveTelecomRisks:hfRisks,deepDiveTelecomPeers:hfPeers,
+transitionCase:exInvestmentNoDup,transitionBusiness:exBusinessNoDup,transitionFinancials:standardFinancials,transitionExecution:exExecutionDedup,transitionOwnership:exOwnershipNoDup,transitionRisks:exRisksNoDup,transitionPeers:exPeers,
+segmentCase:cuInvestment,segmentBusiness:cuBusiness,segmentFinancials:standardFinancials,segmentExecution:cuExecution,segmentOwnership:cuOwnership,segmentRisks:cuRisks,segmentPeers:cuPeers,segmentVerdict:cuVerdict,
+    drhpCase:inInvestment,drhpBusiness:drhpBusinessGeneric,drhpFinancials:standardFinancials,drhpExecution:inExecution,drhpOwnership:inOwnership,drhpRisks:inRisks,drhpPeers:inPeers,drhpListing:inListing,drhpVerdict:inVerdictDrhp,
     drhpGenericCase:drhpInvestmentGeneric,drhpGenericExecution:drhpExecutionGeneric,
     drhpGenericRisks:drhpRisksGeneric,drhpGenericPeers:drhpPeersGeneric,drhpGenericListing:drhpListingWithAnchors,
-opInvestment,opBusiness,opFinancials,opExecution,opRisks,opPeers
+opInvestment,opBusiness,opFinancials:standardFinancials,opExecution,opRisks,opPeers
 };
 const legacyTabs=allTabs.filter(t=>t[0]!=='listing'||(!M.stock&&P.ipo?.summary?.Symbol)).filter(t=>t[0]!=='ownership'||P.coverage.drhp||['EXIDEIND','CUMMINSIND'].includes(I.symbol)).filter(t=>t[0]!=='verdict'||R.verdict||I.symbol==='CUMMINSIND');
 const tabs=PM?A(PM.sections).map(s=>[s.id,s.label,HANDLERS[s.renderer]||HANDLERS[s.id]||(()=>'<div class="empty">This module has no compatible renderer.</div>')]):legacyTabs;
@@ -1260,7 +1691,64 @@ function devBind(){
     btn.textContent = open ? 'Show less' : ('Show '+rows.length+' more');
   });
 }
-function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+devSection()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};links.forEach(a=>a.onclick=()=>setActive(a.dataset.section));addEventListener('scroll',sync,{passive:true});let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);setTimeout(reveal,350);setTimeout(reveal,1800)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
+function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+devSection()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};/* A DIRECT TAB CLICK IS THE READER'S EXPLICIT CHOICE, so it becomes the sticky preference that
+   follows them across symbols (and replaces any earlier one). Recorded here rather than only at the
+   explorer click, so that picking a tab AFTER landing on a new company is what carries forward --
+   otherwise the preference would still hold whatever was chosen two companies ago. */
+links.forEach(a=>a.onclick=()=>{window.__KEEP_SECTION__=a.dataset.section;setActive(a.dataset.section)});/* ONE SCROLL-SPY, NOT ONE PER RENDER. `addEventListener('scroll',sync)` ran on every render with no
+   removal, so after N symbol switches N live listeners each called setActive on every scroll event --
+   a leak that also made the restore below fight N-1 stale spies. The previous render's listener is
+   detached first; `window.__SYNC__` survives the re-execution for the same reason __KEEP_SECTION__ does. */
+if(window.__SYNC__)removeEventListener('scroll',window.__SYNC__);window.__SYNC__=sync;addEventListener('scroll',sync,{passive:true});
+/* RESTORE THE PLACE THE EXPLORER CLICK RECORDED, BEFORE falling back to the first tab. A hash still
+   wins -- it is an explicit request for one section and the reader typed or followed it.
+   THE PREFERENCE IS STICKY, NOT CONSUMED (owner 2026-09-18, after testing New Listing: "when I
+   selected stage analysis for one symbol and i click on another symbol ... it changes sub nav
+   selection"). It was consumed on use, which is right on a screen where every company has the same
+   sections and wrong on New Listing, where MEASURED only 65 of 297 indexed symbols (22%) carry a
+   `stage` section at all -- they are fresh listings with no price history. So four times out of
+   five the held tab did not exist on the next company, the fallback fired, and because the
+   preference had been deleted it was gone for good: the reader had to re-pick Stage on every
+   company that had it. It now SURVIVES a company that lacks the section and re-applies on the next
+   one that has it. Momentum was never affected (267 of 267 carry `stage`), which is why it tested
+   clean while New Listing did not.
+   `__KEEP_SCROLL__` IS still consumed -- a scroll offset is only meaningful for the switch that
+   recorded it, and re-applying a stale one to a later, shorter page would land nowhere.
+   The preference is cleared when the reader picks a tab directly (see the nav onclick above), so it
+   only ever tracks their LAST explicit choice, and it is per-page: nothing is persisted across a
+   reload or a fresh load, which must still open on the natural first section. */
+let keep=window.__KEEP_SECTION__,keepY=window.__KEEP_SCROLL__;delete window.__KEEP_SCROLL__;
+/* CANCEL THE PREVIOUS RENDER'S REVEAL TIMERS. The hash branch below schedules scrollIntoView at
+   350ms and 1800ms to survive late layout. Those timers outlive a symbol switch: the reader clicks
+   a tab (hash='#peers'), clicks a new symbol 200ms later, and the OLD render's 1800ms reveal then
+   fires against the NEW page and yanks the reader to that section -- overriding the restore below
+   and landing at a position neither render intended. Traced: restore() correctly set 1604 three
+   times, then a stale reveal() drove it to 3180. The handles live on window because each render is
+   a fresh execution of this file and cannot see the previous closure. */
+if(window.__REVEAL_T__)window.__REVEAL_T__.forEach(clearTimeout);window.__REVEAL_T__=[];
+let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);window.__REVEAL_T__.push(setTimeout(reveal,350),setTimeout(reveal,1800))}else if(keep&&parts.some(x=>x.id===keep)){/* Repaint the tab, then put the reader back where they were. The scroll must be restored AFTER
+   layout settles or the document is still the old height and the call lands short; rAF plus a late
+   pass mirrors the hash branch above. `sync` would otherwise immediately overwrite the active class
+   from the scroll position, so setActive runs last in each pass. *//* RESTORE INSTANTLY, NOT SMOOTHLY. The page sets `html{scroll-behavior:smooth}`, so a plain
+   scrollTo ANIMATES: each of the three passes below re-triggers the animation from wherever the
+   last one had reached, and the scroll-spy repaints the active tab mid-flight from whatever
+   section is passing under the marker. Measured: 1604 -> drifting -> 3180, i.e. it overshot by a
+   full section and the tab followed it. `behavior:'instant'` jumps, so the passes are idempotent
+   and the spy sees the final position only.
+   The spy is also silenced for the duration: it fires on the programmatic scroll itself and would
+   otherwise overwrite `keep` with whatever the marker lands on. */
+/* BRING THE SECTION INTO VIEW -- DO NOT REPLAY THE PIXEL OFFSET (owner 2026-09-18: "page is still
+   not on stage analysis, the option is selected, but i have to click on stage analysis").
+   Restoring the raw scrollY was wrong the moment the two companies differ in length, which is
+   almost always: y=4325 put ESDS's Stage section 119px below the top of the viewport, and the same
+   4325 on MVELECTRO put it 500px ABOVE it -- off-screen. The tab read as selected while the reader
+   was looking at a different part of the page and had to click the tab to actually get there.
+   The SECTION is the thing to restore, not the number. `scroll-margin-top` is already declared on
+   `.vertical-section` (calc(var(--nav1-h) + 54px)), so scrollIntoView lands it below the sticky
+   navs rather than under them. `block:'start'` is explicit because the default varies once a
+   scroll-margin is in play. Falls back to the offset only if the element has somehow gone. */
+let restore=()=>{let el=document.getElementById(keep);if(el){try{el.scrollIntoView({behavior:'instant',block:'start'})}catch(e){el.scrollIntoView(true)}}else if(typeof keepY==='number'){try{scrollTo({top:keepY,behavior:'instant'})}catch(e){scrollTo(0,keepY)}}setActive(keep)};
+removeEventListener('scroll',sync);restore();requestAnimationFrame(restore);setTimeout(()=>{restore();addEventListener('scroll',sync,{passive:true})},350)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
 function render(){devBind();let app=document.getElementById('store-company');if(P.layout==='vertical')return renderVertical(app);app.innerHTML=hero()+devSection()+'<div class="research-shell"><div class="tabbar" role="tablist" aria-label="Company research">'+tabs.map((t,i)=>'<button role="tab" tabindex="'+(i?-1:0)+'" data-tab="'+t[0]+'" aria-selected="'+(i===0)+'">'+t[1]+'</button>').join('')+'</div>'+tabs.map((t,i)=>'<section class="tab-panel" role="tabpanel" id="'+t[0]+'" '+(i?'hidden':'')+'><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('')+'</div>';let activate=id=>{let active;document.querySelectorAll('[data-tab]').forEach(b=>{let on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on)active=b});document.querySelectorAll('.tab-panel').forEach(p=>p.hidden=p.id!==id);history.replaceState(null,'','#'+id);if(active&&matchMedia('(max-width:760px)').matches)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};let buttons=[...document.querySelectorAll('[data-tab]')];buttons.forEach((b,i)=>{b.onclick=()=>activate(b.dataset.tab);b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;let n=(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();activate(buttons[n].dataset.tab)}});let hash=location.hash.slice(1);if(tabs.some(t=>t[0]===hash))activate(hash);initStage()}
 /* Listing pages must not turn evidence blobs into public prose. */
 

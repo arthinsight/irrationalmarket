@@ -708,6 +708,27 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   }
   function val(id){var e=document.getElementById(id);return e?e.value:'';}
   function minOK(v,id){var t=num(val(id));return t===null||t===undefined||val(id)===''?true:(num(v)!==null&&num(v)>=t);}
+  /* Does this pipe-joined cell list `want` as one of its entries? Compared entry-by-entry rather
+     than with indexOf, so 'HDFC' cannot match 'HDFC Mutual Fund' and hand back the wrong IPOs. */
+  function hasPiped(cell,want){
+    if(!cell||!want)return false;
+    var parts=String(cell).split('|');
+    for(var i=0;i<parts.length;i++)if(parts[i].trim()===want)return true;
+    return false;
+  }
+  /* The DISTINCT ENTRIES across every pipe-joined cell -- one option per anchor house, not one per
+     IPO's combination of them. `uniq()` above cannot be reused: it keys on the whole cell value,
+     which is what produced 744 options for 1,013 houses. */
+  function uniqPiped(){
+    var s={},i,j,f,parts;
+    for(i=0;i<ROWS.length;i++)for(j=0;j<arguments.length;j++){
+      f=ROWS[i][arguments[j]];
+      if(!f)continue;
+      parts=String(f).split('|');
+      for(var k=0;k<parts.length;k++){var t=parts[k].trim();if(t)s[t]=1;}
+    }
+    return Object.keys(s).sort(function(a,b){return a.toUpperCase()<b.toUpperCase()?-1:1;});
+  }
   function apply(){
     var q=String(val('f-q')||'').toUpperCase(),al=val('f-al'),lm=val('f-lm'),anc=val('f-anc');
     var out=ROWS.filter(function(r){
@@ -716,7 +737,14 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
       if(q&&(String(r.sym||'')+' '+String(r.co||'')).toUpperCase().indexOf(q)<0)return false;
       if(al&&String(r.al||'')!==al)return false;
       if(lm&&String(r.lm||'')!==lm)return false;
-      if(anc&&String(r.anc||'')!==anc)return false;
+      /* ONE ANCHOR PER OPTION (owner 2026-09-18: "it should be one anchor per option"). `anc` is
+         every anchor house of one IPO joined by '|', so `!==` compared the selected HOUSE against
+         a whole combination and matched only an IPO anchored by that house ALONE. Measured: 744
+         options of which 735 (99%) matched exactly one IPO, while 1,013 real houses existed --
+         HDFC anchored 145 IPOs and selecting it returned 0. Ask whether this IPO's list CONTAINS
+         the house. `own` carries the same pipe shape and the same question, so it gets the same
+         test rather than a second rule. */
+      if(anc&&!hasPiped(r.anc,anc)&&!hasPiped(r.own,anc))return false;
       if(!minOK(r.mc,'f-mc'))return false;
       if(!minOK(r.avt,'f-avt'))return false;
       if(!minOK(r.dd,'f-dd'))return false;
@@ -749,7 +777,9 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
   document.getElementById('nl-head').innerHTML=SCOLS.map(function(c){return '<th>'+esc(c[1])+'</th>';}).join('');
   fetch(UP+'data/sme.json').then(function(r){return r.json();}).then(function(rows){
     ROWS=rows||[];
-    fill('f-lm',uniq('lm'));fill('f-anc',uniq('anc'));
+    // Anchor options are the INDIVIDUAL houses (and the owners behind them, which the filter also
+    // matches per owner 2026-07-12 "search Kacholia -> his IPOs"), never an IPO's whole combination.
+    fill('f-lm',uniq('lm'));fill('f-anc',uniqPiped('anc','own'));
     seg('f-exch','exch');seg('f-board','board');
     ['f-q','f-al','f-lm','f-anc','f-mc','f-avt','f-dd','f-rfl'].forEach(function(id){
       var e=document.getElementById(id);if(e)e.addEventListener(e.tagName==='INPUT'?'input':'change',apply);});
@@ -1235,7 +1265,7 @@ function runRenderer(){
   // repaints #store-company. The file is cached after the first load, so a switch costs no network
   // beyond the company JSON itself.
   var script=document.createElement('script');
-  script.src='../../company_renderer.js?v=cca3df529e';
+  script.src='../../company_renderer.js?v=7947528c37';
   document.body.appendChild(script);
 }
 function buildPayload(company,explorer,extra,row,selected){
