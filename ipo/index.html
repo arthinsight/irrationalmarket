@@ -21,7 +21,15 @@
 .anch-btn:hover{background:#dbeafe}
 .anch-btn:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
 .anch-btn-file{border-color:#e2e8f0;background:#f8fafc;color:#475569}
-.anch-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+/* z-index 300 CLEARS THE SHARED NAV, which outranks this page's own stylesheet at RUNTIME (owner
+   2026-09-21, "the pop close on mobile is behind the top sub nav and nav"). `public_nav.js` injects
+   `@media(max-width:700px){.site-header{z-index:220!important}}` so its search dropdown (260) can
+   escape the header — measured on the LIVE page, where `elementsFromPoint` at the close button's
+   centre returns the header's search INPUT above `.anch-close`. This template declares 100 for the
+   header, so the defect is invisible in the local template and appears only once the shared script
+   has run: a dialog must outrank the chrome it covers, and the nav's numbers are the ones to beat.
+   300 > 260 (the dropdown) > 220 (the header). */
+.anch-modal{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:20px}
 .anch-modal[hidden]{display:none}
 .anch-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.45)}
 /* THE PANEL DOES NOT SCROLL; ITS BODY DOES (owner 2026-09-21: "the pop close on mobile is behind
