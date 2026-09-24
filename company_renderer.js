@@ -474,12 +474,39 @@ const productsLegacy=v=>A(v).filter(x=>x&&!Array.isArray(x.rows));
 function productsBlock(v,legacyHtml){return gridTables(v)+(legacyHtml||'');}
 /* Legacy `{name, pct_by_fy}` entries still exist on ~265 instances and must keep rendering, so
    `mixTable` handles BOTH shapes: the grids first, then the legacy rows if any remain. */
+/* PERIOD-KEYED FACTS SHOW EVERY PERIOD THE FILING REPORTS (2026-09-24 render audit).
+   The mix and concentration tables hard-coded `FY2024 | FY2025 | FY2026`, so any other period was
+   silently dropped. Measured over the store: 1,413 period values across 1,751 legacy mix entries
+   (FY23 x725, H1FY26 x361, 9MFY26 x71...), and 13 cohort concentration cards. SPECTRAA's
+   FY2026 column was blank while its H1FY26 held 12.06 / 44.08 / 63.88.
+   `series` is [[row label, {period: value}], ...]. The periods are the union the data carries,
+   and `tableByPeriod` folds FY24/FY2024 into one column and sorts oldest to newest with interim
+   periods after their full year - the same function every financial table already uses. */
+function byFyTable(first,series,fmt){
+    fmt=fmt||(v=>N(v,1)+'%');
+    const live=series.filter(s=>s[1]&&typeof s[1]==='object'&&!Array.isArray(s[1])&&Object.keys(s[1]).length);
+    if(!live.length)return'';
+    const periods=[...new Set(live.flatMap(s=>Object.keys(s[1])))];
+    const rows=periods.map(p=>[p].concat(live.map(s=>{const v=s[1][p];return v==null||v===''?'—':fmt(v)})));
+    return tableByPeriod([first].concat(live.map(s=>E(s[0]))),rows);
+}
+const gridsOf=v=>A(v).filter(x=>x&&Array.isArray(x.rows));
+const plainObj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:null;
 function mixTable(rows){
     const grids=gridTables(rows);
     const legacy=A(rows).filter(x=>x&&!Array.isArray(x.rows)&&(x.name!=null||x.pct_by_fy!=null));
-    let pct=(x,short,long)=>{let v=x.pct_by_fy?.[short];if(v==null)v=x.pct_by_fy?.[long];return v==null?'—':N(v,1)+'%'};
-    const legacyHtml=legacy.length?table(['Revenue mix','FY2024','FY2025','FY2026'],legacy.map(x=>[E(x.name),pct(x,'FY24','FY2024'),pct(x,'FY25','FY2025'),pct(x,'FY26','FY2026')])):'';
-    return grids+legacyHtml;
+    return grids+byFyTable('Revenue mix',legacy.map(x=>[x.name,x.pct_by_fy]));
+}
+/* Customer AND supplier concentration, in either stored shape. 30 cohort companies store named
+   keys (`top1_pct_by_fy` ...) and 7 store a captured table; the card read only the keys, so the
+   7 rendered nothing. Top 3 is now a row too - 17 companies carry it and it was never shown. */
+function concentrationBlock(cc,sc){
+    const c=plainObj(cc)||{},s=plainObj(sc)||{};
+    return byFyTable('Concentration',[['Top customer',c.top1_pct_by_fy],['Top three customers',c.top3_pct_by_fy],
+        ['Top five customers',c.top5_pct_by_fy],['Top ten customers',c.top10_pct_by_fy],
+        ['Top supplier',s.top1_pct_by_fy],['Top three suppliers',s.top3_pct_by_fy],
+        ['Top five suppliers',s.top5_pct_by_fy],['Top ten suppliers',s.top10_pct_by_fy]])
+        +gridTables(cc)+gridTables(sc);
 }
 function rsAmount(value){let amount=Number(value);if(!Number.isFinite(amount))return'—';return Math.abs(amount)>100000?'₹'+N(amount/10000000,2)+' cr':'₹'+N(amount,0)}
 /* WE STORE IN RUPEES AND RENDER IN CRORE (owner, 2026-09-19).
@@ -553,8 +580,38 @@ function drhpBusinessGeneric(){
     if(A(b.revenue_split_product).length)cards+=card('Revenue mix by product group',mixTable(b.revenue_split_product));
     if(endMarkets.length)cards+=card('Revenue mix by customer industry',mixTable(endMarkets));
     if(tenure.length)cards+=card('Customer mix by tenure',mixTable(tenure));
-    let cc=b.customer_concentration||{},sc=b.supplier_concentration||{},pct=(obj,key,fy)=>obj[key]?.[fy],concRows=[['Top customer',cc,'top1_pct_by_fy'],['Top five customers',cc,'top5_pct_by_fy'],['Top ten customers',cc,'top10_pct_by_fy'],['Top supplier',sc,'top1_pct_by_fy'],['Top five suppliers',sc,'top5_pct_by_fy'],['Top ten suppliers',sc,'top10_pct_by_fy']].filter(x=>['FY24','FY25','FY26'].some(fy=>pct(x[1],x[2],fy)!=null)).map(x=>[E(x[0]),...['FY24','FY25','FY26'].map(fy=>pct(x[1],x[2],fy)==null?'—':N(pct(x[1],x[2],fy),1)+'%')]);
-    if(concRows.length)cards+=card('Customer and supplier concentration',table(['Concentration','FY2024','FY2025','FY2026'],concRows));
+    let concHtml=concentrationBlock(b.customer_concentration,b.supplier_concentration);
+    if(concHtml)cards+=card('Customer and supplier concentration',concHtml);
+    // FIVE FIELDS THIS RENDERER NEVER READ (2026-09-24 render audit), so they were extracted,
+    // gated and invisible: operating_kpi_grid (47 companies), revenue_split_geography,
+    // domestic_export_mix, order_book, employees. Each takes both stored shapes - a captured grid,
+    // or the older named keys. `certifications` and `strengths_stated` stay OFF this section by
+    // owner decision: certifications is on the 4f0 exclusion list, and strengths belong to the
+    // Moat card (R1).
+    if(A(b.revenue_split_geography).length){let g=mixTable(b.revenue_split_geography);if(g)cards+=card('Geographic revenue mix',g);}
+    let dx=b.domestic_export_mix,dxHtml=gridTables(dx);
+    if(plainObj(dx))dxHtml+=byFyTable('Revenue by market',[['Domestic',dx.domestic_pct_by_fy],['Export',dx.export_pct_by_fy]]);
+    if(dxHtml)cards+=card('Domestic and export revenue',dxHtml);
+    // A KPI grid that repeats at least half the rows of a table already on this section is not
+    // shown again: 7 of 165 stored KPI grids overlap a revenue-split or capacity table that way.
+    let rowKeys=g=>g.rows.filter(r=>A(r).slice(1).some(c=>String(c==null?'':c).trim())).map(r=>JSON.stringify(r));
+    let seenRows=new Set(['revenue_split_product','revenue_split_geography','capacity_utilization','plants','products','customer_concentration','supplier_concentration','domestic_export_mix'].flatMap(f=>gridsOf(b[f]).flatMap(rowKeys)));
+    let kpiHtml=gridsOf(b.operating_kpi_grid).filter(g=>{let k=rowKeys(g);return !k.length||k.filter(x=>seenRows.has(x)).length*2<k.length}).map(g=>gridTable(g)).join('');
+    if(kpiHtml)cards+=card('Operating metrics',kpiHtml);
+    let ob=b.order_book,obHtml=gridTables(ob);
+    if(plainObj(ob)){
+        let tiles=[];
+        if(ob.value_lakhs!=null&&isFinite(Number(ob.value_lakhs)))tiles.push({label:'Order book'+(ob.as_of?' as of '+ob.as_of:''),value:'₹'+N(Number(ob.value_lakhs)/100,2)+' cr'});
+        if(ob.unexecuted_pct!=null&&isFinite(Number(ob.unexecuted_pct)))tiles.push({label:'Unexecuted',value:N(ob.unexecuted_pct,1)+'%'});
+        obHtml+=kpis(tiles);
+        let byFy=plainObj(ob.value_lakhs_by_fy);
+        if(byFy)obHtml+=byFyTable('Order book',[['Order book (₹ cr)',Object.fromEntries(Object.entries(byFy).map(([k,v])=>[k,Number(v)/100]))]],v=>N(v,2));
+    }
+    if(obHtml)cards+=card('Order book',obHtml);
+    let em=b.employees,emHtml=gridTables(em);
+    if(plainObj(em)){let t=[em.total,em.total_headcount,em.permanent_employees,em.permanent].find(x=>x!=null&&x!==''&&isFinite(Number(x)));
+        if(t!=null)emHtml+=kpis([{label:'Employees'+(em.as_of?' as of '+em.as_of:''),value:N(t,0)}]);}
+    if(emHtml)cards+=card('Employees',emHtml);
     if(A(b.capacity_utilization).length)cards+=card('Capacity utilisation by resource',capacity);
     // Grids first: a captured facility register has no `role`, so the `operating` filter above
     // discards it and this card was silently OMITTED rather than blank — HEROMOTORS p279's six
@@ -1362,7 +1419,7 @@ function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o
    `deployment`, `capacity_changes` and `orders_not_placed` are Execution facts (a deployment
    SCHEDULE and a capacity delta, not an amount split) and are unconditionally kept. */
 function objectsRenderElsewhere(){return PM?A(PM.sections).some(s=>s.id==='listing'):false}
-function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let schedule=table(['Equipment / infrastructure','FY2027','FY2028'],deployment.map(x=>[E(x.item),rsAmount(x.amount_rs_by_fy?.FY27),rsAmount(x.amount_rs_by_fy?.FY28)]));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
+function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let fys=[...new Set(deployment.flatMap(x=>Object.keys(x.amount_rs_by_fy||{})))].sort();let schedule=table(['Object of the offer'].concat(fys.map(f=>E(f))),deployment.map(x=>[E(x.item)].concat(fys.map(f=>x.amount_rs_by_fy?.[f]==null?'—':rsAmount(x.amount_rs_by_fy[f])))));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
 function drhpRisksGeneric(){let rows=drhpRiskRows();if(!rows.length)return'<div class="empty">No company-specific risk disclosures are stored.</div>';return'<p class="method-note">Showing the most company-specific, evidence-backed risks. The complete risk register remains stored for audit.</p><div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(concise(x.title||x.risk||value(x),220))+'</h3><p>'+E(concise(x.detail||x.note||'',260))+'</p></div></article>').join('')+'</div>'}
 function drhpPeersGeneric(){let ip=sec('industry_peers'),sk=Q.sk||{},pp=Q.peer_panel||P.peers||{},facts=A(ip.other_material_facts).map(x=>x.value||x),position=[ip.market_position?.positioning,ip.market_position?.basis].filter(Boolean),metrics=A(sk.market_size||sk.cagrs),drivers=A(sk.drivers||sk.growth_drivers),peers=A(ip.peers_drhp).length?A(ip.peers_drhp):A(pp.peers);let peerRows=peers.map(x=>[E(x.name||x.company||x.s),E(x.fy||x.period||'—'),x.revenue_cr==null&&x.rev==null?'—':N(x.revenue_cr??x.rev,2),x.ebitda_margin==null?'—':N(x.ebitda_margin,2)+'%',x.pe==null?'—':N(x.pe,2)+'x']);let cards='';if(position.length||facts.length)cards+=card('Industry position',list([...position,...facts],8),'positive');if(metrics.length)cards+=card('Market size and growth',list(metrics,8));if(drivers.length)cards+=card('Growth drivers',list(drivers,8));if(peerRows.length)cards+=card('Disclosed and operating peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">Industry evidence is not yet structured for this filing.</div>'}
 function drhpListingWithAnchors(){let html=drhpListingGeneric(),anchors=anchorCard();if(!anchors)return html;let at=html.lastIndexOf('</div>');return at<0?html+anchors:html.slice(0,at)+anchors+html.slice(at)}
