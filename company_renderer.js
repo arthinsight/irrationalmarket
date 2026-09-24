@@ -371,7 +371,116 @@ function hfExecution(){let w=D.wtt||{},track=D.track||{},cap=table(['Milestone',
 function hfRisks(){let risk=ddBlock('bull_bear','risks'),tone=ddBlock('bull_bear','management quality'),rows=[{title:'Thesis risks',detail:risk.body},{title:'Management framing risk',detail:tone.body},{title:'Balance-sheet and working-capital pressure',detail:'Receivable days '+((D.ratios||[]).find(x=>x.label==='Receivable d')?.value||'—')+' and inventory days '+((D.ratios||[]).find(x=>x.label==='Inventory d')?.value||'—')+' keep cash conversion and funding cost central to the thesis.'},{title:'Execution credibility',detail:(D.wtt?.summary||'')+' The page should underwrite delivery, not merely the size of the opportunity.'}];return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title)+'</h3><p>'+E(x.detail)+'</p></div></article>').join('')+'</div>'}
 function hfPeers(){let pp=D.peer_panel||{},all=[pp.target,...A(pp.peers)].filter(Boolean),groups={};all.forEach(x=>(groups[x.s===I.symbol?I.symbol:(x.group||'Reference')]??=[]).push(x));return'<div class="stack">'+Object.keys(groups).map(g=>card(g,table(['Company','FY','Revenue ₹cr','Growth','EBITDA margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],groups[g].map(x=>[E(x.name),E(x.fy),N(x.rev,0),x.rev_growth==null?'—':N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),x.pat_growth==null?'—':N(x.pat_growth,1)+'%',x.pe==null?'—':N(x.pe,1)+'x',N(x.mcap,0)])))).join('')+'<p class="method-note">'+E(I.symbol)+' is shown separately. Stored operating peer groups remain distinct lenses rather than one blended reference set.</p></div>'}
 function inInvestment(){let f=sec('financials'),b=sec('business_ops'),ip=sec('industry_peers'),v=sec('verdict'),last=A(f.pnl_3yr).at(-1)||{},cf=A(f.cash_flow).at(-1)||{},rr=A(f.return_ratios).at(-1)||{},mix=b.domestic_export_mix?.export_pct_by_fy||{},cc=b.customer_concentration?.top10_pct_by_fy||{};let facts=[{label:'Global MIM share',value:N(ip.market_position?.share_pct,1)+'%'},{label:'Revenue',value:crMoney(last,'revenue')},{label:'PAT',value:crMoney(last,'pat')},{label:'Operating cash flow',value:crMoney(cf,'cfo')},{label:'RoNW',value:N(rr.ronw_pct,1)+'%'},{label:'Export revenue',value:N(mix.FY2026,1)+'%'},{label:'Top-10 customers',value:N(cc.FY2026,1)+'%'}];return kpis(facts)+card('Our read','<p>'+E(v.our_read)+'</p>','inference-card')}
-function mixTable(rows){let pct=(x,short,long)=>{let v=x.pct_by_fy?.[short];if(v==null)v=x.pct_by_fy?.[long];return v==null?'—':N(v,1)+'%'};return table(['Revenue mix','FY2024','FY2025','FY2026'],A(rows).map(x=>[E(x.name),pct(x,'FY24','FY2024'),pct(x,'FY25','FY2025'),pct(x,'FY26','FY2026')]))}
+/* THE CAPTURED GRID (2026-09-23, owner chose Option A).
+
+   The Our Business extraction stores the table it captured from the filing -- `{rows, source_page,
+   granularity}` -- while every card here reads NAMED keys (`x.name`, `x.pct_by_fy.FY24`,
+   `x.unit_or_product`). Neither key exists on a grid, so 89 POPULATED field-instances across
+   `revenue_split_product`, `revenue_split_geography` and `capacity_utilization` rendered a header
+   and a row of em-dashes: a card that says "we looked and there is nothing", over data we hold.
+
+   The alternative was to project each grid down to the legacy keys. Measured over all 157 grid
+   instances it preserves 2,089 of 8,941 cells (23%) and leaves 62 tables (39%) EMPTY ANYWAY --
+   SKOFFSET p180 recovers ZERO of 43, because the filing heads its percentage column `%` instead
+   of writing `90.92%`. So the renderer learns the grid instead, and every captured cell lands. */
+
+/* A HEADER IS A BAND, NOT A ROW. JSIPL p172's header is three physical rows deep
+   (`Particulars | For the Period | Fiscal 2026` / `| Ended | June 30,` / `| 2026`), so reading
+   row 0 alone labels a column `For the Period` and loses the period it names. The band ends at
+   the first row that carries a LABEL plus figures -- the same test `bops_signatures._header_key`
+   uses, and for the same reason: a spanning year row has an empty first cell, a data row names
+   something there. */
+const gridBand=rows=>{
+    let n=0;
+    for(let i=0;i<Math.min(4,rows.length);i++){
+        const r=rows[i]||[],label=String(r[0]==null?'':r[0]).trim();
+        const vals=r.slice(1).map(c=>String(c==null?'':c).trim()).filter(Boolean);
+        /* A SERIAL NUMBER IN COLUMN 0 OPENS THE DATA, whatever the other cells hold. Requiring
+           every value to be numeric was wrong and cost two companies their whole table:
+           POOJALOGIS p134 row `1. | Owned | 13 | 55 | 289` carries the word `Owned`, so the row
+           read as header, the band grew to cover the entire 3-row grid, and `gridTable` found no
+           body. PANCHATV p143 is the same shape. A row numbered `1.` is never a header. */
+        if(/^\d{1,3}[.)]?$/.test(label))break;
+        if(label&&vals.length&&vals.every(c=>/^[\d,.%()\s-]+$/.test(c)))break;
+        n++;
+    }
+    /* Never let the band eat the whole grid: if every row looked like a header, the LAST row is
+       the data. A table with no body at all is refused by `gridTable` on its own. */
+    return Math.min(Math.max(1,n),Math.max(1,rows.length-1));
+};
+/* Join the band down each column. A blank cell inherits nothing, so `%` under `Fiscal 2026`
+   becomes `Fiscal 2026 %` and the two `%` columns of SKOFFSET p180 stop reading identically. */
+const gridHeader=rows=>{
+    const band=gridBand(rows),width=Math.max(...rows.map(r=>r.length));
+    const out=[];
+    for(let c=0;c<width;c++){
+        const parts=[];let carry='';
+        for(let r=0;r<band;r++){
+            const cell=String((rows[r]||[])[c]==null?'':(rows[r]||[])[c]).trim();
+            if(cell)parts.push(cell);
+        }
+        /* A spanning label sits in the FIRST column of its group and the columns it covers are
+           blank on that row, so walk left for the nearest non-empty cell on row 0. */
+        if(!parts.length||!String((rows[0]||[])[c]||'').trim()){
+            for(let k=c-1;k>=0;k--){const v=String((rows[0]||[])[k]||'').trim();if(v){carry=v;break}}
+        }
+        const joined=(carry&&parts.length&&parts[0]!==carry?[carry].concat(parts):parts).join(' ');
+        out.push(joined.replace(/\s+/g,' ').trim());
+    }
+    return out;
+};
+/* Render a captured grid as the filing printed it. All-empty columns are dropped: a PDF uses
+   them for layout (JSIPL p172 column 2, GLASSWALL p29), and rendering one produces a column of
+   blanks that reads as missing data. */
+function gridTable(grid,maxVisibleRows=12){
+    if(!grid||!Array.isArray(grid.rows)||!grid.rows.length)return'';
+    const rows=grid.rows,band=gridBand(rows),head=gridHeader(rows);
+    const body=rows.slice(band).filter(r=>r&&r.some(c=>String(c==null?'':c).trim()));
+    if(!body.length)return'';
+    const width=Math.max(head.length,...body.map(r=>r.length));
+    const keep=[];
+    for(let c=0;c<width;c++){
+        const hasHead=!!String(head[c]||'').trim();
+        const hasData=body.some(r=>String(r[c]==null?'':r[c]).trim());
+        if(hasHead||hasData)keep.push(c);
+    }
+    if(!keep.length)return'';
+    const h=keep.map(c=>String(head[c]||'').trim()||'—');
+    const cells=body.map(r=>keep.map(c=>E(String(r[c]==null?'':r[c]).trim())||'—'));
+    const page=grid.source_page?'<p class="method-note">Source: page '+E(grid.source_page)+' of the filing.</p>':'';
+    return table(h,cells,maxVisibleRows)+page;
+}
+/* Every grid a field holds, in page order. A field can carry several (HEROMOTORS has six
+   `revenue_split_product` grids), and decision 8.2 is that we KEEP THEM ALL. */
+const gridTables=v=>A(v).filter(x=>x&&Array.isArray(x.rows)).map(x=>gridTable(x)).filter(Boolean).join('');
+/* THE MANUFACTURING FOOTPRINT takes grids too, and was missed on the first pass. HEROMOTORS p279
+   is `S. No. | Facility | Description of Operations` listing six sites across India, the UK and
+   Thailand; it reached the payload and still rendered em-dashes because this card read
+   `x.location`, `x.role` and `x.ownership`, none of which exist on a grid. */
+function plantsTable(v){
+    const grids=gridTables(v);
+    const legacy=A(v).filter(x=>x&&!Array.isArray(x.rows));
+    if(!legacy.length)return grids;
+    const city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};
+    return grids+table(['Location','Facility','Tenure'],legacy.map(x=>[E(city(x)),E(x.role),E(x.ownership||'—')]));
+}
+/* THE PRODUCT CARDS take grids too. A catalogue captured as `Product | Description` reaches
+   `products` as `{rows, source_page}`, and both card mappings read `x.category` / `x.items`, so
+   a captured catalogue drew an EMPTY card - the same shape defect as `plants`, found the same
+   week. Grids render as the filing printed them; the legacy `{category, items, note}` entries
+   keep their cards. Each call site passes its own legacy markup so the two card styles stay
+   where they were. */
+const productsLegacy=v=>A(v).filter(x=>x&&!Array.isArray(x.rows));
+function productsBlock(v,legacyHtml){return gridTables(v)+(legacyHtml||'');}
+/* Legacy `{name, pct_by_fy}` entries still exist on ~265 instances and must keep rendering, so
+   `mixTable` handles BOTH shapes: the grids first, then the legacy rows if any remain. */
+function mixTable(rows){
+    const grids=gridTables(rows);
+    const legacy=A(rows).filter(x=>x&&!Array.isArray(x.rows)&&(x.name!=null||x.pct_by_fy!=null));
+    let pct=(x,short,long)=>{let v=x.pct_by_fy?.[short];if(v==null)v=x.pct_by_fy?.[long];return v==null?'—':N(v,1)+'%'};
+    const legacyHtml=legacy.length?table(['Revenue mix','FY2024','FY2025','FY2026'],legacy.map(x=>[E(x.name),pct(x,'FY24','FY2024'),pct(x,'FY25','FY2025'),pct(x,'FY26','FY2026')])):'';
+    return grids+legacyHtml;
+}
 function rsAmount(value){let amount=Number(value);if(!Number.isFinite(amount))return'—';return Math.abs(amount)>100000?'₹'+N(amount/10000000,2)+' cr':'₹'+N(amount,0)}
 /* WE STORE IN RUPEES AND RENDER IN CRORE (owner, 2026-09-19).
    Every money field in the statement blocks now carries a companion `<field>_amount_rs` holding
@@ -418,7 +527,7 @@ const crMoney=(row,field,d=2)=>{let v=crVal(row,field);return v==null?'—':'₹
 const fyKey=row=>periodLabel(row&&row.fy!=null?row.fy:row&&row.period).label;
 const byFy=rows=>{let m={};A(rows).forEach(r=>{let k=fyKey(r);if(k&&!(k in m))m[k]=r});return m};
 function concise(value,limit=280){let text=String(value||'').replace(/\s+/g,' ').trim();if(text.length<=limit)return text;let cut=text.slice(0,limit),stop=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('; '));if(stop>Math.floor(limit*.55))cut=cut.slice(0,stop+1);else cut=cut.replace(/\s+\S*$/,'');return cut.replace(/[,:;\s]+$/,'')+'…'}
-function inBusiness(){let b=sec('business_ops'),o=sec('overview'),cc=b.customer_concentration||{},sc=b.supplier_concentration||{},products=A(b.products);let prod=products.map(x=>{let note=String(x.note||'').replace(/ supplied in Fiscal 2026/gi,'').replace(/ in Fiscal 2026/gi,'');return'<article class="product-card"><h3>'+E(x.category)+'</h3><p>'+E(A(x.items).join(' · '))+'</p><small>'+E(note)+'</small></article>'}).join('');let concentration=table(['Concentration','FY2024','FY2025','FY2026'],[['Top customer',N(cc.top1_pct_by_fy?.FY2024,1)+'%',N(cc.top1_pct_by_fy?.FY2025,1)+'%',N(cc.top1_pct_by_fy?.FY2026,1)+'%'],['Top five customers',N(cc.top5_pct_by_fy?.FY2024,1)+'%',N(cc.top5_pct_by_fy?.FY2025,1)+'%',N(cc.top5_pct_by_fy?.FY2026,1)+'%'],['Top ten customers',N(cc.top10_pct_by_fy?.FY2024,1)+'%',N(cc.top10_pct_by_fy?.FY2025,1)+'%',N(cc.top10_pct_by_fy?.FY2026,1)+'%'],['Top ten suppliers',N(sc.top10_pct_by_fy?.FY2024,1)+'%',N(sc.top10_pct_by_fy?.FY2025,1)+'%',N(sc.top10_pct_by_fy?.FY2026,1)+'%']]);let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};return'<div class="stack">'+card('How the business makes money','<p>'+E(o.business_model||P.summary.business)+'</p>')+card('Product-group architecture','<div class="product-grid">'+prod+'</div>')+card('Revenue mix by product group',mixTable(b.revenue_split_product))+card('Geographic revenue mix',mixTable(b.revenue_split_geography))+card('Customer and supplier concentration',concentration)+card('Manufacturing footprint',table(['Location','Facility','Tenure'],A(b.plants).map(x=>[E(city(x)),E(x.role),E(x.ownership||'—')])))+card('Vertical integration','<p>'+E(b.supply_chain_integration)+'</p>')+card('Qualification stack',list(b.certifications,12))+'</div>'}
+function inBusiness(){let b=sec('business_ops'),o=sec('overview'),cc=b.customer_concentration||{},sc=b.supplier_concentration||{},products=productsLegacy(b.products);let prod=products.map(x=>{let note=String(x.note||'').replace(/ supplied in Fiscal 2026/gi,'').replace(/ in Fiscal 2026/gi,'');return'<article class="product-card"><h3>'+E(x.category)+'</h3><p>'+E(A(x.items).join(' · '))+'</p><small>'+E(note)+'</small></article>'}).join('');let concentration=table(['Concentration','FY2024','FY2025','FY2026'],[['Top customer',N(cc.top1_pct_by_fy?.FY2024,1)+'%',N(cc.top1_pct_by_fy?.FY2025,1)+'%',N(cc.top1_pct_by_fy?.FY2026,1)+'%'],['Top five customers',N(cc.top5_pct_by_fy?.FY2024,1)+'%',N(cc.top5_pct_by_fy?.FY2025,1)+'%',N(cc.top5_pct_by_fy?.FY2026,1)+'%'],['Top ten customers',N(cc.top10_pct_by_fy?.FY2024,1)+'%',N(cc.top10_pct_by_fy?.FY2025,1)+'%',N(cc.top10_pct_by_fy?.FY2026,1)+'%'],['Top ten suppliers',N(sc.top10_pct_by_fy?.FY2024,1)+'%',N(sc.top10_pct_by_fy?.FY2025,1)+'%',N(sc.top10_pct_by_fy?.FY2026,1)+'%']]);let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};return'<div class="stack">'+card('How the business makes money','<p>'+E(o.business_model||P.summary.business)+'</p>')+card('Product-group architecture',productsBlock(b.products,prod?'<div class="product-grid">'+prod+'</div>':''))+card('Revenue mix by product group',mixTable(b.revenue_split_product))+card('Geographic revenue mix',mixTable(b.revenue_split_geography))+card('Customer and supplier concentration',concentration)+card('Manufacturing footprint',plantsTable(b.plants))+card('Vertical integration','<p>'+E(b.supply_chain_integration)+'</p>')+card('Qualification stack',list(b.certifications,12))+'</div>'}
 function drhpBusinessGeneric(){
     let b=sec('business_ops'),o=sec('overview'),facts=A(b.other_material_facts);
     let evidence=(labels,limit=8)=>facts.filter(x=>labels.includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,260)).filter(Boolean).slice(0,limit);
@@ -427,12 +536,19 @@ function drhpBusinessGeneric(){
     let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};
     let operating=A(b.plants).filter(x=>/(data cent(?:re|er)|manufactur(?:ing|ing facility)|\bplant\b|warehouse|operating facility)/i.test(x.role||''));
     let facility=x=>/data cent(?:re|er)/i.test(x.role||'')?'Data Centre':/manufactur/i.test(x.role||'')?'Manufacturing Facility':/warehouse/i.test(x.role||'')?'Warehouse':'Operating Facility';
-    let capacity=table(['Resource','FY2024','FY2025','FY2026'],A(b.capacity_utilization).map(x=>[E(x.unit_or_product),x.utilization_pct_by_fy?.FY24==null?'—':N(x.utilization_pct_by_fy.FY24,1)+'%',x.utilization_pct_by_fy?.FY25==null?'—':N(x.utilization_pct_by_fy.FY25,1)+'%',x.utilization_pct_by_fy?.FY26==null?'—':N(x.utilization_pct_by_fy.FY26,1)+'%']));
+    // CAPTURED GRIDS FIRST, then the legacy `{unit_or_product, utilization_pct_by_fy}` rows.
+    // 24 of 102 `capacity_utilization` instances are grid-only and rendered a column of
+    // em-dashes; SKOFFSET p180 is the worst of them, a complete three-product table whose
+    // percentages sit under a column headed `%`. See `gridTable`.
+    let capLegacy=A(b.capacity_utilization).filter(x=>x&&!Array.isArray(x.rows));
+    let capacity=gridTables(b.capacity_utilization)
+        +(capLegacy.length?table(['Resource','FY2024','FY2025','FY2026'],capLegacy.map(x=>[E(x.unit_or_product),x.utilization_pct_by_fy?.FY24==null?'—':N(x.utilization_pct_by_fy.FY24,1)+'%',x.utilization_pct_by_fy?.FY25==null?'—':N(x.utilization_pct_by_fy.FY25,1)+'%',x.utilization_pct_by_fy?.FY26==null?'—':N(x.utilization_pct_by_fy.FY26,1)+'%'])):'');
     let capValue=(x,fy)=>{let full='FY20'+fy.slice(2),installed=x.installed_capacity_by_fy?.[fy]??x.installed_capacity_by_fy?.[full],production=x.production_by_fy?.[fy]??x.production_by_fy?.[full],used=x.utilization_pct_by_fy?.[fy]??x.utilization_pct_by_fy?.[full],parts=[];if(installed!=null)parts.push(N(installed,0)+' '+E(x.capacity_unit||''));if(production!=null)parts.push('output '+N(production,0));if(used!=null)parts.push(N(used,1)+'% used');return parts.join(' · ')||'—'};
-    if(A(b.capacity_utilization).some(x=>x.installed_capacity_by_fy||x.production_by_fy))capacity=table(['Resource','FY2024','FY2025','FY2026'],A(b.capacity_utilization).map(x=>[E(x.unit_or_product),capValue(x,'FY24'),capValue(x,'FY25'),capValue(x,'FY26')]));
+    if(capLegacy.some(x=>x.installed_capacity_by_fy||x.production_by_fy))capacity=gridTables(b.capacity_utilization)+table(['Resource','FY2024','FY2025','FY2026'],capLegacy.map(x=>[E(x.unit_or_product),capValue(x,'FY24'),capValue(x,'FY25'),capValue(x,'FY26')]));
     let cards=card('How the business makes money','<p>'+E(concise(o.business_model||P.summary.business,520))+'</p>');
-    let productGroups=A(b.products).slice(0,8).map(x=>{let items=A(x.items);if(!items.length&&x.items)items=[x.items];return'<article class="product-card"><h3>'+E(concise(x.category||'Product group',90))+'</h3>'+list(items,8)+'</article>'});
-    if(productGroups.length)cards+=card('Products and solutions','<div class="product-grid">'+productGroups.join('')+'</div>');
+    let productGroups=productsLegacy(b.products).slice(0,8).map(x=>{let items=A(x.items);if(!items.length&&x.items)items=[x.items];return'<article class="product-card"><h3>'+E(concise(x.category||'Product group',90))+'</h3>'+list(items,8)+'</article>'});
+    let productsHtml=productsBlock(b.products,productGroups.length?'<div class="product-grid">'+productGroups.join('')+'</div>':'');
+    if(productsHtml)cards+=card('Products and solutions',productsHtml);
     let differentiation=evidence(['technology_ip','vertical_integration','cost_advantage','customer_qualification'],10);if(differentiation.length)cards+=card('Technology, platform and differentiation',list(differentiation,10),'positive');
     if(A(b.revenue_split_product).length)cards+=card('Revenue mix by product group',mixTable(b.revenue_split_product));
     if(endMarkets.length)cards+=card('Revenue mix by customer industry',mixTable(endMarkets));
@@ -440,7 +556,11 @@ function drhpBusinessGeneric(){
     let cc=b.customer_concentration||{},sc=b.supplier_concentration||{},pct=(obj,key,fy)=>obj[key]?.[fy],concRows=[['Top customer',cc,'top1_pct_by_fy'],['Top five customers',cc,'top5_pct_by_fy'],['Top ten customers',cc,'top10_pct_by_fy'],['Top supplier',sc,'top1_pct_by_fy'],['Top five suppliers',sc,'top5_pct_by_fy'],['Top ten suppliers',sc,'top10_pct_by_fy']].filter(x=>['FY24','FY25','FY26'].some(fy=>pct(x[1],x[2],fy)!=null)).map(x=>[E(x[0]),...['FY24','FY25','FY26'].map(fy=>pct(x[1],x[2],fy)==null?'—':N(pct(x[1],x[2],fy),1)+'%')]);
     if(concRows.length)cards+=card('Customer and supplier concentration',table(['Concentration','FY2024','FY2025','FY2026'],concRows));
     if(A(b.capacity_utilization).length)cards+=card('Capacity utilisation by resource',capacity);
-    if(operating.length)cards+=card('Operating footprint',table(['Location','Facility'],operating.map(x=>[E(city(x)),E(facility(x))])));
+    // Grids first: a captured facility register has no `role`, so the `operating` filter above
+    // discards it and this card was silently OMITTED rather than blank — HEROMOTORS p279's six
+    // sites never appeared here at all.
+    let footprintGrid=gridTables(b.plants);
+    if(footprintGrid||operating.length)cards+=card('Operating footprint',footprintGrid+(operating.length?table(['Location','Facility'],operating.map(x=>[E(city(x)),E(facility(x))])):''));
     if(b.channel_mix?.distributors)cards+=card('Distribution reach',kpis([{label:'Distributors',value:N(b.channel_mix.distributors,0)},{label:'States',value:E(b.channel_mix.states||'—')} ]));
     let qualifications=evidence(['certifications','repeat_business'],10);if(qualifications.length)cards+=card('Qualifications and customer relationships',list(qualifications,10));
     return'<div class="stack">'+cards+'</div>'
