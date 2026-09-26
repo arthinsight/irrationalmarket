@@ -1,0 +1,2457 @@
+(function(){'use strict';
+const P=JSON.parse(document.getElementById('store-payload').textContent),I=P.identity,R=P.report||{},Q=P.drhpResearch||{},M=P.market||{},D=P.currentResearch||{},C=P.currentContext||{},PM=P.pageModel||null;
+const E=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),A=v=>Array.isArray(v)?v:(v?[v]:[]),N=(v,d=1)=>{var n=Number(v);return v==null||v===''||!isFinite(n)?'—':n.toLocaleString('en-IN',{maximumFractionDigits:d});};/* NaN GUARD 2026-09-03 (owner: "on page financial one table heading is NaN"). The old test was `v==null||v===''`, which does NOT catch NaN -- and every period table computes its cells, so a row missing one field renders `undefined/100` = NaN and prints the literal string "NaN". Seen on QUALIANCEINTERNATIONAL (FY22 has no `pat`, FY26 no `ebitda`), HARITINDUSTRIES and OMGALAXY. `isFinite` also catches Infinity from a divide-by-zero, which the same cells can produce. */
+const ordinal=v=>{let n=Number(v),s=['th','st','nd','rd'],m=n%100;return N(n,0)+(s[(m-20)%10]||s[m]||s[0])};
+/* SHAPE CONTRACT FOR TEXT RENDERING -- 2026-09-04 (owner: "its Market size and growth is not
+   presented correctly (has bracket double quote etc) do RCA and see how wide spread it is on ANY
+   sections and fix so this does not happen"; "I don't need a patch, it should be an architecture
+   level fix").
+
+   THE ARCHITECTURE PROBLEM, stated plainly: the payload has no shape contract, so three different
+   shapes arrive at ONE renderer. `sk.market_size` is a list of dicts, `sk.drivers` is a
+   pipe-delimited string, `sk.cagrs` is null. `value()` ended in `JSON.stringify(x)`, so any dict
+   without one of the known text keys printed its own source syntax -- braces, quotes and all --
+   straight onto the page.
+
+   Measured across all 2,889 published company payloads before this fix: 16 (field, shape) pairs on
+   1,342 companies (46.5%) would render raw syntax. market_size (841 companies) and cagrs (801) were
+   two members of that class, not the class itself -- nine pipe-delimited strings (strengths,
+   strategies, mdna, end_markets, certs, drivers, schemes) rendered as one run-on line, and
+   promoters_directors (100) and plants (24) printed dicts. A market_size special case would have
+   left 13 of the 16 pairs broken, which is why the fix is here in the helper and not in a card.
+
+   THE CONTRACT, applied to every field that reaches a text renderer:
+     dict                  -> "Label — value" from its own fields, never its syntax
+     list of dicts         -> one line per record, each through the same rule
+     pipe-delimited string -> split into items (`pipe()` at line ~140 already did this, but only 4
+                              of 13 call sites used it -- the split now happens by shape, not by
+                              the caller remembering)
+     null / undefined      -> dropped, never the words "None" or "undefined"
+   `JSON.stringify` is deliberately NOT a fallback: an unrenderable value yields '' and disappears
+   rather than leaking syntax. qa/raw_syntax_check.js gates this on the rendered DOM. */
+
+/* Keys that carry the human-readable text of a record, in priority order. Extended beyond the
+   original list because the shapes above are real: a market-size row leads with `metric`, a plant
+   with `location`, a person with `name`. */
+const TEXT_KEYS=['title','risk','item','note','event','detail','purpose','issue','approval','signal','check','metric','label','name','location','text','summary','description','statement','question','driver','scheme','factor','area','head','category','type','q'];
+/* Keys holding the QUANTITY that qualifies the label, and the ones that time-stamp it. */
+const VALUE_KEYS=['value','amount','figure','size','cagr','pct','percent','rate','count','number','qty','quantum','amount_lakhs','amount_cr'];
+const WHEN_KEYS=['year','fy','period','as_of','asof','date','horizon','quarter'];
+const isPlain=x=>x&&typeof x==='object'&&!Array.isArray(x);
+const NOISE_KEYS=new Set(['id','_id','uid','key','slug','src','source_page','page','idx','index','order','rank','raw','evidence_id']);
+const scalarish=v=>v!=null&&v!==''&&(typeof v!=='object');
+/* Render a record as prose: "<label> — <value> (<when>)", falling back to the record's own
+   remaining scalar fields so a shape we have never seen still reads as text rather than syntax. */
+const recordText=x=>{
+    const pick=keys=>{for(const k of keys){const v=x[k];if(scalarish(v))return String(v).trim()}return''};
+    const label=pick(TEXT_KEYS),val=pick(VALUE_KEYS),when=pick(WHEN_KEYS);
+    if(label||val){
+        let out=label&&val?label+' — '+val:(label||val);
+        /* only append the period when it is not already spelled out in the value */
+        if(when&&out.toLowerCase().indexOf(String(when).toLowerCase())===-1)out+=' ('+when+')';
+        return out;
+    }
+    /* Unknown shape: name its own scalar fields rather than dumping the object. */
+    const used=new Set([...TEXT_KEYS,...VALUE_KEYS,...WHEN_KEYS]);
+    const parts=Object.keys(x).filter(k=>!used.has(k)&&!NOISE_KEYS.has(k)&&scalarish(x[k])&&typeof x[k]!=='boolean')
+        .map(k=>k.replace(/_/g,' ')+': '+String(x[k]).trim());
+    return parts.join(' · ');
+};
+const value=x=>x==null?'':(typeof x==='string'?x:(typeof x==='number'||typeof x==='boolean'?String(x):(isPlain(x)?recordText(x):(Array.isArray(x)?x.map(value).filter(Boolean).join('; '):''))));
+/* Normalise ANY payload value into the list of display strings it represents. This is the single
+   place that decides "what are the items?", so a pipe string, a dict, a list of dicts and null all
+   reach every list renderer already correct. */
+const items=v=>{
+    if(v==null||v==='')return[];
+    if(typeof v==='string'){
+        const t=v.trim();
+        if(!t||t==='None'||t==='undefined'||t==='nan')return[];
+        return t.indexOf('|')!==-1?t.split('|').map(x=>x.trim()).filter(Boolean):[t];
+    }
+    if(Array.isArray(v))return v.flatMap(items);
+    if(isPlain(v)){const s=value(v);return s?[s]:[]}
+    return[String(v)];
+};
+/* `list()` now routes through `items()`, so every caller gets the shape contract without changing
+   a single call site -- that is what makes this architectural rather than a per-card patch. */
+const list=(v,n=8)=>{const xs=items(v);return xs.length?'<ul class="intel-list">'+xs.slice(0,n).map(x=>'<li>'+mdInline(E(mdLine(x)))+'</li>').join('')+'</ul>':''},card=(t,b,c='')=>b?'<article class="card '+c+'"><h3>'+E(t)+'</h3>'+b+'</article>':'';
+/* PERIOD-COLUMN TABLE (owner 2026-09-02: "keep year or QTr on column heading not row").
+   A financial table reads by METRIC across time, so the period belongs on the column axis and the
+   metric on the row axis -- the same orientation the Deep-Dive uses. `table()` above renders the
+   opposite (one row per period), which forces a reader to scan sideways to follow a single line
+   item and, with 5-6 metrics, produces the wide table the phone audit flags as M10.
+   `h` is the ORIGINAL header list whose FIRST entry is the period label ('Year'/'Quarter'); rows
+   are period-major. Transposing here rather than at the data layer keeps every caller's row shape
+   untouched. */
+/* SHORT PERIOD HEADERS + DUPLICATE-COLUMN GUARD (owner 2026-09-09: "why Margins, returns and
+   balance-sheet efficiency has dup column", "Balance-sheet trajectory ... same year column with
+   different heading", and "H1FY26 (6m ended 2025-09-30, not annualised)" -> "only H1FY2026 is
+   enough").
+
+   A transposed table gives each period a NARROW column, so a header like
+   `H1FY2026 (six months ended September 30, 2025; annualised)` is unreadable there and squeezes
+   every other column. `periodLabel` reduces a label to its period CODE -- FY26, H1FY26, 9MFY26,
+   Q1FY26 -- which is the whole of the owner's instruction.
+
+   WHAT IS NOT DISCARDED. A parenthetical that merely restates the period ("six months ended
+   September 30, 2025", "as at 2025-12-31") is redundant once the code is shown. But two qualifiers
+   CHANGE WHAT THE NUMBER MEANS and are kept as a short marker plus a footnote:
+     * annualised -- ICICIAMC carries `H1FY2025 (...; annualised)` beside `H1FY2026 (...)`. Cut to
+       bare `H1FY25`/`H1FY26`, a reader compares an annualised figure against a raw one.
+     * basis -- LCL carries two FY2024 rows, 'Restated Standalone' and 'Special Purpose Combined
+       and Carve-Out'. Two real, different figures for one year; the marker is what keeps them
+       distinguishable instead of looking like one year measured twice.
+
+   THE DEDUPE HERE IS DEFENCE IN DEPTH, NOT THE FIX. The cause was in the producers and is fixed
+   there (`factual_populate` used two label vocabularies for the same three years;
+   `schema_contract._merge_key` keyed per-year rows on the RAW `fy` so 'FY24' and 'FY2024' never
+   collided and both rows survived). This guard only ensures a future producer regression degrades
+   to a merged column rather than silently reprinting a year. It merges cells rather than dropping
+   a column, so no real value can be lost: a later non-empty cell fills an earlier em-dash, and a
+   genuine disagreement keeps BOTH columns so the reader can see it. */
+/* MUST AGREE WITH `schema_contract.canon_period` (Python). That function decides which rows MERGE
+   in the store; this one decides which columns MERGE on the page. If they disagree, the page can
+   fold two periods the store deliberately kept apart -- so the hyphenated span and the basis
+   vocabulary below are deliberately the same rules, and `qa/period_column_gate.py` cross-checks
+   this function's output against the Python one. */
+const PERIOD_HYPHEN_RE = /^\s*(9M|6M|3M|H1|H2|Q[1-4])?[\s\-_]*FY\s*20(\d{2})\s*[-\/]\s*(\d{2})(?!\d)/i;
+const PERIOD_RE = /^\s*(9M|6M|3M|H1|H2|Q[1-4])?[\s\-_]*FY\s*(\d{2,4})/i;
+const periodLabel = s => {
+  const raw = String(s == null ? '' : s).trim();
+  // `FY2023-24` / `FY 2023-24` spans two calendar years and names the ENDING one -- FY24, not
+  // FY23. Verified on GVELECTRIC, which stores both forms for identical values:
+  // 'FY 2025-26' revenue 15641.29 == 'FY26' revenue 15641.29. This case must be tested BEFORE the
+  // general rule, which would otherwise match the leading `2023` and label the column a year early.
+  const hy = PERIOD_HYPHEN_RE.exec(raw);
+  let m = hy || PERIOD_RE.exec(raw);
+  // RAW PRINTED CAPTIONS. Several producers store the document's own caption instead of a period
+  // code -- 'As at 31 March 2024', 'As at 31-03-2025', 'Fiscal 2024'. Printed verbatim these are
+  // enormous column headers. A 31-MARCH date is a full Indian fiscal year end and resolves
+  // safely; any OTHER month-end is an interim date whose fiscal year must NOT be assumed
+  // (QUALIANCE stores '30-09-2025', ADISOFT 'Oct 31, 2025'), so those keep their raw label and
+  // their own column. Same rule as `canon_period`'s date branch.
+  if (!m) {
+    const fis = /^\s*fiscal\s*(20\d{2})\b/i.exec(raw);
+    const iso = /\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/.exec(raw);
+    const dmy = /\b(\d{1,2})[-\/.](\d{1,2})[-\/.](20\d{2})\b/.exec(raw);
+    const txt = /\b(\d{1,2})\s*(?:st|nd|rd|th)?\s+(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(20\d{2})\b/i.exec(raw)
+             || /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\s*(?:st|nd|rd|th)?,?\s*(20\d{2})\b/i.exec(raw);
+    let day = null, mon = null, yr4 = null;
+    if (fis) { day = 31; mon = 3; yr4 = +fis[1]; }
+    else if (iso) { yr4 = +iso[1]; mon = +iso[2]; day = +iso[3]; }
+    else if (dmy) { day = +dmy[1]; mon = +dmy[2]; yr4 = +dmy[3]; }
+    else if (txt) {
+      const MON = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+      if (/^\d/.test(txt[1])) { day = +txt[1]; mon = MON[txt[2].toLowerCase()]; yr4 = +txt[3]; }
+      else { mon = MON[txt[1].toLowerCase()]; day = +txt[2]; yr4 = +txt[3]; }
+    }
+    if (yr4 && mon === 3 && (day === 31 || day === null)) {
+      return { label: 'FY' + String(yr4).slice(2), note: '' };
+    }
+    return { label: raw, note: '' };            // interim or unreadable: leave it alone
+  }
+  const yr = hy ? hy[3] : (m[2].length > 2 ? m[2].slice(-2) : m[2]);
+  const code = (m[1] ? m[1].toUpperCase() : '') + 'FY' + yr;
+  // The distinguishing qualifier is not always inside the bracket: ALPINETEX prints
+  // 'FY2026 (Mar 31, 2026) Consolidated' beside 'FY2024 (Mar 31, 2024) Standalone', where the
+  // basis word TRAILS the parenthetical. Read the qualifier from everything after the period code
+  // so a basis cannot be lost -- losing it would let two different bases share one column.
+  const q = raw.slice(m[0].length);
+  let note = '';
+  if (/annuali[sz]ed/i.test(q) && !/not\s+annuali[sz]ed/i.test(q)) note = 'annualised';
+  const basis = /(restated|standalone|consolidated|carve[- ]?out|combined|special purpose|proforma|pro forma)/i.exec(q);
+  if (basis) note = (note ? note + ', ' : '') + basis[1].toLowerCase();
+  return { label: note ? code + '*' : code, note: note };
+};
+const isEmptyCell = v => { const t = String(v == null ? '' : v).replace(/<[^>]*>/g, '').trim();
+  return t === '' || t === '—' || t === '-' || t === 'N/A' || t === 'NaN' || t === 'null'; };
+const tableByPeriod = (h, rows, maxVisibleRows = 10) => {
+  if (!rows || !rows.length) return '';
+  const metrics = h.slice(1);
+  // Shorten each period label, then fold columns that resolve to the SAME label, filling gaps.
+  const cols = [], notes = [];
+  rows.forEach(r => {
+    const p = periodLabel(r[0]);
+    const cells = metrics.map((m, i) => r[i + 1]);
+    const at = cols.findIndex(c => c.label === p.label);
+    if (at === -1) { cols.push({ label: p.label, note: p.note, cells: cells.slice() }); return; }
+    const tgt = cols[at];
+    let clash = false;
+    cells.forEach((v, i) => {
+      if (isEmptyCell(tgt.cells[i])) { tgt.cells[i] = v; return; }
+      if (!isEmptyCell(v) && String(v).trim() !== String(tgt.cells[i]).trim()) clash = true;
+    });
+    // A real disagreement is shown, never silently resolved: keep both columns.
+    if (clash) cols.push({ label: p.label, note: p.note, cells: cells.slice() });
+  });
+  // PERIODS READ OLDEST TO NEWEST, WITH THE LATEST AS THE LAST COLUMN (owner, 2026-09-18).
+  // The producers do not agree on direction and never did: measured across the store's published
+  // rows, `pnl_3yr` is 117 ascending / 79 descending, `balance_sheet_key` 64 / 97, `cash_flow`
+  // 25 / 90, and 79 companies have one block running opposite to another in the SAME payload --
+  // SPEEDEX renders its P&L FY24->FY26 and its cash flow FY26->FY24 on one page. Some rows are in
+  // no order at all (30 across the four blocks), because a fallback appended a year the table
+  // reader had not produced.
+  //
+  // Sorting HERE rather than in each producer is what makes that irrelevant: every financial table
+  // on the page goes through this one function, so the page is consistent whatever order a reader
+  // emits, and a new extraction path cannot reintroduce the problem.
+  //
+  // An interim period sorts AFTER the full year it falls inside -- Q1FY27 follows FY26 -- because
+  // its own fiscal year is the later one, which `periodSortKey` reads from the label. A column
+  // whose label carries no resolvable year keeps its position relative to the others by falling to
+  // the end, rather than being silently reordered against a year it cannot be compared with.
+  const periodSortKey = label => {
+    const s = String(label || '');
+    const m = /FY(\d{2,4})/i.exec(s);
+    if (!m) return [Number.POSITIVE_INFINITY, 0];
+    const y = m[1].length > 2 ? +m[1] : 2000 + +m[1];
+    // Within one fiscal year the full year comes first, then the interim periods in span order.
+    const cov = /^(Q1|Q2|Q3|H1|H2|9M|\d+M)FY/i.exec(s);
+    const rank = cov ? ({ Q1: 1, H1: 2, Q2: 2, '9M': 3, Q3: 3, H2: 3 }[cov[1].toUpperCase()] || 4) : 0;
+    return [y, rank];
+  };
+  cols.sort((a, b) => {
+    const ka = periodSortKey(a.label), kb = periodSortKey(b.label);
+    return ka[0] - kb[0] || ka[1] - kb[1];
+  });
+  cols.forEach(c => { if (c.note && notes.indexOf(c.note) === -1) notes.push(c.note); });
+  const out = metrics.map((m, i) => [m].concat(cols.map(c => c.cells[i])));
+  const html = table([h[0] === 'Year' ? 'Metric' : h[0]].concat(cols.map(c => c.label)),
+                     out, maxVisibleRows);
+  return notes.length
+    ? html + '<p class="table-note" style="margin:6px 0 0;font-size:11px;color:var(--g700)">* '
+           + E(notes.join('; ')) + '</p>'
+    : html;
+};
+
+const table = (h, rows, maxVisibleRows = 10) => {
+    if (!rows || !rows.length) return '';
+    let asOfIdx = h.findIndex(x => x.toLowerCase().includes('as of'));
+    if (asOfIdx !== -1) {
+        h.splice(asOfIdx, 1);
+        rows.forEach(r => r.splice(asOfIdx, 1));
+    }
+    let utilisedIdx = h.findIndex(x => x.toLowerCase().includes('utilised') || x.toLowerCase().includes('utilized'));
+    if (utilisedIdx !== -1) {
+        let hasData = rows.some(r => {
+            let val = String(r[utilisedIdx] || '').trim();
+            return val !== '' && val !== '—' && /[0-9]/.test(val);
+        });
+        if (!hasData) {
+            h.splice(utilisedIdx, 1);
+            rows.forEach(r => r.splice(utilisedIdx, 1));
+        }
+    }
+    let visibleRows = rows.slice(0, maxVisibleRows);
+    let hiddenRows = rows.slice(maxVisibleRows);
+    let html = '<div class="table-wrap"><table><thead><tr>' + h.map(x => '<th>' + E(x) + '</th>').join('') + '</tr></thead><tbody>';
+    html += visibleRows.map(r => '<tr>' + r.map(x => '<td>' + x + '</td>').join('') + '</tr>').join('');
+    if (hiddenRows.length > 0) {
+        html += hiddenRows.map(r => '<tr class="hidden-row" style="display: none;">' + r.map(x => '<td>' + x + '</td>').join('') + '</tr>').join('');
+        html += '</tbody></table>';
+        html += '<button class="show-more-btn" onclick="let r=this.parentElement.querySelectorAll(\'.hidden-row\'); let collapsed=r[0].style.display===\'none\'; r.forEach(x=>x.style.display=collapsed?\'table-row\':\'none\'); this.textContent=collapsed?\'Show less\':\'Show more\';" style="margin-top: 8px; background: transparent; border: 1px solid var(--g300); color: var(--g700); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Show more</button>';
+    } else {
+        html += '</tbody></table>';
+    }
+    html += '</div>';
+    return html;
+};
+const badge=(s,c='fact')=>'<span class="evidence '+c+'">'+E(s)+'</span>',sec=k=>R[k]||{};
+const callStore=P.concallIntel||C.concallIntel||{};
+const concall=q=>{let s=callStore.sections||{},k=Object.keys(s).find(k=>k.includes(q));return k?s[k]:[]};
+const callBody=q=>concall(q).map(x=>{
+    let s=E(String(x||'').trim().replace(/^[-*•]\s+/gm,''));
+    s=s.replace(/\r?\n/g,'<br>');
+    return '<p>'+mdInline(s)+'</p>';
+}).join('');
+const creditRatingCard=()=>{let c=P.credit;if(!c||!c.rating)return '';return card('Credit rating & solvency','<div class="analysis-strip"><div><span>Agency</span><b>'+E(c.agency)+'</b></div><div><span>Instrument</span><b>'+E(c.instrument)+'</b></div><div><span>Rating</span><b>'+E(c.rating)+' ('+E(c.outlook||'Stable')+')</b></div><div><span>Prior rating</span><b>'+E(c.prior_rating||'—')+'</b></div><div><span>Action date</span><b>'+E(c.action_date)+'</b></div></div>'+(c.rationale?'<p><strong>Rationale:</strong> '+E(c.rationale)+'</p>':''))};
+const ddBlocks=g=>A(D.sections?.[g]), ddBlock=(g,q)=>ddBlocks(g).find(x=>(x.title||'').toLowerCase().includes(q))||{};
+// ddBlock returns {} on a miss, and {} is truthy — so `a||b` always takes the first.
+// pick() is the honest chain: the first candidate that actually carries a body.
+const pick=(...xs)=>xs.find(x=>x&&String(x.body||'').trim())||{};
+// Cards route by TOPIC, resolved in Python through the closed vocabulary and the source ladder
+// (company_public_page._topic_index). Substring-on-title is kept only as a fallback: it finds a
+// moat block for 201 symbols where the vocabulary finds 1,004, because the evidence is stored as
+// "Bull - competitive strengths", which contains no such word.
+const TOPICS=P.topics||{};
+const topicBlock=(t,...fallbacks)=>pick(TOPICS[t]||{},...fallbacks);
+// Split a stored prose block into bullet lines, stripping list markers and numbering.
+const bullets=v=>String(v==null?'':v).split(/\r?\n+/).map(s=>s.replace(/^\s*[-•*]\s*/,'').replace(/^\s*\d+[.)]\s*/,'').trim()).filter(s=>s.length>3);
+// "Title: detail" -> {head, note}; otherwise the whole line is the head.
+const headNote=s=>{let m=/^\*{0,2}([^:*]{4,70}?)\*{0,2}\s*:\s+(.+)$/.exec(s);return m?{head:m[1].trim(),note:m[2].trim()}:{head:s.replace(/\*\*/g,'').trim(),note:''}};
+// The stored bodies are MARKDOWN. The page converted `**bold**` and nothing else, so measured
+// across 26,162 blocks: 2,085 italics (212 symbols), 433 horizontal rules (429), 414 blockquote
+// markers (312), 338 inline-code spans (113) and 5 headings all printed their raw punctuation to
+// the reader. mdLine strips the LINE markers before escaping; mdInline runs on already-escaped
+// text. Bold must run before italic or `**x**` is eaten by the single-asterisk rule.
+const mdInline=s=>String(s==null?'':s)
+    .replace(/\*\*([^*]+?)\*\*/g,'<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]{1,200}?)\*(?!\*)/g,'$1<i>$2</i>')
+    .replace(/`([^`\n]+?)`/g,'<code>$1</code>');
+const mdLine=s=>String(s==null?'':s)
+    .replace(/^\s*&gt;\s?/gm,'').replace(/^\s*>\s?/gm,'')
+    .replace(/^\s*#{1,6}\s+/gm,'')
+    .replace(/^\s*-{3,}\s*$/gm,'')
+    .replace(/^\s*[-*•]\s+/gm,'');
+const dedupeKey=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+// Capacity cells arrive carrying the extractor's provenance ("stated verbatim as ...", the exact
+// report section). The figure is the fact; the provenance is a statement about our pipeline and
+// belongs in coverage, not in a table cell. Values are never altered — only the aside is dropped.
+// Captive power is an INPUT to manufacturing, not manufacturing capacity — unless the company
+// sells power, in which case it is the product. The producers now exclude it at write time; these
+// stored rows predate that rule (measured 2026-08-24: 11 rows across 7 symbols of 187 blocks).
+// FIRST ATTEMPT MATCHED ONLY "captive power" / "captive generation" and caught 11 of the 36
+// capacity rows that mention captive — 31%. The phrasing varies far more than that: "Captive
+// windmill", "Captive Thermal Power Plants", "Captive renewable energy - Solar", "Rooftop Solar
+// (captive renewable capacity)", "Captive thermal power — company total". The word `captive` in a
+// product cell IS the signal; the energy noun after it is not predictable. The power-company guard
+// below is what keeps this from deleting a genuine producer's own output.
+// Some producers also label the row outright — ANUP writes "(energy asset, not product capacity)".
+const CAPTIVE_ROW=/^\|\s*[^|]*(?:\bcaptive\b|not\s+product\s+capacity)/i;
+const isPowerCo=()=>/power|energy|utilit|renewab/i.test(String(D.peer_panel?.industry||D.profile?.subseg||''));
+const tidyCapacity=v=>{
+    let keep=isPowerCo()?()=>true:(l=>!CAPTIVE_ROW.test(l));
+    return String(v==null?'':v).split(/\r?\n/).filter(keep).join('\n')
+        .replace(/\s*\((?:stated|as stated|as per|per the|quoted)[^()]{0,160}\)/gi,'')
+        .replace(/\s*;\s*(?:BRSR|Annexure|Note|Section)[^|\n]{0,80}/gi,'')
+        .replace(/[ \t]{2,}/g,' ');
+};
+const prose=(v,maxVisibleRows=10)=>{
+    if(!v) return '';
+    let tableRegex = /((?:^|\n)\|[^\n\r]+\|(?:\r?\n\|[\-\s|]+\|)(?:\r?\n\|[^\n\r]+\|)+)/g;
+    let lastIdx = 0, html = '', match;
+    while ((match = tableRegex.exec(v)) !== null) {
+        let prevText = v.substring(lastIdx, match.index);
+        if (prevText.trim()) {
+            html += mdInline(E(mdLine(prevText)).replace(/\n+/g, '<br>'));
+        }
+        let tableText = match[1].trim();
+        let lines = tableText.split('\n').filter(Boolean);
+        let header = lines[0].split('|').map(x => x.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+        let rows = lines.slice(2).map(l => l.split('|').map(x => x.trim()).filter((_, i, a) => i > 0 && i < a.length - 1).map(E));
+        html += table(header, rows, maxVisibleRows);
+        lastIdx = tableRegex.lastIndex;
+    }
+    let remaining = v.substring(lastIdx);
+    if (remaining.trim()) {
+        html += mdInline(E(mdLine(remaining)).replace(/\n+/g, '<br>'));
+    }
+    return html || mdInline(E(mdLine(v)).replace(/\n+/g, '<br>'));
+};
+const status=s=>'<span class="status '+E(String(s||'open').toLowerCase())+'">'+E(s||'open')+'</span>';
+const kpiLabel=v=>String(v||'').replace(/\s*\(Q\dFY\d+\)/gi,'').replace(/^Revenue$/i,'Latest revenue').replace(/^EBITDA Margin$/i,'Latest EBITDA margin');
+const kpis=v=>A(v).length?'<div class="kpi-grid">'+A(v).map(x=>'<div class="kpi"><span>'+E(kpiLabel(x.label))+'</span><b>'+E(x.value)+'</b></div>').join('')+'</div>':'';
+const pipe=v=>String(v||'').split('|').map(x=>x.trim()).filter(Boolean), jsonish=v=>{try{return typeof v==='string'?JSON.parse(v):v||{}}catch(_){return {}}};
+// The store ships one list in three shapes: a real array, a JSON object of category -> [items]
+// (`products`), and a pipe-delimited string (`endMarkets`). The page tested `Array.isArray` and
+// silently dropped the other two, so 996 companies carried products the Products card never
+// showed. Normalise once, here, instead of guessing the shape at each call site.
+// P.products is the TRUNCATED copy: something between company_profile.csv (clean, parses, up to
+// 2,635 chars) and the sidecar cuts it to 599 chars plus an ellipsis, so 220 of 996 are broken
+// JSON that can never parse. currentContext carries the same field already parsed, clean, on 960
+// pages - prefer it, and keep the truncated string only as a last resort.
+const productList=()=>{let a=asList(C.products);return a.length?a:asList(P.products)};
+const marketList=()=>{let a=asList(C.end_markets);return a.length?a:asList(P.endMarkets)};
+const asList=v=>{
+    if(Array.isArray(v))return v;
+    if(v&&typeof v==='object')return Object.keys(v).map(k=>'**'+k+':** '+A(v[k]).map(x=>typeof x==='string'?x:value(x)).join(', '));
+    let s=String(v==null?'':v).trim();
+    if(!s)return[];
+    if(s[0]==='{'||s[0]==='['){let p=jsonish(s);return Array.isArray(p)?p:asList(p)}
+    return pipe(s);
+};
+const unique=v=>{let seen=new Set;return A(v).filter(x=>{let k=value(x).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();if(!k||seen.has(k))return false;seen.add(k);return true})};
+const ddCards=(group,skip=[])=>ddBlocks(group).filter(x=>!skip.some(q=>(x.title||'').toLowerCase().includes(q))).map(x=>card(x.title,prose(x.body))).join('');
+function pnlPanel(v){return v?.rows?.length?'<div class="compare-head"><b>'+E(v.label)+'</b><span>vs '+E(v.prior)+'</span></div>'+table(['Metric',v.label,v.prior,'Change'],v.rows.map(x=>[E(x.metric),N(x.cur,x.nd)+(x.pct?'%':''),N(x.prior,x.nd)+(x.pct?'%':''),(x.yoy==null?'—':N(x.yoy,1)+(x.pct?' pts':'%'))])):''}
+function hfInvestment(){let sc=P.scorecard||{},ob=ddBlock('outlook','order book'),opt=ddBlock('outlook','growth vertical'),non=ddBlock('bull_bear','non-obvious'),margin=ddBlock('latest_quarter','margin');return kpis(D.keynums)+'<div class="layout-2">'+card('Business quality',sc.symbol?'<div class="scoreline"><strong>'+E(sc.bq_total)+'</strong><span>/100</span></div><p>'+E(sc.verdict||'')+'</p>':'','positive')+card('Order-book visibility',prose(ob.body),'positive')+card('Margin architecture',prose(margin.body),'positive')+card('Growth optionality',prose(opt.body),'inference-card')+card('Non-obvious read',badge('Analytical inference','inference')+prose(non.body),'inference-card')+card('Capital allocation',prose(ddBlock('bull_bear','capital allocation').body))+'</div>'}
+function hfBusiness(){let p=D.profile||{},products=productList(),markets=marketList();return'<div class="profile-band"><div><span>Operating entities</span><b>'+E(p.entities)+'</b></div><div><span>Business lines</span><b>'+E(p.subseg)+'</b></div><div><span>Structural themes</span><b>'+E(p.themes)+'</b></div></div><div class="layout-2">'+ddCards('business',['challenges'])+(products.length?card('Products and platforms',list(products,12)):'')+(markets.length?card('End markets',list(markets,12)):'')+'</div>'}
+function hfFinancials(){let actual=tableByPeriod(['Quarter','Revenue ₹cr','YoY','Operating profit ₹cr','OPM','PAT ₹cr','YoY','EPS'],A(D.actuals).map(x=>[E(x.q),N(x.revenue,0),N(x.rev_yoy,1)+'%',N(x.op,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.pat_yoy,1)+'%',N(x.eps,2)]));let model=P.projection?.projection||[],est=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr','EPS'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.eps,2)]));let val=tableByPeriod(['Year','Market cap ₹cr','P/E','ROE','OPM','D/E'],A(D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.roe,1)+'%',N(x.opm,1)+'%',N(x.de,2)+'x']));return'<div class="stack">'+card('Eight-quarter operating trajectory',badge('Reported fact')+actual)+card('Latest quarter comparison',pnlPanel(D.pnl?.quarter))+card('Full-year comparison',pnlPanel(D.pnl?.year))+(model.length?card('Forward model',badge('Model estimate','estimate')+est,'estimate-card'):'')+(A(P.projection?.assumptions).length?card('Model assumptions',list(P.projection?.assumptions,10)):'')+card('Financial quality & working capital',kpis(D.ratios))+card('Five-year valuation and quality history',val)+creditRatingCard()+'</div>'}
+function hfFinancialsRich(){let a=A(D.actuals),last=a.at(-1)||{},prior=a.at(-5)||{},rat=Object.fromEntries(A(D.ratios).map(x=>[x.label,x.value]));let read='<div class="analysis-strip"><div><span>Recovery shape</span><b>Five-quarter contraction ended before the latest two growth quarters</b></div><div><span>Profit inflection</span><b>Operating profit ₹'+N(prior.op,0)+'cr → ₹'+N(last.op,0)+'cr; PAT ₹'+N(prior.pat,0)+'cr → ₹'+N(last.pat,0)+'cr</b></div><div><span>Cash-cycle watch</span><b>'+E(rat['Receivable d']||'—')+' debtor days · '+E(rat['Inventory d']||'—')+' inventory days</b></div></div>';return hfFinancials().replace('<div class="stack">','<div class="stack">'+badge('Analytical inference','inference')+read)}
+function hfExecution(){let w=D.wtt||{},track=D.track||{},cap=table(['Milestone','Target','Promise','State'],A(D.capex).map(x=>[E(x.item),E(x.timeline||'—'),E(x.pv||'—'),status(x.status)]));let verdict=table(['Commitment','Made','Checked','Outcome'],A(track.verdicts).map(x=>[E(x.item)+'<small class="row-note">'+E(x.note||'')+'</small>',E(x.made||'—'),E(x.checked||'—'),status(x.status)]));let open=table(['Forward commitment','Horizon','Category'],A(track.open).filter(x=>/FY27|Q[1-4]FY27|CY2026/i.test(x.horizon||'')).map(x=>[E(x.item),E(x.horizon),E((x.category||'').replaceAll('_',' '))]));return'<div class="credibility"><div class="grade">'+E(w.credibility_grade||'—')+'</div><div><h3>Walk the Talk</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.guidance_hit_rate||'—')+'%</b> guidance hit</span><span><b>'+E(w.projects_ontime||'—')+'/'+(Number(w.projects_ontime||0)+Number(w.projects_slipped||0))+'</b> projects on time</span><span><b>'+E(w.reconciled_n||track.verdicts_total||'—')+'</b> commitments reconciled</span></div></div><div class="stack">'+card('Capacity and capex milestones',cap)+card('Near-term forward commitments',badge('Management guidance','guide')+open,'guide-card')+card('Commitment outcomes',verdict)+card('Management tone — latest assessment',prose(w.tone_latest),'inference-card')+'</div>'}
+function hfRisks(){let risk=ddBlock('bull_bear','risks'),tone=ddBlock('bull_bear','management quality'),rows=[{title:'Thesis risks',detail:risk.body},{title:'Management framing risk',detail:tone.body},{title:'Balance-sheet and working-capital pressure',detail:'Receivable days '+((D.ratios||[]).find(x=>x.label==='Receivable d')?.value||'—')+' and inventory days '+((D.ratios||[]).find(x=>x.label==='Inventory d')?.value||'—')+' keep cash conversion and funding cost central to the thesis.'},{title:'Execution credibility',detail:(D.wtt?.summary||'')+' The page should underwrite delivery, not merely the size of the opportunity.'}];return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title)+'</h3><p>'+E(x.detail)+'</p></div></article>').join('')+'</div>'}
+function hfPeers(){let pp=D.peer_panel||{},all=[pp.target,...A(pp.peers)].filter(Boolean),groups={};all.forEach(x=>(groups[x.s===I.symbol?I.symbol:(x.group||'Reference')]??=[]).push(x));return'<div class="stack">'+Object.keys(groups).map(g=>card(g,table(['Company','FY','Revenue ₹cr','Growth','EBITDA margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],groups[g].map(x=>[E(x.name),E(x.fy),N(x.rev,0),x.rev_growth==null?'—':N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),x.pat_growth==null?'—':N(x.pat_growth,1)+'%',x.pe==null?'—':N(x.pe,1)+'x',N(x.mcap,0)])))).join('')+'<p class="method-note">'+E(I.symbol)+' is shown separately. Stored operating peer groups remain distinct lenses rather than one blended reference set.</p></div>'}
+function inInvestment(){let f=sec('financials'),b=sec('business_ops'),ip=sec('industry_peers'),v=sec('verdict'),last=A(f.pnl_3yr).at(-1)||{},cf=A(f.cash_flow).at(-1)||{},rr=A(f.return_ratios).at(-1)||{},mix=b.domestic_export_mix?.export_pct_by_fy||{},cc=b.customer_concentration?.top10_pct_by_fy||{};let facts=[{label:'Global MIM share',value:N(ip.market_position?.share_pct,1)+'%'},{label:'Revenue',value:crMoney(last,'revenue')},{label:'PAT',value:crMoney(last,'pat')},{label:'Operating cash flow',value:crMoney(cf,'cfo')},{label:'RoNW',value:N(rr.ronw_pct,1)+'%'},{label:'Export revenue',value:N(mix.FY2026,1)+'%'},{label:'Top-10 customers',value:N(cc.FY2026,1)+'%'}];return kpis(facts)+card('Our read','<p>'+E(v.our_read)+'</p>','inference-card')}
+/* THE CAPTURED GRID (2026-09-23, owner chose Option A).
+
+   The Our Business extraction stores the table it captured from the filing -- `{rows, source_page,
+   granularity}` -- while every card here reads NAMED keys (`x.name`, `x.pct_by_fy.FY24`,
+   `x.unit_or_product`). Neither key exists on a grid, so 89 POPULATED field-instances across
+   `revenue_split_product`, `revenue_split_geography` and `capacity_utilization` rendered a header
+   and a row of em-dashes: a card that says "we looked and there is nothing", over data we hold.
+
+   The alternative was to project each grid down to the legacy keys. Measured over all 157 grid
+   instances it preserves 2,089 of 8,941 cells (23%) and leaves 62 tables (39%) EMPTY ANYWAY --
+   SKOFFSET p180 recovers ZERO of 43, because the filing heads its percentage column `%` instead
+   of writing `90.92%`. So the renderer learns the grid instead, and every captured cell lands. */
+
+/* A HEADER IS A BAND, NOT A ROW. JSIPL p172's header is three physical rows deep
+   (`Particulars | For the Period | Fiscal 2026` / `| Ended | June 30,` / `| 2026`), so reading
+   row 0 alone labels a column `For the Period` and loses the period it names. The band ends at
+   the first row that carries a LABEL plus figures -- the same test `bops_signatures._header_key`
+   uses, and for the same reason: a spanning year row has an empty first cell, a data row names
+   something there. */
+const gridBand=rows=>{
+    let n=0;
+    for(let i=0;i<Math.min(4,rows.length);i++){
+        const r=rows[i]||[],label=String(r[0]==null?'':r[0]).trim();
+        const vals=r.slice(1).map(c=>String(c==null?'':c).trim()).filter(Boolean);
+        /* A SERIAL NUMBER IN COLUMN 0 OPENS THE DATA, whatever the other cells hold. Requiring
+           every value to be numeric was wrong and cost two companies their whole table:
+           POOJALOGIS p134 row `1. | Owned | 13 | 55 | 289` carries the word `Owned`, so the row
+           read as header, the band grew to cover the entire 3-row grid, and `gridTable` found no
+           body. PANCHATV p143 is the same shape. A row numbered `1.` is never a header. */
+        if(/^\d{1,3}[.)]?$/.test(label))break;
+        /* MOSTLY FIGURES, FOOTNOTE MARKS ALLOWED. SPEEDEX p191's data row ends `88.41*`; requiring
+           EVERY value to be a bare number read it as header and the band swallowed the only row. */
+        const num=vals.filter(c=>/^[\d,.%()\s-]+$/.test(c.replace(/[*#†‡^]+$/,''))).length;
+        if(label&&vals.length&&num>=Math.ceil(vals.length*0.6))break;
+        n++;
+    }
+    /* Never let the band eat the whole grid: if every row looked like a header, the LAST row is
+       the data. A table with no body at all is refused by `gridTable` on its own. */
+    return Math.min(Math.max(1,n),Math.max(1,rows.length-1));
+};
+/* Join the band down each column. A blank cell inherits nothing, so `%` under `Fiscal 2026`
+   becomes `Fiscal 2026 %` and the two `%` columns of SKOFFSET p180 stop reading identically. */
+const gridHeader=rows=>{
+    const band=gridBand(rows),width=Math.max(...rows.map(r=>r.length));
+    const out=[];
+    for(let c=0;c<width;c++){
+        const parts=[];let carry='';
+        for(let r=0;r<band;r++){
+            const cell=String((rows[r]||[])[c]==null?'':(rows[r]||[])[c]).trim();
+            if(cell)parts.push(cell);
+        }
+        /* A spanning label sits in the FIRST column of its group and the columns it covers are
+           blank on that row, so walk left for the nearest non-empty cell on row 0. */
+        if(!parts.length||!String((rows[0]||[])[c]||'').trim()){
+            for(let k=c-1;k>=0;k--){const v=String((rows[0]||[])[k]||'').trim();if(v){carry=v;break}}
+        }
+        const joined=(carry&&parts.length&&parts[0]!==carry?[carry].concat(parts):parts).join(' ');
+        out.push(joined.replace(/\s+/g,' ').trim());
+    }
+    return out;
+};
+/* Render a captured grid as the filing printed it. All-empty columns are dropped: a PDF uses
+   them for layout (JSIPL p172 column 2, GLASSWALL p29), and rendering one produces a column of
+   blanks that reads as missing data. */
+function gridTable(grid,maxVisibleRows=12){
+    if(!grid||!Array.isArray(grid.rows)||!grid.rows.length)return'';
+    const rows=grid.rows,band=gridBand(rows),head=gridHeader(rows).slice();
+    const txt=v=>String(v==null?'':v).trim();
+    let body=rows.slice(band).filter(r=>r&&r.some(c=>txt(c))).map(r=>r.slice());
+    if(!body.length)return'';
+    const labelOnly=r=>!!txt(r[0])&&r.slice(1).every(c=>!txt(c));
+    /* A WRAPPED LABEL CLOSING THE TABLE folds into the row above. SPEEDEX p191 prints its product as
+       `Single + Double` / `Wall Bottles` over two lines, the figures on the first; the second line
+       rendered as a row of em-dashes. A label-only row that data rows FOLLOW is a sub-heading
+       (`Revenue by Source`, p180) and is kept as one, below. */
+    if(body.length>1&&labelOnly(body[body.length-1])&&!labelOnly(body[body.length-2])){
+        const last=body.pop();body[body.length-1][0]=txt(body[body.length-1][0])+' '+txt(last[0]);
+    }
+    const width=Math.max(head.length,...body.map(r=>r.length));
+    const hasData=c=>body.some(r=>!labelOnly(r)&&txt(r[c]));
+    /* A HEADER THAT SITS ONE COLUMN RIGHT OF ITS FIGURES. SPEEDEX p182/p186 print `Amount` twice, so
+       the extractor shifted every value one column left: the `% of Revenue from Operations` header
+       sits over an empty column and the percentages sit under a second `Amount`. A header-only
+       column naming a share hands its label to the nearest unlabelled-as-share column to its left
+       whose cells ARE percentages, keeping that column's period. */
+    const pctCol=c=>{const v=body.filter(r=>!labelOnly(r)).map(r=>txt(r[c])).filter(Boolean);
+        return v.length&&v.every(x=>/%$|^\d{1,3}(?:\.\d+)?$/.test(x))&&v.some(x=>/\./.test(x))};
+    /* A column's OWN header cells, below the spanning row. A word the PDF split across two cells
+       (`% of Revenue fro` | `m`) is rejoined, and a cell that is only such a fragment is not a label. */
+    const frag=v=>/^[a-z]{1,2}$/.test(v);
+    const own=c=>{const out=[];for(let r=1;r<band;r++){let v=txt((rows[r]||[])[c]);const nx=txt((rows[r]||[])[c+1]);
+        if(frag(v))continue;if(v&&frag(nx))v+=nx;if(v)out.push(v)}return out.join(' ')};
+    const fragOnly=c=>{const v=[];for(let r=0;r<band;r++){const x=txt((rows[r]||[])[c]);if(x)v.push(x)}return v.length>0&&v.every(frag)};
+    for(let c=1;c<width;c++){
+        if(hasData(c)||!/%|share|per\s*cent/i.test(own(c)))continue;
+        for(let k=c-1;k>=Math.max(1,c-2);k--){
+            if(hasData(k)&&!/%|share/i.test(own(k))&&pctCol(k)){
+                const period=((head[k]||'').match(/(?:Fiscal|FY|Financial Year)\s*'?\d{2,4}|(?:March|June|September|December)\s+\d{1,2},?\s+\d{4}/i)||[''])[0];
+                head[k]=((period?period+' ':'')+own(c)).trim();head[c]='';break;
+            }
+        }
+    }
+    const keep=[];
+    for(let c=0;c<width;c++){
+        /* A header-only column SURVIVES (JSIPL p172: it is the only clue that 22,500 is the June
+           quarter). It goes only once its label has been handed on above, or when all it holds is a
+           stray fragment like the `m` a wrapped `from` leaves behind. */
+        const hasHead=!!txt(head[c])&&!fragOnly(c);
+        if(hasHead||hasData(c))keep.push(c);
+    }
+    if(!keep.length)return'';
+    const h=keep.map(c=>txt(head[c])||'—');
+    const cells=body.map(r=>labelOnly(r)
+        ? keep.map((c,i)=>i===0?'<strong>'+E(txt(r[0]))+'</strong>':'')
+        : keep.map(c=>E(txt(r[c]))||'—'));
+    const page=grid.source_page?'<p class="method-note">Source: page '+E(grid.source_page)+' of the filing.</p>':'';
+    return table(h,cells,maxVisibleRows)+page;
+}
+/* Every grid a field holds, in page order. A field can carry several (HEROMOTORS has six
+   `revenue_split_product` grids), and decision 8.2 is that we KEEP THEM ALL. */
+const gridTables=v=>A(v).filter(x=>x&&Array.isArray(x.rows)).map(x=>gridTable(x)).filter(Boolean).join('');
+/* THE MANUFACTURING FOOTPRINT takes grids too, and was missed on the first pass. HEROMOTORS p279
+   is `S. No. | Facility | Description of Operations` listing six sites across India, the UK and
+   Thailand; it reached the payload and still rendered em-dashes because this card read
+   `x.location`, `x.role` and `x.ownership`, none of which exist on a grid. */
+function plantsTable(v){
+    const grids=gridTables(v);
+    const legacy=A(v).filter(x=>x&&!Array.isArray(x.rows));
+    if(!legacy.length)return grids;
+    const city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};
+    return grids+table(['Location','Facility','Tenure'],legacy.map(x=>[E(city(x)),E(x.role),E(x.ownership||'—')]));
+}
+/* THE PRODUCT CARDS take grids too. A catalogue captured as `Product | Description` reaches
+   `products` as `{rows, source_page}`, and both card mappings read `x.category` / `x.items`, so
+   a captured catalogue drew an EMPTY card - the same shape defect as `plants`, found the same
+   week. Grids render as the filing printed them; the legacy `{category, items, note}` entries
+   keep their cards. Each call site passes its own legacy markup so the two card styles stay
+   where they were. */
+const productsLegacy=v=>A(v).filter(x=>x&&!Array.isArray(x.rows));
+function productsBlock(v,legacyHtml){return gridTables(v)+(legacyHtml||'');}
+/* Legacy `{name, pct_by_fy}` entries still exist on ~265 instances and must keep rendering, so
+   `mixTable` handles BOTH shapes: the grids first, then the legacy rows if any remain. */
+/* PERIOD-KEYED FACTS SHOW EVERY PERIOD THE FILING REPORTS (2026-09-24 render audit).
+   The mix and concentration tables hard-coded `FY2024 | FY2025 | FY2026`, so any other period was
+   silently dropped. Measured over the store: 1,413 period values across 1,751 legacy mix entries
+   (FY23 x725, H1FY26 x361, 9MFY26 x71...), and 13 cohort concentration cards. SPECTRAA's
+   FY2026 column was blank while its H1FY26 held 12.06 / 44.08 / 63.88.
+   `series` is [[row label, {period: value}], ...]. The periods are the union the data carries,
+   and `tableByPeriod` folds FY24/FY2024 into one column and sorts oldest to newest with interim
+   periods after their full year - the same function every financial table already uses. */
+function byFyTable(first,series,fmt){
+    fmt=fmt||(v=>N(v,1)+'%');
+    const live=series.filter(s=>s[1]&&typeof s[1]==='object'&&!Array.isArray(s[1])&&Object.keys(s[1]).length);
+    if(!live.length)return'';
+    const periods=[...new Set(live.flatMap(s=>Object.keys(s[1])))];
+    const rows=periods.map(p=>[p].concat(live.map(s=>{const v=s[1][p];return v==null||v===''?'—':fmt(v)})));
+    return tableByPeriod([first].concat(live.map(s=>E(s[0]))),rows);
+}
+const gridsOf=v=>A(v).filter(x=>x&&Array.isArray(x.rows));
+const plainObj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:null;
+function mixTable(rows){
+    const grids=gridTables(rows);
+    const legacy=A(rows).filter(x=>x&&!Array.isArray(x.rows)&&(x.name!=null||x.pct_by_fy!=null));
+    return grids+byFyTable('Revenue mix',legacy.map(x=>[x.name,x.pct_by_fy]));
+}
+/* Customer AND supplier concentration, in either stored shape. 30 cohort companies store named
+   keys (`top1_pct_by_fy` ...) and 7 store a captured table; the card read only the keys, so the
+   7 rendered nothing. Top 3 is now a row too - 17 companies carry it and it was never shown. */
+function concentrationBlock(cc,sc){
+    const c=plainObj(cc)||{},s=plainObj(sc)||{};
+    return byFyTable('Concentration',[['Top customer',c.top1_pct_by_fy],['Top three customers',c.top3_pct_by_fy],
+        ['Top five customers',c.top5_pct_by_fy],['Top ten customers',c.top10_pct_by_fy],
+        ['Top supplier',s.top1_pct_by_fy],['Top three suppliers',s.top3_pct_by_fy],
+        ['Top five suppliers',s.top5_pct_by_fy],['Top ten suppliers',s.top10_pct_by_fy]])
+        +gridTables(cc)+gridTables(sc);
+}
+function rsAmount(value){let amount=Number(value);if(!Number.isFinite(amount))return'—';return Math.abs(amount)>100000?'₹'+N(amount/10000000,2)+' cr':'₹'+N(amount,0)}
+/* WE STORE IN RUPEES AND RENDER IN CRORE (owner, 2026-09-19).
+   Every money field in the statement blocks now carries a companion `<field>_amount_rs` holding
+   ABSOLUTE RUPEES as an integer. The bare field stays in LAKHS for backward compatibility while
+   the producers migrate row by row, so BOTH must be read: rupees when present (crore = rs/1e7),
+   lakhs otherwise (crore = lakhs/100). Measured across the published store, `revenue_amount_rs`
+   is on 326 of 729 revenue rows and the balance sheet carries none yet -- a renderer that read
+   only one of the two would blank half the page or print it 100,000x wrong.
+
+   `crVal` returns a NUMBER in crore or null; `crCell` formats it for a table cell. Null renders
+   as an em-dash and NEVER as 0: an absent field is not a company that earned nothing.
+   SIGNS ARE PRESERVED -- a cash outflow is negative in rupees exactly as in lakhs, so nothing
+   here may take an absolute value. */
+function crVal(row,field){
+    if(!row)return null;
+    const num=v=>{if(v==null||v==='')return null;let n=Number(String(v).replace(/,/g,''));return isFinite(n)?n:null};
+    // Rupees first, under either spelling of the companion. The statement blocks name it
+    // `<field>_amount_rs`; the older object blocks whose legacy field is `<field>_lakhs`
+    // (debt_profile loans, one_offs, receivables_aging) name it `<field>_rs`.
+    let rs=num(row[field+'_amount_rs']);
+    if(rs==null)rs=num(row[field+'_rs']);
+    if(rs==null&&/_lakhs$/.test(field))rs=num(row[field.replace(/_lakhs$/,'')+'_amount_rs']);
+    if(rs!=null)return rs/10000000;
+    // Then the legacy LAKHS field, under either spelling.
+    let lk=num(row[field]);
+    if(lk==null)lk=num(row[field+'_lakhs']);
+    return lk==null?null:lk/100;
+}
+const crCell=(row,field,d=2)=>{let v=crVal(row,field);return v==null?'—':N(v,d)};
+/* PER-SHARE AND RATIO FIELDS ARE NEVER UNIT-SCALED. EPS is already an absolute rupee figure per
+   share, percentages are percentages and day counts are days -- dividing any of them by 100 or
+   1e7 is the known 10x/100000x defect class, so they are read raw through `rawVal`, and no
+   `_amount_rs` companion exists or may be invented for them. */
+const rawVal=(row,field)=>{if(!row)return null;let v=row[field];if(v==null||v==='')return null;let n=Number(v);return isFinite(n)?n:null};
+const numCell=(v,d=2,suffix='')=>v==null?'—':N(v,d)+suffix;
+const crMoney=(row,field,d=2)=>{let v=crVal(row,field);return v==null?'—':'₹'+N(v,d)+' cr'};
+/* ONE FISCAL IDENTITY FOR JOINING ACROSS BLOCKS.
+   HEROMOTORS keys its P&L rows `FY24/FY25/FY26` and its balance sheet `FY2024/FY2025/FY2026` --
+   the same three years in two spellings, because different readers produced them. A join between
+   blocks that compares the raw `fy` strings therefore MISSES every row. `periodLabel` already
+   folds both spellings to one COLUMN label, and this reuses it as the JOIN key so the two agree
+   by construction. A genuine stub keeps its own identity: JINDALSUPREMEINDIA's `Q1FY27` resolves
+   to 'Q1FY27', not to 'FY27', and so never merges with the full year it falls inside. */
+const fyKey=row=>periodLabel(row&&row.fy!=null?row.fy:row&&row.period).label;
+const byFy=rows=>{let m={};A(rows).forEach(r=>{let k=fyKey(r);if(k&&!(k in m))m[k]=r});return m};
+function concise(value,limit=280){let text=String(value||'').replace(/\s+/g,' ').trim();if(text.length<=limit)return text;let cut=text.slice(0,limit),stop=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('; '));if(stop>Math.floor(limit*.55))cut=cut.slice(0,stop+1);else cut=cut.replace(/\s+\S*$/,'');return cut.replace(/[,:;\s]+$/,'')+'…'}
+function inBusiness(){let b=sec('business_ops'),o=sec('overview'),cc=b.customer_concentration||{},sc=b.supplier_concentration||{},products=productsLegacy(b.products);let prod=products.map(x=>{let note=String(x.note||'').replace(/ supplied in Fiscal 2026/gi,'').replace(/ in Fiscal 2026/gi,'');return'<article class="product-card"><h3>'+E(x.category)+'</h3><p>'+E(A(x.items).join(' · '))+'</p><small>'+E(note)+'</small></article>'}).join('');let concentration=table(['Concentration','FY2024','FY2025','FY2026'],[['Top customer',N(cc.top1_pct_by_fy?.FY2024,1)+'%',N(cc.top1_pct_by_fy?.FY2025,1)+'%',N(cc.top1_pct_by_fy?.FY2026,1)+'%'],['Top five customers',N(cc.top5_pct_by_fy?.FY2024,1)+'%',N(cc.top5_pct_by_fy?.FY2025,1)+'%',N(cc.top5_pct_by_fy?.FY2026,1)+'%'],['Top ten customers',N(cc.top10_pct_by_fy?.FY2024,1)+'%',N(cc.top10_pct_by_fy?.FY2025,1)+'%',N(cc.top10_pct_by_fy?.FY2026,1)+'%'],['Top ten suppliers',N(sc.top10_pct_by_fy?.FY2024,1)+'%',N(sc.top10_pct_by_fy?.FY2025,1)+'%',N(sc.top10_pct_by_fy?.FY2026,1)+'%']]);let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};return'<div class="stack">'+card('How the business makes money','<p>'+E(o.business_model||P.summary.business)+'</p>')+card('Product-group architecture',productsBlock(b.products,prod?'<div class="product-grid">'+prod+'</div>':''))+card('Revenue mix by product group',mixTable(b.revenue_split_product))+card('Geographic revenue mix',mixTable(b.revenue_split_geography))+card('Customer and supplier concentration',concentration)+card('Manufacturing footprint',plantsTable(b.plants))+card('Vertical integration','<p>'+E(b.supply_chain_integration)+'</p>')+card('Qualification stack',list(b.certifications,12))+'</div>'}
+function drhpBusinessGeneric(){
+    let b=sec('business_ops'),o=sec('overview'),facts=A(b.other_material_facts);
+    let evidence=(labels,limit=8)=>facts.filter(x=>labels.includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,260)).filter(Boolean).slice(0,limit);
+    let industry=A(b.revenue_split_industry),tenure=industry.filter(x=>/existing customers|new customers/i.test(x.name||''));
+    let endMarkets=industry.filter(x=>/^(BFSI|Government|Enterprise)/i.test(x.name||'')).filter((x,i,a)=>a.findIndex(y=>String(y.name).replace(/\W/g,'').replace(/\d/g,'').toLowerCase()===String(x.name).replace(/\W/g,'').replace(/\d/g,'').toLowerCase())===i).slice(0,3);
+    let city=x=>{let role=String(x.role||''),m=role.match(/\b(?:in|at)\s+(?:CEL\s+)?([^,(]+)/i);if(m)return m[1].trim();let parts=String(x.location||'').split(',').map(s=>s.trim()).filter(Boolean);return parts.length>1?parts[parts.length-2]:parts[0]||'—'};
+    let operating=A(b.plants).filter(x=>/(data cent(?:re|er)|manufactur(?:ing|ing facility)|\bplant\b|warehouse|operating facility)/i.test(x.role||''));
+    let facility=x=>/data cent(?:re|er)/i.test(x.role||'')?'Data Centre':/manufactur/i.test(x.role||'')?'Manufacturing Facility':/warehouse/i.test(x.role||'')?'Warehouse':'Operating Facility';
+    // CAPTURED GRIDS FIRST, then the legacy `{unit_or_product, utilization_pct_by_fy}` rows.
+    // 24 of 102 `capacity_utilization` instances are grid-only and rendered a column of
+    // em-dashes; SKOFFSET p180 is the worst of them, a complete three-product table whose
+    // percentages sit under a column headed `%`. See `gridTable`.
+    let capLegacy=A(b.capacity_utilization).filter(x=>x&&!Array.isArray(x.rows));
+    let capacity=gridTables(b.capacity_utilization)
+        +(capLegacy.length?table(['Resource','FY2024','FY2025','FY2026'],capLegacy.map(x=>[E(x.unit_or_product),x.utilization_pct_by_fy?.FY24==null?'—':N(x.utilization_pct_by_fy.FY24,1)+'%',x.utilization_pct_by_fy?.FY25==null?'—':N(x.utilization_pct_by_fy.FY25,1)+'%',x.utilization_pct_by_fy?.FY26==null?'—':N(x.utilization_pct_by_fy.FY26,1)+'%'])):'');
+    let capValue=(x,fy)=>{let full='FY20'+fy.slice(2),installed=x.installed_capacity_by_fy?.[fy]??x.installed_capacity_by_fy?.[full],production=x.production_by_fy?.[fy]??x.production_by_fy?.[full],used=x.utilization_pct_by_fy?.[fy]??x.utilization_pct_by_fy?.[full],parts=[];if(installed!=null)parts.push(N(installed,0)+' '+E(x.capacity_unit||''));if(production!=null)parts.push('output '+N(production,0));if(used!=null)parts.push(N(used,1)+'% used');return parts.join(' · ')||'—'};
+    if(capLegacy.some(x=>x.installed_capacity_by_fy||x.production_by_fy))capacity=gridTables(b.capacity_utilization)+table(['Resource','FY2024','FY2025','FY2026'],capLegacy.map(x=>[E(x.unit_or_product),capValue(x,'FY24'),capValue(x,'FY25'),capValue(x,'FY26')]));
+    let cards=card('How the business makes money','<p>'+E(concise(o.business_model||P.summary.business,520))+'</p>');
+    /* EVERY STORED PRODUCT FACT REACHES THE PAGE (2026-09-25). `note` - the description the filing
+       prints beside each group, held on 485 stored entries - was never rendered, categories were
+       cut at 90 characters and only 8 groups showed; measured, 31% of stored product text reached
+       the page. Groups past the eighth sit behind a toggle so the card stays scannable. */
+    let productGroups=productsLegacy(b.products).map(x=>{let items=A(x.items);if(!items.length&&x.items)items=[x.items];return'<article class="product-card"><h3>'+E(concise(x.category||'Product group',180))+'</h3>'+list(items,12)+(x.note?'<p class="muted">'+E(concise(x.note,600))+'</p>':'')+'</article>'});
+    let groupsHtml=productGroups.length?'<div class="product-grid">'+productGroups.slice(0,8).join('')+'</div>'+(productGroups.length>8?'<details class="more-groups"><summary>Show '+(productGroups.length-8)+' more product group'+(productGroups.length-8===1?'':'s')+'</summary><div class="product-grid">'+productGroups.slice(8).join('')+'</div></details>':''):'';
+    let productsHtml=productsBlock(b.products,groupsHtml);
+    if(productsHtml)cards+=card('Products and solutions',productsHtml);
+    let differentiation=evidence(['technology_ip','vertical_integration','cost_advantage','customer_qualification'],10);if(differentiation.length)cards+=card('Technology, platform and differentiation',list(differentiation,10),'positive');
+    if(A(b.revenue_split_product).length)cards+=card('Revenue mix by product group',mixTable(b.revenue_split_product));
+    if(endMarkets.length)cards+=card('Revenue mix by customer industry',mixTable(endMarkets));
+    if(tenure.length)cards+=card('Customer mix by tenure',mixTable(tenure));
+    let concHtml=concentrationBlock(b.customer_concentration,b.supplier_concentration);
+    if(concHtml)cards+=card('Customer and supplier concentration',concHtml);
+    // FIVE FIELDS THIS RENDERER NEVER READ (2026-09-24 render audit), so they were extracted,
+    // gated and invisible: operating_kpi_grid (47 companies), revenue_split_geography,
+    // domestic_export_mix, order_book, employees. Each takes both stored shapes - a captured grid,
+    // or the older named keys. `certifications` and `strengths_stated` stay OFF this section by
+    // owner decision: certifications is on the 4f0 exclusion list, and strengths belong to the
+    // Moat card (R1).
+    if(A(b.revenue_split_geography).length){let g=mixTable(b.revenue_split_geography);if(g)cards+=card('Geographic revenue mix',g);}
+    let dx=b.domestic_export_mix,dxHtml=gridTables(dx);
+    if(plainObj(dx))dxHtml+=byFyTable('Revenue by market',[['Domestic',dx.domestic_pct_by_fy],['Export',dx.export_pct_by_fy]]);
+    if(dxHtml)cards+=card('Domestic and export revenue',dxHtml);
+    // A KPI grid that repeats at least half the rows of a table already on this section is not
+    // shown again: 7 of 165 stored KPI grids overlap a revenue-split or capacity table that way.
+    let rowKeys=g=>g.rows.filter(r=>A(r).slice(1).some(c=>String(c==null?'':c).trim())).map(r=>JSON.stringify(r));
+    let seenRows=new Set(['revenue_split_product','revenue_split_geography','capacity_utilization','plants','products','customer_concentration','supplier_concentration','domestic_export_mix'].flatMap(f=>gridsOf(b[f]).flatMap(rowKeys)));
+    let kpiHtml=gridsOf(b.operating_kpi_grid).filter(g=>{let k=rowKeys(g);return !k.length||k.filter(x=>seenRows.has(x)).length*2<k.length}).map(g=>gridTable(g)).join('');
+    if(kpiHtml)cards+=card('Operating metrics',kpiHtml);
+    let ob=b.order_book,obHtml=gridTables(ob);
+    if(plainObj(ob)){
+        let tiles=[];
+        if(ob.value_lakhs!=null&&isFinite(Number(ob.value_lakhs)))tiles.push({label:'Order book'+(ob.as_of?' as of '+ob.as_of:''),value:'₹'+N(Number(ob.value_lakhs)/100,2)+' cr'});
+        if(ob.unexecuted_pct!=null&&isFinite(Number(ob.unexecuted_pct)))tiles.push({label:'Unexecuted',value:N(ob.unexecuted_pct,1)+'%'});
+        obHtml+=kpis(tiles);
+        let byFy=plainObj(ob.value_lakhs_by_fy);
+        if(byFy)obHtml+=byFyTable('Order book',[['Order book (₹ cr)',Object.fromEntries(Object.entries(byFy).map(([k,v])=>[k,Number(v)/100]))]],v=>N(v,2));
+    }
+    if(obHtml)cards+=card('Order book',obHtml);
+    let em=b.employees,emHtml=gridTables(em);
+    if(plainObj(em)){let t=[em.total,em.total_headcount,em.permanent_employees,em.permanent].find(x=>x!=null&&x!==''&&isFinite(Number(x)));
+        if(t!=null)emHtml+=kpis([{label:'Employees'+(em.as_of?' as of '+em.as_of:''),value:N(t,0)}]);}
+    /* The OVERVIEW reader stores headcount too (`overview.employee_strength`, 33 companies with a
+       count and often a department / attrition / contract-labour note) and nothing rendered it. */
+    let es=plainObj(o.employee_strength);
+    if(!emHtml&&es&&es.count!=null&&isFinite(Number(es.count)))emHtml=kpis([{label:'Employees'+(es.as_of?' as of '+es.as_of:''),value:N(es.count,0)}])+(es.note?'<p class="muted">'+E(concise(es.note,700))+'</p>':'');
+    if(emHtml)cards+=card('Employees',emHtml);
+    /* Key inputs and how they are sourced (`raw_materials`), stored and never rendered. */
+    let rm=plainObj(b.raw_materials);
+    if(rm){let inputs=A(rm.key_inputs||rm.key_materials||rm.materials);if(inputs.length||rm.sourcing)cards+=card('Raw materials and sourcing',(inputs.length?list(inputs,12):'')+(rm.sourcing?'<p>'+E(concise(rm.sourcing,600))+'</p>':''));}
+    if(A(b.capacity_utilization).length)cards+=card('Capacity utilisation by resource',capacity);
+    // Grids first: a captured facility register has no `role`, so the `operating` filter above
+    // discards it and this card was silently OMITTED rather than blank — HEROMOTORS p279's six
+    // sites never appeared here at all.
+    let footprintGrid=gridTables(b.plants);
+    if(footprintGrid||operating.length)cards+=card('Operating footprint',footprintGrid+(operating.length?table(['Location','Facility'],operating.map(x=>[E(city(x)),E(facility(x))])):''));
+    if(b.channel_mix?.distributors)cards+=card('Distribution reach',kpis([{label:'Distributors',value:N(b.channel_mix.distributors,0)},{label:'States',value:E(b.channel_mix.states||'—')} ]));
+    let qualifications=evidence(['certifications','repeat_business'],10);if(qualifications.length)cards+=card('Qualifications and customer relationships',list(qualifications,10));
+    return'<div class="stack">'+cards+'</div>'
+}
+/* THE P&L IS PRINTED AS A SPINE, AND THE PAGE NOW SHOWS IT AS ONE. Until 2026-09-17 three
+   separate renderers each hard-coded Revenue -> EBITDA -> PAT and nothing between, so EBITDA was
+   an unverifiable number: a reader had no way to get from the top line down to profit. The
+   producer extracts other income, total income, finance costs, depreciation, PBT and tax, and
+   they were sitting in the store unrendered.
+   Built ONCE here because there were three copies of the column list and a fourth would have
+   been added by the next person to touch this -- the same reason the producers were consolidated.
+   A column is DROPPED when no year carries it rather than printed as a column of dashes:
+   coverage of the spine lines varies by filing (29-41% of recently-listed and open IPOs), and an
+   all-dash column reads as a company that reported nothing, not as a statement we could not
+   parse. `opts.ratios` and `opts.years` supply margins when the row itself lacks them; `opts.eps`
+   appends the EPS column for the callers that show it. */
+/* THE P&L BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Sales, Expenses, Operating Profit, OPM %, Other Income, Interest, Depreciation,
+     Profit before tax, Tax %, Net Profit, EPS in Rs.
+   Money reads `<field>_amount_rs` and renders CRORE, per `crVal`. Two lines are DERIVED because
+   the store holds no field for them, and each is derived only from figures the same row actually
+   carries -- never part-invented:
+     Expenses      = total income (or sales+other income) - operating profit
+     Tax %         = tax / PBT, the effective rate the filing implies
+   `Operating Profit` is EBITDA: operating earnings before interest and depreciation, which is
+   what the store's `ebitda` holds and what the owner's `OPM %` is computed against. When the
+   inputs for a derived line are absent the cell is an em-dash, never 0. */
+function pnlSpineTable(rows,opts){opts=opts||{};let ratios=opts.ratios||{},years=opts.years||{};
+    // [label, value(row, ctx) -> number|null, decimals, suffix]. A column survives only if some
+    // row produces a value for it, so a company reporting no interest gets no interest COLUMN
+    // rather than a column of dashes that reads as "reported nil".
+    const sales=x=>crVal(x,'revenue'),
+          otherInc=x=>crVal(x,'other_income'),
+          totalInc=x=>{let t=crVal(x,'total_income');if(t!=null)return t;let s=sales(x);if(s==null)return null;let o=otherInc(x);return o==null?s:s+o},
+          op=x=>crVal(x,'ebitda'),
+          expenses=x=>{let t=totalInc(x),o=op(x);return t==null||o==null?null:t-o};
+    let cols=[
+        ['Sales ₹cr',sales,2,''],
+        ['Expenses ₹cr',expenses,2,''],
+        ['Operating Profit ₹cr',op,2,''],
+        ['OPM %',(x,c)=>c.opm,2,'%'],
+        ['Other Income ₹cr',otherInc,2,''],
+        ['Interest ₹cr',x=>crVal(x,'finance_cost'),2,''],
+        ['Depreciation ₹cr',x=>crVal(x,'depreciation'),2,''],
+        ['Profit before tax ₹cr',x=>crVal(x,'pbt'),2,''],
+        ['Tax %',(x,c)=>c.taxPct,2,'%'],
+        ['Net Profit ₹cr',x=>crVal(x,'pat'),2,''],
+    ];
+    if(opts.margins===0)cols=cols.filter(c=>c[0]!=='OPM %');
+    // EPS IS A PER-SHARE RUPEE FIGURE AND IS NEVER UNIT-SCALED.
+    if(opts.eps)cols.push(['EPS in Rs',x=>rawVal(x,'eps'),2,'']);
+    if(!rows.length)return '';
+    // Context per row: the margins, which prefer the stored percentage over a recomputation so the
+    // page shows what the filing reported rather than our arithmetic on rounded inputs.
+    const ctx=x=>{
+        let r=ratios[x.fy]||ratios[periodLabel(x.fy).label]||ratios['FY20'+String(x.fy||'').slice(2)]||{};
+        let opm=x.ebitda_margin_pct??r.ebitda_margin_pct??years[x.fy]?.ebitda_margin_pct;
+        if(opm==null){let s=sales(x),o=op(x);if(s!=null&&o!=null&&s!==0)opm=100*o/s;}
+        /* A STORED `tax_pct` IS PREFERRED OVER THE DERIVATION, exactly as OPM % above prefers a
+           stored `ebitda_margin_pct`. This read ONLY tax/pbt, so a producer that supplies the
+           percentage without the tax AMOUNT had the row dropped entirely -- measured 2026-09-20:
+           120 rows across 26 companies, every screener-filled company among them, because
+           screener's card prints `Tax %` and no tax figure. LENSKART carried tax_pct on all seven
+           years and rendered no Tax % row at all.
+           Same shape as the ROCE wiring and the day counts: a value sitting in the payload that
+           the renderer had no path to. The derivation stays as the fallback, so every company
+           rendering today is unaffected. */
+        let pbt=crVal(x,'pbt'),tax=crVal(x,'tax');
+        let taxPct=rawVal(x,'tax_pct');
+        if(taxPct==null)taxPct=r?rawVal(r,'tax_pct'):null;
+        if(taxPct==null&&pbt!=null&&tax!=null&&pbt!==0)taxPct=100*tax/pbt;
+        return {opm:opm==null?null:Number(opm),taxPct:taxPct};
+    };
+    const ctxs=rows.map(ctx);
+    /* EVERY SPEC LINE IS PRINTED, dashed where there is no figure (owner, 2026-09-20). The four
+       tables each used to drop a line that no period filled, so the shape of the block changed from
+       company to company: measured over all 6,248 published pages, only 41 showed all 33 lines, and
+       `Tax %` alone vanished from 86 of the 224 rendered P&Ls. The earlier note here argued an
+       all-dash line reads as "reported nothing" -- but a line that is simply absent says nothing at
+       all, and the owner's call is that a dash stating "no figure" is the more honest of the two.
+       `keep` is retained as the name so the emit below is untouched; the wholly-empty table still
+       returns '' and the card shows its blank placeholder. */
+    let keep=cols;
+    if(!cols.some(c=>rows.some((x,i)=>c[1](x,ctxs[i])!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),rows.map((x,i)=>
+        [E(x.fy)].concat(keep.map(c=>numCell(c[1](x,ctxs[i]),c[2],c[3])))));}
+
+/* THE BALANCE SHEET BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Equity Capital, Reserves, Borrowings, Other Liabilities, Total Liabilities,
+     Fixed Assets, CWIP, Investments, Other Assets, Total Assets.
+   The store's vocabulary is narrower than these ten lines, so each is mapped to the field that
+   actually holds it and left ABSENT when nothing does -- measured over the published store,
+   `equity_share_capital` appears on 3 rows against `networth` on 491. Two lines are derived from
+   what the row carries, and only when every input is present:
+     Reserves          = net worth - equity capital (the reserves inside the stored net worth)
+     Other Liabilities = total liabilities - borrowings, once a total is known
+   Nothing here is back-solved from a figure the row does not have: an absent cell is an em-dash. */
+function balanceSheetTable(rows){
+    rows=A(rows); if(!rows.length)return '';
+    const equity=x=>crVal(x,'equity_share_capital'),
+          nw=x=>crVal(x,'networth'),
+          reserves=x=>{let r=crVal(x,'other_equity');if(r!=null)return r;let n=nw(x),e=equity(x);return n==null||e==null?null:n-e},
+          borrow=x=>{let t=crVal(x,'total_debt');if(t!=null)return t;
+              let l=crVal(x,'long_term_borrowings'),s=crVal(x,'short_term_borrowings');
+              if(l==null)l=crVal(x,'non_current_borrowings');
+              if(s==null)s=crVal(x,'current_borrowings');
+              return l==null&&s==null?null:(l||0)+(s||0)},
+          totalLia=x=>{let t=crVal(x,'total_liabilities');if(t!=null)return t;return crVal(x,'total_assets')},
+          // Same rule as `Other Assets`: a residual that comes out negative is proof the inputs
+          // disagree, not a liability balance, so it is left blank rather than published.
+          otherLia=x=>{let t=totalLia(x),b=borrow(x),e=equity(x),r=reserves(x);
+              if(t==null||b==null||e==null||r==null)return null;
+              let rest=t-b-e-r;return rest<0?null:rest},
+          totalAssets=x=>crVal(x,'total_assets');
+    let cols=[
+        ['Equity Capital ₹cr',equity],
+        ['Reserves ₹cr',reserves],
+        ['Borrowings ₹cr',borrow],
+        ['Other Liabilities ₹cr',otherLia],
+        ['Total Liabilities ₹cr',totalLia],
+        ['Fixed Assets ₹cr',x=>crVal(x,'net_fixed_assets')],
+        ['CWIP ₹cr',x=>crVal(x,'cwip')],
+        ['Investments ₹cr',x=>crVal(x,'investments')],
+        /* A DERIVED RESIDUAL IS ONLY PUBLISHED WHEN IT IS POSSIBLE.
+           `Other Assets` is what is left of the total after the named asset lines, so it can only
+           be >= 0. HEROMOTORS stores `total_assets` 281.95 cr against `net_fixed_assets` 360.31 cr
+           alone -- the stored total is smaller than one of its own components, so the residual
+           comes out at -137.96 cr. That is an upstream extraction defect (the bs producers own
+           `total_assets`), and the honest render of an arithmetic that cannot be true is a BLANK:
+           printing a negative asset balance would assert, in our own voice, something no filing
+           says. The named lines beside it still render, so nothing the store does hold is lost. */
+        ['Other Assets ₹cr',x=>{let t=totalAssets(x),fa=crVal(x,'net_fixed_assets'),cw=crVal(x,'cwip'),iv=crVal(x,'investments');
+            if(t==null||fa==null)return null;
+            let rest=t-fa-(cw||0)-(iv||0);
+            return rest<0?null:rest}],
+        ['Total Assets ₹cr',totalAssets],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`. The emptiness
+    // test now asks the DATA, because `keep` is always full and `!keep.length` could never fire.
+    let keep=cols;
+    if(!cols.some(c=>rows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        rows.map(x=>[E(x.fy)].concat(keep.map(c=>numCell(c[1](x),2)))));
+}
+
+/* THE CASH FLOW BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Cash from Operating Activity, Cash from Investing Activity, Cash from Financing Activity,
+     Net Cash Flow, Free Cash Flow, CFO/OP.
+   CASH FLOWS ARE SIGNED. An outflow is negative in rupees exactly as it is in lakhs, so no cell
+   here may take an absolute value -- HEROMOTORS' FY25 net cash flow is -33.20 cr and must print
+   as a negative number, because a page that shows 33.20 reports the opposite of what happened.
+   `Free Cash Flow` and `CFO/OP` are rendered from the store when it carries them and left absent
+   otherwise: capex has not landed yet, and a blank is honest where a zero would be a fabrication.
+   `CFO/OP` joins the cash flow to the P&L BY FISCAL IDENTITY, never by array position -- the two
+   blocks are stored in opposite directions (HEROMOTORS' cash flow descends while its P&L ascends),
+   so an index join silently divides FY26's cash flow by FY24's operating profit. */
+function cashFlowTable(rows,pnlRows){
+    rows=A(rows); if(!rows.length)return '';
+    const pnlBy=byFy(pnlRows);
+    const cfo=x=>crVal(x,'cfo'),cfi=x=>crVal(x,'cfi'),cff=x=>crVal(x,'cff'),
+          capex=x=>crVal(x,'capex'),
+          netcf=x=>{let n=crVal(x,'net_cash_flow');if(n!=null)return n;
+              n=crVal(x,'net_change_in_cash');if(n!=null)return n;
+              let o=cfo(x),i=cfi(x),f=cff(x);
+              return o==null||i==null||f==null?null:o+i+f},
+          fcf=x=>{let v=crVal(x,'free_cash_flow');if(v!=null)return v;
+              let o=cfo(x),c=capex(x);
+              // capex is stored as the outflow it is; free cash flow is CFO net of it.
+              return o==null||c==null?null:o-Math.abs(c)},
+          cfoOp=x=>{let o=cfo(x),p=pnlBy[fyKey(x)];if(o==null||!p)return null;
+              let op=crVal(p,'ebitda');return op==null||op===0?null:o/op};
+    let cols=[
+        ['Cash from Operating Activity ₹cr',cfo,2,''],
+        ['Cash from Investing Activity ₹cr',cfi,2,''],
+        ['Cash from Financing Activity ₹cr',cff,2,''],
+        ['Net Cash Flow ₹cr',netcf,2,''],
+        ['Free Cash Flow ₹cr',fcf,2,''],
+        ['CFO/OP',cfoOp,2,''],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`.
+    let keep=cols;
+    if(!cols.some(c=>rows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        rows.map(x=>[E(x.fy)].concat(keep.map(c=>numCell(c[1](x),c[2],c[3])))));
+}
+
+/* THE RATIOS BLOCK, IN THE OWNER'S ORDER (2026-09-19):
+     Debtor Days, Inventory Days, Days Payable, Cash Conversion Cycle, Working Capital Days, ROCE %.
+   DAY COUNTS AND PERCENTAGES ARE NEVER UNIT-SCALED -- they are days and percent, not money, so
+   `_amount_rs` neither exists nor applies to them. The day counts are derived where the store
+   does not carry them, against the SAME year's sales joined by fiscal identity rather than array
+   position (the balance sheet spells HEROMOTORS' years `FY2024` while the P&L spells them `FY24`,
+   so a raw-string or positional join finds nothing). Sales is the denominator for all four, which
+   is the convention the owner's screener figures follow; cost of goods is not stored.
+     Cash Conversion Cycle = debtor days + inventory days - days payable
+     Working Capital Days  = debtor days + inventory days - days payable  (net operating cycle) */
+function ratiosTable(bsRows,pnlRows,rrRows){
+    bsRows=A(bsRows); if(!bsRows.length)return '';
+    const pnlBy=byFy(pnlRows),rrBy=byFy(rrRows);
+    const salesOf=x=>{let p=pnlBy[fyKey(x)];return p?crVal(p,'revenue'):null};
+    const days=(x,field)=>{let s=salesOf(x),v=crVal(x,field);
+        return s==null||v==null||s===0?null:v/s*365};
+    /* A STORED DAY COUNT IS PREFERRED OVER A DERIVED ONE, and every one of the five must have
+       that path -- not just Debtor Days. Only `dso_days` was read, so a producer supplying
+       `inventory_days` or `payable_days` had them silently ignored and the rows rendered from
+       balance-sheet residuals instead, or not at all.
+       Measured 2026-09-20 on the screener fill: its ratios card carries all five day counts
+       directly (MALA FY2022 debtor 194, inventory 92, payable 153, cycle 132, working capital 49)
+       and supplies NO `trade_receivables`/`inventory`/`trade_payables`, so a derive-only reader
+       saw four blank rows on a company whose figures were sitting in the payload. The same held
+       for 16 of the 31 cached companies.
+       The derivation stays as the fallback for every company that has the balance-sheet lines and
+       no stored counts, which is how the DRHP path works today -- so nothing that renders now
+       changes. `rrBy` is consulted too: the producer writes ratio rows into `return_ratios`
+       keyed by the same fiscal identity. */
+    /* THREE PLACES, NOT TWO. The producer writes the day counts and ROCE onto the `pnl_3yr` rows
+       (`factual_populate` ~3801), and this looked only at the balance-sheet row and
+       `return_ratios` -- so a value it had computed was invisible to the table that exists to
+       show it. Measured 2026-09-20: `debtor_days` sits in pnl_3yr for 105 of 226 companies,
+       inventory_days 72, working_capital_days 68, payable_days 56, cash_conversion_cycle 52,
+       roce_pct 83. That is the same wiring mismatch as the ROCE fix, the four derive-only day
+       counts and the Tax % row -- a stored figure with no path to the page, four times over. */
+    const stored=(x,f)=>{let v=rawVal(x,f);if(v!=null)return v;
+        let r=rrBy[fyKey(x)];v=r?rawVal(r,f):null;if(v!=null)return v;
+        let p=pnlBy[fyKey(x)];return p?rawVal(p,f):null};
+    const debtor=x=>{let d=stored(x,'dso_days');if(d==null)d=stored(x,'debtor_days');
+              return d!=null?d:days(x,'trade_receivables')},
+          invd=x=>{let d=stored(x,'inventory_days');return d!=null?d:days(x,'inventory')},
+          payd=x=>{let d=stored(x,'payable_days');return d!=null?d:days(x,'trade_payables')},
+          cycle=x=>{let d=stored(x,'cash_conversion_cycle_days');if(d!=null)return d;
+              let a=debtor(x),b=invd(x),c=payd(x);
+              return a==null||b==null||c==null?null:a+b-c},
+          wcd=x=>{let d=stored(x,'working_capital_days');return d!=null?d:cycle(x)};
+    let cols=[
+        ['Debtor Days',debtor],
+        ['Inventory Days',invd],
+        ['Days Payable',payd],
+        ['Cash Conversion Cycle',cycle],
+        /* WAS `cycle` TOO -- two labels rendering one number. Now reads its own stored
+           `working_capital_days` where a producer supplies it (screener does), falling back to
+           the cycle only when it does not, which preserves every page that renders today. */
+        ['Working Capital Days',wcd],
+        /* ROCE IS WRITTEN INTO `pnl_3yr`, AND THIS READ ONLY `return_ratios`.
+           The producer derives `roce_pct` onto the P&L row (factual_populate, 19.6.12's ratio
+           block); `return_ratios` is an older, separately-populated block. Measured on the store:
+           44 companies carry roce_pct in `pnl_3yr` and NOT in `return_ratios`, so their ROCE row
+           could never render, while 26 carry it in both and 49 in `return_ratios` alone. Reading
+           `return_ratios` FIRST keeps those 49 exactly as they were and adds the 44 that were
+           invisible; a company with neither still renders no ROCE row, because the column is
+           dropped when no year produces a value.
+           A per-symbol reconciler for this already existed (`inFinancialsReconciled`) but was
+           wired to INDOMIM alone, so every other company fell through to the unreconciled path --
+           the fix belongs at the lookup, not in another special case. */
+        ['ROCE %',x=>{let k=fyKey(x),r=rrBy[k],v=r?rawVal(r,'roce_pct'):null;
+            if(v!=null)return v;
+            let p=pnlBy[k];return p?rawVal(p,'roce_pct'):null}],
+        /* ROE SITS IN THE STORE ON 147 OF 224 COMPANIES AND WAS RENDERED NOWHERE (owner, 2026-09-20).
+           The producer writes it as PAT over CLOSING net worth (factual_populate 19.6.12), under two
+           names: an Indian filing says Return on Net Worth, a screener-style page says ROE, and
+           `ronw_pct` and `roe_pct` are set to the same number so neither consumer needs the other's
+           word for it. Both are read here for that reason.
+           Same three-place lookup as ROCE and the day counts -- the row itself, then `return_ratios`,
+           then `pnl_3yr` -- because a value the producer computed was invisible to the table that
+           exists to show it, four times over. The derivation is the LAST resort and repeats the
+           producer's convention exactly (closing, not average or opening net worth) so a rendered
+           figure never disagrees with a stored one; net worth prefers the printed split
+           `equity_share_capital + other_equity` over the stored total, as the producer does. */
+        ['ROE %',x=>{let v=stored(x,'roe_pct');if(v!=null)return v;
+            v=stored(x,'ronw_pct');if(v!=null)return v;
+            let k=fyKey(x),p=pnlBy[k],pat=p?crVal(p,'pat'):null;
+            if(pat==null)return null;
+            let eq=crVal(x,'equity_share_capital'),oe=crVal(x,'other_equity'),
+                nw=(eq!=null&&oe!=null)?eq+oe:crVal(x,'networth');
+            return (nw==null||nw<=0)?null:100*pat/nw}],
+    ];
+    // Every spec line prints, dashed where empty -- see the note in `pnlSpineTable`.
+    let keep=cols;
+    if(!cols.some(c=>bsRows.some(x=>c[1](x)!=null)))return '';
+    return tableByPeriod(['Year'].concat(keep.map(c=>c[0])),
+        /* Percent formatting keys on the LABEL, not on one hard-coded name. It read `ROCE %`
+           literally, so adding `ROE %` would have printed a bare number at day-count precision --
+           the second percentage line proves the rule that the first one only implied. Day counts
+           stay at 1dp, percentages at 2dp with the suffix. */
+        bsRows.map(x=>[E(x.fy)].concat(keep.map(c=>{let pc=/%$/.test(c[0]);
+            return numCell(c[1](x),pc?2:1,pc?'%':'')}))));
+}
+function inFinancials(){let f=sec('financials'),intel=sec('intellisense'),years=D.kpi?.years||{},recv=f.receivables_aging||{};
+    /* THE FOUR BLOCKS, IN THE OWNER'S ORDER: P&L, Balance sheet, Cash flow, Ratios.
+       Every money figure reads `<field>_amount_rs` and renders CRORE (`crVal`), falling back to
+       the legacy lakhs field only where the rupee companion has not landed. */
+    let pnlRows=A(f.pnl_3yr),bsRows=A(f.balance_sheet_key),cfRows=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let pnl=pnlSpineTable(pnlRows,{years:years,eps:1});
+    let bs=balanceSheetTable(bsRows);
+    let cf=cashFlowTable(cfRows,pnlRows);
+    let ratios=ratiosTable(bsRows,pnlRows,rrRows);
+    let debt=table(['Borrowing type','Amount ₹cr','Purpose'],A(f.debt_profile?.loans).map(x=>[E(x.type),numCell(crVal(x,'amount'),2),E(x.purpose)]));
+    let oneoffs=table(['Year','Item','Amount ₹cr','Interpretation'],A(f.one_offs).map(x=>[E(x.fy),E(x.item),numCell(crVal(x,'amount'),2),E(x.note)]));
+    let checks=table(['Check','Result','Evidence'],A(intel.forensic).filter(x=>!/objects_total|CFO_vs_PAT/i.test(x.check||'')).map(x=>[E(x.check),status(x.verdict),E(x.note)]));
+    return'<div class="stack">'
+        +card('Profit & loss',badge('Reported fact')+pnl)
+        +card('Balance sheet',bs)
+        +card('Cash flow',cf,'positive')
+        +card('Ratios',ratios)
+        +creditRatingCard()+'</div>'}
+function inFinancialsReconciled(){let f=sec('financials'),years=D.kpi?.years||{};A(f.pnl_3yr).forEach(x=>{if(x.pat_margin_pct==null&&x.revenue)x.pat_margin_pct=100*x.pat/x.revenue});A(f.return_ratios).forEach(x=>{if(x.roce_pct==null&&years[x.fy]?.roce_pct!=null)x.roce_pct=years[x.fy].roce_pct});return inFinancials()}
+/* THE FINANCIAL SECTION, IDENTICAL FOR EVERY COMPANY (owner, 2026-09-20: "this should appear
+   same across all symbols we have", "for all company I want to standardise this section").
+
+   Four cards, always in the owner's order: Profit & loss, Balance sheet, Cash flow, Ratios.
+
+   WHY A SHARED FUNCTION RATHER THAN A CONVENTION. The section was produced by FOUR different
+   renderers picked per company -- `opFinancials` on 2,034 public pages, `drhpFinancials` on 142,
+   `transitionFinancials` on 81, `segmentFinancials` on 1 -- plus per-symbol hand-written variants
+   for HFCL, INDOMIM, EXIDEIND, CUMMINSIND and WELCORP. Each emitted its own card list, so
+   HINDZINC showed an eight-quarter trajectory and a five-year valuation history while NSE showed
+   the four tables. That is a code-path difference, not a data one, and no amount of extraction
+   work would have made the two pages agree.
+
+   A CARD IS KEPT EVEN WHEN ITS TABLE IS EMPTY (owner: "if no data for any table it can stay
+   blank"). `card()` returns '' for an empty body, which DROPS the card entirely -- so a company
+   with no cash flow silently lost the heading and a reader could not tell "no data" from "we do
+   not show this". The placeholder says which it is.
+
+   THE COLUMN COUNT IS NOT FIXED (owner: "number of years could be different based on years or
+   quarters are available"). Measured across the opFinancials pages that carry a P&L: 1, 3, 4 and
+   5 years all occur. `tableByPeriod` already derives the columns from the rows, so nothing here
+   constrains them. */
+function standardFinancials(){
+    let f=sec('financials');
+    let pnlRows=A(f.pnl_3yr),bsRows=A(f.balance_sheet_key),
+        cfRows=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let ratios={};rrRows.forEach(x=>{ratios[x.fy]=x;ratios[fyKey(x)]=x});
+    const blank='<p class="method-note">No data available for this table.</p>';
+    /* FIVE-YEAR VALUATION AND QUALITY HISTORY is the fifth standard card (owner, 2026-09-20: "we
+       should add this table to standard"). It came from the per-symbol renderers, which printed it
+       under three different headings -- "... and quality history", "... and returns history",
+       "... and balance-sheet history" -- over two different column sets. One heading and the
+       richer six-column set now apply everywhere.
+
+       It reads `deepdive.val5`, which 1,990 of 3,334 public payloads carry; the rest get the same
+       blank placeholder as any other empty table. Row counts run 1 to 5, so the "five-year" title
+       is the table's NAME and not a promise about its width. */
+    let val=tableByPeriod(['Year','Market cap ₹cr','P/E','ROE','OPM','D/E'],
+        A(D&&D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.roe,1)+'%',
+                             N(x.opm,1)+'%',N(x.de,2)+'x']));
+    const cards=[
+        ['Profit & loss',  pnlSpineTable(pnlRows,{ratios:ratios,eps:1})],
+        ['Balance sheet',  balanceSheetTable(bsRows)],
+        ['Cash flow',      cashFlowTable(cfRows,pnlRows)],
+        ['Ratios',         ratiosTable(bsRows,pnlRows,rrRows)],
+        ['Five-year valuation and quality history', val],
+    ];
+    return '<div class="stack">'+cards.map(x=>card(x[0],x[1]||blank)).join('')+'</div>';
+}
+
+
+function drhpFinancialsGeneric(){
+    let f=sec('financials'),intel=sec('intellisense');
+    /* Ratios are keyed by BOTH the raw `fy` and its canonical label, because the return-ratio
+       rows and the P&L rows do not always spell the same year the same way. */
+    let pnlRows=A(f.pnl_3yr),bsRows2=A(f.balance_sheet_key),cfRows2=A(f.cash_flow),rrRows=A(f.return_ratios);
+    let ratios={};rrRows.forEach(x=>{ratios[x.fy]=x;ratios[fyKey(x)]=x});
+    let pnl=pnlSpineTable(pnlRows,{ratios:ratios,eps:1});
+    let bsBlock=balanceSheetTable(bsRows2),cfBlock=cashFlowTable(cfRows2,pnlRows),ratioBlock=ratiosTable(bsRows2,pnlRows,rrRows);
+
+    /* DEBT COMPOSITION -- summary, not bank-by-bank. 2026-09-04 (owner: "show only debt profile
+       like total debt or short term or long term, not all detailed row e.g. it has bank wise which
+       is not needed").
+
+       Shape, measured over all 2,889 payloads: `debt_profile` is a DICT in all 99 companies that
+       carry it -- never a bare list -- with `loans` (98) and `total_lakhs` (98) the only keys that
+       generalise; the other 24 keys appear on 1-10 companies each. 638 per-lender rows in total,
+       median 4 and max 33 per company: that is the detail the owner is asking us to drop.
+
+       THE SPLIT IS SHOWN ONLY WHERE THE DOCUMENT STATES IT. Short/long term is not a stored field;
+       it appears only inside the free-text `type` ("... (short-term borrowing)"), and only 38 of
+       the 638 loans say so -- 6%. Classifying the silent 94% by guessing would invent a split the
+       filing never made, so unstated debt is carried as "Other / unclassified" and the reader can
+       see the difference. `total_lakhs` is preferred over summing the rows, because it is the
+       figure the document printed; the sum is used only when no total was stated. */
+    let loans=A(f.debt_profile?.loans),dpRaw=f.debt_profile||{};
+    let bucket=t=>/short[-\s]?term/i.test(t)?'short':(/long[-\s]?term/i.test(t)?'long':'other');
+    let sums={short:0,long:0,other:0},anyAmt=false;
+    loans.forEach(x=>{let a=Number(x&&x.amount_lakhs);if(isFinite(a)){anyAmt=true;sums[bucket(String((x&&x.type)||''))]+=a}});
+    let statedTotal=Number(dpRaw.total_lakhs),
+        totalLakhs=isFinite(statedTotal)?statedTotal:(anyAmt?sums.short+sums.long+sums.other:null);
+    let cr=v=>'₹'+N(v/100,2)+' cr';
+    let debtRows=[];
+    if(totalLakhs!=null)debtRows.push(['Total debt',cr(totalLakhs)]);
+    if(sums.short>0)debtRows.push(['Short-term borrowings',cr(sums.short)]);
+    if(sums.long>0)debtRows.push(['Long-term borrowings',cr(sums.long)]);
+    if(sums.other>0&&(sums.short>0||sums.long>0))debtRows.push(['Other / unclassified',cr(sums.other)]);
+    if(loans.length)debtRows.push(['Facilities',N(loans.length,0)+(loans.length===1?' facility':' facilities')]);
+    let checks=table(['Check','Result','Evidence'],A(intel.forensic).map(x=>[E(x.check),status(x.verdict),E(x.note)]));
+    return'<div class="stack">'+card('Profit & loss',badge('Reported fact')+pnl)+/* SPLIT INTO TWO CARDS 2026-09-02 (owner). They were one card holding two unrelated tables:
+   a balance sheet is a POSITION at a date, a cash-flow statement is a MOVEMENT over a period.
+   Stacking them under one heading invited reading a net-worth figure as a flow. Both now use
+   `tableByPeriod`, so the year is a COLUMN and each metric is a row.
+
+   COMMENT MOVED ABOVE THE OPERATOR, 2026-09-04. It used to sit BETWEEN the two `+` signs:
+   `card(...)+ /* ... *SLASH +(bsRows.length?...)`. JS then read the second `+` as a UNARY plus on
+   the string that followed, so the whole expression evaluated to `'...' + (+'<article>...')` =
+   NaN, and the page printed a bare "NaN" where the balance-sheet card should have been -- the
+   card was silently dropped on EVERY DRHP financials page (confirmed on QUALIANCEINTERNATIONAL,
+   KWICK and ESDSSOFTWARESOLUTION). A comment must never separate a binary operator from its
+   right-hand operand. Found by qa/raw_syntax_check.js, which is exactly the class of defect it
+   was written to catch. */
+/* `Margins, returns and balance-sheet efficiency` RETIRED 2026-09-20 (owner: "we dont need this
+   any more"). It printed RoE / RoCE / DSO days / Debt-equity / DSCR off `return_ratios`, which
+   duplicates the Ratios card below -- ROCE % and Debtor Days are both in the owner's six-line
+   ratio spec, and the other three were never part of it. The `efficiency` builder that fed it is
+   removed with it; nothing else referenced either. */
+(bsBlock?card('Balance sheet',bsBlock):'')+(cfBlock?card('Cash flow',cfBlock):'')+(ratioBlock?card('Ratios',ratioBlock):'')+creditRatingCard()+'</div>'
+}
+function inExecution(){let o=sec('objects_execution'),intel=sec('intellisense'),gd=intel.growth_durability||{},w=P.wtt||{},all=A(P.commitments),pick=re=>[...all].reverse().find(x=>re.test(x.item||'')),prom=[pick(/joint venture.*foldable hinge/i),pick(/Arms Components/i),pick(/45 to 50 new tools/i)].filter(Boolean);let uses=table(['Use','₹cr'],A(o.objects).map(x=>[E(x.purpose),x.amount_lakhs==null?'—':N(x.amount_lakhs/100,0)]));let promises=table(['Strategic commitment','Horizon','Evidence marker'],prom.map(x=>[E(x.item),E(x.horizon),E([x.promised_value,x.unit].filter(z=>z&&z!=='None').join(' ')||'Qualitative')]));let evidence=table(['Evidence test','State','What the store shows'],A(gd.signals).map(x=>[E((x.signal||'').replaceAll('_',' ')),status(x.status),E(x.note)]));let credibility=w.symbol?'<div class="credibility"><div class="grade compact">'+E(w.credibility_grade||'N/A')+'</div><div><h3>Walk the Talk is not scored yet</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||1)+'</b> quarter logged</span><span><b>'+E(w.open_commitments||0)+'</b> tracked across page</span><span><b>'+E(w.reconciled_n||0)+'</b> reconciled</span></div></div>':'';return credibility+'<div class="stack">'+card('Use of fresh issue',uses)+card('Growth evidence',badge('Analytical inference','inference')+'<div class="scoreline"><strong>'+E(gd.score||'—')+'</strong><span> / evidence score</span></div>'+evidence,'inference-card')+card('Unique strategic commitments',promises)+'</div>'}
+/* EMPTY KPI CARDS SUPPRESSED 2026-09-08 (owner-approved follow-up to the Governance-snapshot
+   anchor removal earlier today). Measured over 3,037 payloads in `.deploy_irrationalmarket`:
+   'Governance snapshot' rendered on all 395 `drhpOwnership` companies but carried NO real value
+   on 292 of them (74%), and 'Ownership and offer context' on 1,020 of 1,140 (89%). Those cards
+   painted a heading over three em-dashes.
+
+   THE OBVIOUS PREDICATE IS WRONG AND WAS CAUGHT BY MEASUREMENT. A first pass suppressed on
+   `some(tile => /\d/.test(tile.value))` -- a digit test on the RENDERED string, the same test
+   `assert_offer.js` adopted after a generic constant made an empty card look populated. It
+   suppressed 0 of 395, because 'Related-party entries' rendered `E(A(g.rpts).length)` = the
+   string "0", which contains a digit. The four-dash card is really three dashes and a zero.
+
+   So this uses `drhpOfferStructure`'s established idiom instead of a second one -- build the
+   list by PUSHING only tiles whose source field is present, which that function's own comment
+   states as 'OMITTED when they cannot be computed -- never a placeholder, never a zero'.
+   NO NEW HELPER IS NEEDED: `kpis([])` already returns '' and `card(t,'')` already returns '',
+   so an empty push-list collapses the card by construction, at the two helpers that already
+   exist rather than at a third.
+
+   ONE REAL VALUE STILL RENDERS -- the list is non-empty so the card stands. Verified in
+   Chromium on ACTIVEINFR (only 'Pre-offer promoter holding 125.03%') and KRATIKAL (only
+   'Anchor investors 8'). A zero rpt count is NOT a value: it is the absence of related-party
+   entries, not a measurement of them.
+
+   ANCHOR KPIs DELIBERATELY KEPT in 'Ownership and offer context', against the brief that asked
+   for their removal by analogy with the Governance snapshot. Measured: of the 1,140
+   `coverageOwnership` companies, 120 hold anchor data and exactly ONE (KRATIKAL) also has a
+   listing section reaching `anchorCard()`. For the other 119 these tiles are the ONLY anchor
+   surface on the page, so removing them deletes the data outright. The Governance case was
+   different in kind: that card's title promised governance facts, while this one is titled
+   'Ownership AND OFFER CONTEXT' and declares that it carries offer facts. DO NOT re-litigate
+   this without re-running the census -- the number that matters is 119, not 1,140. */
+function govTiles(c,g){let t=[],ph=c.promoter_holding||{},pl=c.pledging||{},b=g.board||{},r=A(g.rpts).length;
+    if(ph.pre_pct!=null)t.push({label:'Pre-offer promoter holding',value:N(ph.pre_pct,2)+'%'});
+    /* A ZERO PLEDGE IS THE ABSENCE OF PLEDGING, NOT A FACT WORTH A TILE (2026-09-09). Measured
+       over the 183 published payloads carrying capital_ownership: `pledged_pct` is present on
+       64 and is 0 on 61 of those -- so this tile printed a meaningless '0%' on a third of all
+       company pages, and only 3 companies have a pledge to report. This card's own idiom is
+       already "never a placeholder, never a zero"; a 0 was slipping through because the guard
+       tested `!=null` rather than the value. Surfaced while removing the duplicate pledge card
+       from Offer (owner item 5): QUALIANCE was rendering '0%' on BOTH surfaces. */
+    if(pl.pledged_pct)t.push({label:'Promoter pledge',value:N(pl.pledged_pct,1)+'%'});
+    if(b.independent_count&&b.size)t.push({label:'Independent directors',value:E(b.independent_count)+' / '+E(b.size)});
+    if(r)t.push({label:'Related-party entries',value:E(r)});
+    return t}
+/* `anchorsRenderElsewhere()` -- does a listing section exist that will render `anchorCard()`?
+   Every listing renderer in the dispatch table reaches `anchorCard()` (inListing, coverageListing,
+   drhpGenericListing/drhpListingWithAnchors, drhpListing), so the SECTION'S PRESENCE is the test;
+   naming the renderers would be a second list to keep in sync with the dispatch table. */
+function anchorsRenderElsewhere(){return PM?A(PM.sections).some(s=>s.id==='listing'):false}
+function ownerOfferTiles(c,a){let t=[],ph=c.promoter_holding||{};
+    if(ph.pre_pct!=null)t.push({label:'Promoter holding',value:N(ph.pre_pct,2)+'%'});
+    /* ANCHOR TILES ONLY WHEN NOTHING ELSE SHOWS THEM (2026-09-08). Measured over 3,037 payloads:
+       of the 1,140 `coverageOwnership` companies, 120 hold anchor data and exactly ONE (KRATIKAL)
+       also has a listing section -- so on that one page these tiles duplicated the full
+       `anchorCard()` table sitting above them, verified in Chromium ('Anchor investors 8' beside
+       'Anchor investors (8)'). For the other 119 this card is the ONLY anchor surface, because
+       their listing section is retired by the approved 6-month lifecycle rule in
+       `company_coverage_model.build_page_model` -- NOT by a routing defect. Deleting these tiles
+       outright, as the duplicate-removal analogy suggests, would blank anchor data on 119 pages to
+       fix 1. So: defer to the Offer surface when it exists, stand in for it when it does not. */
+    if(!anchorsRenderElsewhere()){
+        if(a.n)t.push({label:'Anchor investors',value:E(a.n)});
+        if(a.total_amount)t.push({label:'Anchor allocation',value:'₹'+N(a.total_amount/10000000,1)+'cr'});
+    }
+    return t}
+function inOwnership(){
+    let c=sec('capital_ownership'),g=sec('governance');
+    /* MATERIAL SHAREHOLDERS: promoter/promoter-group only, and never an empty row -- 2026-09-04
+       (owner: "show only records except promoter or promoter group? if blank row don't show").
+
+       The filter is CONDITIONAL, and the measurement is why. Across all 2,889 payloads, 101
+       companies carry `shareholders_1pct` (826 rows). The distinct `category` values are
+       'promoter' (203), 'public' (191), 'promoter group' (61), 'director' (3) -- and 368 rows,
+       45% of the corpus, carry NO category at all. An unconditional "keep only promoter" would
+       therefore blank the table for 19 companies whose every row is uncategorised, plus 2 more
+       that label rows but list no promoter: 21 of 97 good tables destroyed to tidy 76.
+       So: filter only when THIS company actually labels its rows, otherwise show them all and let
+       the Category column say '—'. A filter that silently empties a good table is a worse defect
+       than the one being fixed. Blank rows (no name, no shares, no pct) are dropped either way. */
+    let shRows=A(c.shareholders_1pct).filter(x=>x&&(String(x.name||'').trim()||String(x.shares||'').trim()||x.pct!=null));
+    let shLabelled=shRows.some(x=>String(x.category||'').trim());
+    let shPromoter=shRows.filter(x=>/promoter/i.test(String(x.category||'')));
+    if(shLabelled&&shPromoter.length)shRows=shPromoter;
+    let holders=table(['Holder','Category','Shares','Pre-offer'],shRows.map(x=>[E(x.name),E(x.category||'—'),E(x.shares),x.pct==null?'—':N(x.pct,2)+'%']));
+    let brief=value=>{let text=String(value||'').replace(/\s+/g,' ').replace(/^(?:except as detailed below|such price has been computed)[:,]?\s*/i,'').trim();let sentence=(text.match(/^.{30,120}?[.!?](?:\s|$)/)||[])[0]||text.slice(0,110);return sentence.length<text.length?sentence.replace(/[.!?]?$/,'…'):sentence};
+    let history=table(['Event','Summary'],A(c.capital_history).slice(0,10).map(x=>[E(String(x.event||'').replaceAll('_',' ')),E(brief(x.details))]));
+    
+    /* DESIGNATION vs the stored `role` string, 2026-09-02 (owner: DIN / DOB / appointment dates /
+       shareholding are "not useful and redundant"). Measured over all 849 stored board entries the
+       redundancy is NOT a stray column -- din/date_of_birth exist as separate fields on only 20/15
+       entries. It is embedded INSIDE `role` itself: 270 carry a DIN, 286 a "w.e.f."/"since" date,
+       164 a term / retire-by-rotation clause, 85 a date of birth, and the longest role is 1,254
+       characters of biography. The designation is only the LEADING clause.
+       This strips for DISPLAY only -- the store keeps `role` verbatim, because it is the record of
+       what the document said. Order matters: parentheticals are removed FIRST, because a ';' or '.'
+       inside one would otherwise shatter the clause split and leave the noise glued to the head
+       (measured: "Promoter; Whole Time Director (w.e.f. Aug 01, 2025...)" collapsed to "Promoter").
+       Scored over all 849 stored roles: DIN/DOB/date residue 355 -> 0, empty outputs 0, and 0 of
+       the 849 lost their designation keyword. */
+    let ROLE_NOISE=/\bD\.?I\.?N\b|date of birth|\bDOB\b|\bborn\b|\bPAN\b|\bCIN\b|w\.?e\.?f\.?|with effect from|\bsince\b|\bfrom\s+(?:\w+\s+)?\d{1,2},?\s*\d{4}|\b(?:19|20)\d{2}\b|retire\w*\s+by\s+rotation|liable to retire|\bterm\b|re-?appoint|resign|\bceased\b|\b(?:son|daughter|wife|husband|brother|sister|father|mother|spouse)\s+of\b|board table states|\baged?\b|shareholding|equity shares|resides|occupation|nationality|address/i;
+    let designation=role=>{let t=String(role==null?'':role).replace(/\s+/g,' ').trim();if(!t)return'';
+        for(let prev=null;prev!==t;){prev=t;t=t.replace(/\s*[\(\[][^()\[\]]*[\)\]]/g,m=>ROLE_NOISE.test(m)?'':m)}
+        t=t.replace(/\s+/g,' ').trim();
+        let keep=[];
+        for(let p of t.split(/(?:[.;])\s+|;\s*/)){p=p.trim().replace(/\s*,\s*$/,'');if(!p)continue;
+            let m=p.match(ROLE_NOISE);
+            if(m){let head=p.slice(0,m.index);for(let q=null;q!==head;){q=head;head=head.replace(/[\s,;.\-(]+$/,'').replace(/\s+(?:with|for|the|a|an|as|of|and|or|in|on|at|by|from|current|its|his|her|not|liable|to|is|was|pursuant|under|who|which|that)$/i,'')};if(head&&/[A-Za-z]{3}/.test(head)&&!/^(?:not|liable|to|and|or|the|a|an|of|with|for|as|is|was|current|its|his|her|in|on|at|by|from|who|which|that)(?:\s+(?:not|liable|to|and|or|the|a|an|of|with|for|as|is|was|current|its|his|her|in|on|at|by|from|who|which|that))*$/i.test(head))keep.push(head);break}
+            keep.push(p);if(keep.join(' ').length>85)break}
+        let out=keep.join(' ').replace(/[\s,;.\-]+$/,'').trim();
+        if(out.length>90){out=out.slice(0,90).replace(/\s+\S*$/,'');for(let q=null;q!==out;){q=out;out=out.replace(/[\s,;.\-]+$/,'').replace(/\s+(?:and|or|of|to|the|a|an|with|for|as|in|on|at|by|from|pursuant|under|who|which|that|its|his|her|not|liable|is|was)$/i,'')}}
+        return out};
+    let leadershipInsight=x=>brief(x.qualification||x.qualifications||x.experience||x.past_experience||x.profile||x.background||'');
+    /* ONE builder for BOTH cards 2026-09-02 -- the owner asked for the KMP card to match the board
+       card, and two copies of the same markup is how they drift apart again. The KMP card WAS a
+       3-column table ('Executive | Role | Relevant qualification / experience'); it is now the same
+       .person-grid/.person-card the board uses, which is what fixed the M10 phone finding there.
+       KMP keys its title off `designation` (present on 256 of 261 stored KMP entries; `role` on only
+       3), and its bio is usually EMPTY and correctly renders as nothing: the store holds a profile
+       for 12 of 261 and a qualification for 2, so there is no bio to show and none is invented.
+       NO show-more is applied. The owner asked for top-3-then-show-more, but the only show-more in
+       this file is table-row based (it sets display:'table-row'), which cannot drive a CSS grid, and
+       there is no field to rank a top 3 BY -- remuneration appears on 12 of 261 entries. So the full
+       list stays in stored order rather than inventing a new interaction or a fake ranking. */
+    let personGrid=people=>{let rows=A(people).map(x=>[E(x.name),E(designation(x.role||x.designation)),E(leadershipInsight(x))]).filter(r=>r[0]);
+        return rows.length?'<div class="person-grid">'+rows.map(r=>'<article class="person-card"><h4>'+r[0]+'</h4>'+(r[1]?'<p class="person-role">'+r[1]+'</p>':'')+(r[2]?'<p class="person-bio">'+r[2]+'</p>':'')+'</article>').join('')+'</div>':''};
+    let board=personGrid(g.promoters_directors);
+    let kmp=personGrid(g.kmp);
+    return'<div class="stack">'+card('Governance snapshot',kpis(govTiles(c,g)))+card('Material shareholders',holders)+card('Capital history and private placements',history)/* 'Dilution, OFS and lock-in' REMOVED from Ownership 2026-09-02 (owner: "keep only in offer"). It read the SAME capital_ownership fields the Offer section's 'Offer structure' card renders (drhpGenericListing, this file) -- dilution/ofs/lock_in/pledging -- so the page showed one dataset twice under two headings. Dilution and lock-in are consequences of the offer structure, so Offer is where they belong; Ownership keeps holders, capital history, board, KMP and pledging. `bonus_within_18m` was unique to this card and is now UNRENDERED -- if it must survive, add it to the Offer card rather than restoring this one. *//* 'Promoter acquisition cost' REMOVED 2026-09-02 (owner: "we don't need Promoter acquisition cost"). Its `costs` table builder went with it -- the two were each other's only reference, so leaving the builder would be dead code computing a value nothing renders. The underlying `capital_ownership.promoter_avg_cost` field is UNTOUCHED in the store and payload; only this card is gone, so restoring it is a one-line change. */+card('Board and leadership',board)+card('Key management personnel',kmp)/* 'Anchor allocation' REMOVED from Ownership 2026-09-03 (owner: "we have Anchor allocation in two places ownership and governance and Offer .. can we remove from ownership"). The Offer & Listing tab renders the SAME anchor data via `anchorCard()` (see inListing), so the page showed one dataset twice. Anchor allocation is a property of the OFFER, so Offer is where it belongs; the `anchors` binding above is still read by the Governance snapshot KPIs, so it is NOT dead. *//* 'Anchor investors' + 'Anchor allocation' KPIs REMOVED from the Governance snapshot 2026-09-08 (owner: "it should not have ANCHOR INVESTORS"). This FINISHES the 2026-09-03 removal above, which took the card but left its two KPI tiles behind -- the note's own closing clause ("the `anchors` binding ... is NOT dead") is the tell that the removal stopped early. Anchor count and allocation are OFFER facts; `anchorCard()` renders the full book in the Offer section for the 145 of 395 `drhpOwnership` companies that have a listing section, so those pages were rendering the anchor book TWICE (measured on DEEPAJEWELLERS: KPI tiles '15 / ₹138cr' beside an 'Anchor investors (15)' table). NOW DEAD AND REMOVED WITH THEM: the `anc` binding and the `anchors` table builder. `anchors` was ALREADY dead before this change -- it was built and never concatenated into the returned HTML, so the 2026-09-03 note was right about `anc` and wrong about `anchors`. Nothing is lost with it: it rendered the same `anchor_allotment` rows `anchorCard()` renders. NOTE THE TWO BINDINGS ARE NOT THE SAME SOURCE: `anc` read `D.anchor_allotment` (currentResearch = deepdive ?? drhp) while `anchorCard()` reads `Q.anchor_allotment` (drhpResearch = drhp). They diverge on any company with a deep dive -- ADISOFT rendered 'Anchor investors —' in Governance while the Offer card correctly showed 8, so the KPIs were also printing orphan dashes over live data. 'Pre-offer promoter holding' was CONSIDERED for a move to Offer in the same request and DELIBERATELY KEPT HERE: `drhpOfferStructure` already renders 'Pre-issue promoter + promoter group' from the SAME `promoter_holding.pre_pct` field, but only when `promoterPre` parses out of `promoter_holding.note` -- true for 1 of the 100 companies that show the KPI, so moving it would DELETE the figure for 99. It is also a governance fact (who controls the company) and the only place it renders for the 250 companies with no listing section. */+card('Governance flags',list(g.non_compliances,8),'caution')+'</div>'
+}
+function inRisks(){let r=sec('risks'),find=(bucket,re)=>A(r[bucket]).find(x=>re.test(x.title||'')),items=[find('internal_operational',/No definitive purchase commitments/i),find('internal_operational',/High import dependence/i),find('internal_operational',/quality.*recalls/i),find('financial_valuation',/Pricing pressure/i),find('financial_valuation',/Restrictive covenants/i),find('financial_valuation',/Currency exchange/i),find('compliance_legal',/Environmental law/i),find('compliance_legal',/Majority of Directors/i),find('compliance_legal',/sanctioned countries/i),find('strategy_growth',/Acquisitions.*joint ventures/i),find('strategy_growth',/structural threats/i),find('strategy_growth',/R&D investment/i)].filter(Boolean),lit=r.litigation_summary||{},cont=r.contingent_liabilities||{};return'<div class="stack"><div class="analysis-strip"><div><span>Litigation exposure</span><b>₹'+N(lit.total_amount_lakhs/100,0)+'cr · '+N(lit.pct_of_networth,1)+'% of net worth</b></div><div><span>Contingent liabilities</span><b>₹'+N(cont.amount_lakhs/100,0)+'cr · '+N(cont.pct_of_networth,1)+'% of net worth</b></div><div><span>Risk architecture</span><b>Operating · financial · compliance · strategy</b></div></div><p class="method-note">Balanced risk register — three decision-relevant risks from each risk family.</p><div class="risk-grid">'+items.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title)+'</h3><p>'+E(x.detail)+'</p><small>'+E(x.evidence||'')+'</small></div></article>').join('')+'</div>'+card('Approvals pending',list(r.approvals_pending,10))+'</div>'}
+function inPeers(){let pp=D.peer_panel||{},target=pp.target||{},ip=sec('industry_peers'),intel=sec('intellisense'),exact=A(ip.peers_drhp),size=intel.valuation?.size_mismatch||{},refs=A(ip.peers_internal).filter(x=>['PTCIL','STEELCAS','HAPPYFORGE','INVPRECQ'].includes(x.symbol)),barrier=pipe(D.strengths).find(x=>/barriers|qualification/i.test(x));let structure=list([ip.market_position?.basis,barrier].filter(Boolean),4);let t=table(['Company','FY','Revenue ₹cr','Growth','PAT ₹cr','PAT growth'],[['INDO-MIM',E(target.fy),N(target.rev,0),N(target.rev_growth,1)+'%',N(target.pat,0),N(target.pat_growth,1)+'%']]);let global=table(['Company','Period','Revenue ₹cr','RoNW','Relative scale'],exact.map(x=>[E(x.name),E(x.fy),N((x.total_income||0)/10,0),N(x.ronw,1)+'%',N(size.peer_to_issuer_x,1)+'x INDO-MIM']));let operating=table(['Symbol','Company','Treatment'],refs.map(x=>[E(x.symbol),E(x.company),'Operating reference — not a MIM valuation peer']));return'<div class="stack">'+card('MIM industry structure',structure,'positive')+card('INDO-MIM operating scale',t)+card('Closest disclosed global comparable',global)+card('Operating references — not valuation peers',operating)+'<p class="method-note">There is no listed Indian end-to-end MIM equivalent. Jiangsu Gian is the sole disclosed global comparable and is materially larger; valuation interpretation belongs to the Verdict tab.</p></div>'}
+function inListing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{},intel=sec('intellisense'),ins=intel.insider||{},c=sec('capital_ownership'),o=sec('objects_execution'),note=c.dilution?.note||'',
+    /* OFS READS THE STORED FIELD (2026-09-11). This regex was the SECOND browser-side extractor of
+       `ofs_shares` -- `inListing` is a different renderer path from `drhpOfferStructure`, which is why
+       the same defect had to be fixed twice. `offerShareCount` applies the same >=1000 floor the
+       producer uses, so a face value cannot render as a share count.
+       `employee` STAYS a regex: no stored field carries the employee reservation, so this is the only
+       source. It is a candidate for the producer in a later pass, not dead code to delete now. */
+    ofs=(()=>{let n=offerShareCount(c.dilution?.ofs_shares);return n!=null?N(n,0):null})(),
+    employee=(note.match(/Employee Reservation Portion of up to ([\d,]+)/i)||[])[1],sellers=table(['Selling shareholder','Shares disclosed'],A(c.ofs).map(x=>[E(x.seller),x.shares?E(x.shares):'Not separately disclosed']));return'<div class="stack"><div class="analysis-strip"><div><span>Latest close</span><b>₹'+N(a['Latest Close'],2)+' · '+N(a['Return From Listing %'],1)+'% from open</b></div><div><span>Supply calendar</span><b>'+E(A(ins.supply_calendar).length)+' identified release events</b></div></div>'+card('Offer composition',kpis([{label:'Fresh issue',value:'₹'+N(o.project?.funding_mix?.fresh_issue_lakhs/100,0)+'cr'},{label:'Offer-for-sale shares',value:E(ofs||'—')},{label:'Employee reservation',value:E(employee||'—')}])+sellers)+card('Supply calendar',table(['Date','Holder','Event','Equity'],A(ins.supply_calendar).map(x=>[E(x.date),E(x.holder),E(x.event),x.pct_equity==null?'—':N(x.pct_equity,2)+'%'])))+anchorCard()+'</div>'}
+
+function inVerdict(){let v=sec('verdict'),intel=sec('intellisense'),f=sec('financials'),pe=intel.true_pe||{},scenarios=intel.scenarios||{},pct=intel.percentiles||{},ins=intel.insider||{},gd=intel.growth_durability||{},scores=A(v.parameter_scores),openQuestions=A(v.open_questions).filter(x=>!/What price band/i.test(x)),monitorables=A(v.monitorables).filter(x=>!/Post-issue debt|US tariff|Triax Industries/i.test(x)),dataGaps=A(v.data_gaps).filter(x=>!/Price band, lot size and P\/E|FY26 RoCE/i.test(x)),last=A(f.pnl_3yr).at(-1)||{},norm=A(pe.lines).find(x=>x.label==='normalized')||{},stance=String(v.stance||'Not rated').split(/\s+-\s+/)[0];let bars='<div class="analytical-scores">'+scores.map(x=>{let s=Number(x.score_1_10)||0,band=s>=7?'strong':s>=4?'watch':'weak',filingStage=/Valuation clarity/i.test(x.parameter||'')&&intel.ipo_price,basis=filingStage?'Stored filing-stage score: pricing was unavailable in the source document. Final issue pricing is now available; the score is retained and not automatically re-rated.':x.basis;return'<div class="analytical-score"><div class="score-head"><b>'+E(x.parameter)+'</b><strong>'+N(s,0)+' / 10</strong></div><div class="score-track"><i class="'+band+'" style="width:'+Math.max(0,Math.min(100,s*10))+'%"></i></div><p>'+E(basis||'')+'</p></div>'}).join('')+'</div>';let price=Number(intel.ipo_price)||0,valuationRows=[['Reported','FY2026','—',numCell(crVal(last,'revenue'),0),N(last.pat_margin_pct,2)+'%',N(last.eps,2),N(pe.reported,2)+'x'],['Diluted','FY2026','—',numCell(crVal(last,'revenue'),0),N(last.pat_margin_pct,2)+'%',N(price/pe.diluted,2),N(pe.diluted,2)+'x'],['Normalized','FY2026','—',numCell(crVal(last,'revenue'),0),N(norm.inputs?.avg_margin_pct,2)+'%',N(price/pe.normalized,2),N(pe.normalized,2)+'x']];['bear','base','bull'].forEach(k=>{let x=scenarios[k],a=x?.assumptions||{};if(x)valuationRows.push([k,'FY2027',N(a.revenue_growth_pct,1)+'%',N(a.revenue_cr,0),N(a.pat_margin_pct,2)+'%',N(x.eps,2),N(x.fwd_pe,2)+'x'])});let percentileRows=[['Revenue growth',pct.revenue_growth],['PAT margin',pct.pat_margin],['Margin expansion',pct.margin_expansion]].filter(x=>x[1]).map(x=>[x[0],N(x[1].value,2)+'%',ordinal(x[1].pct),E(x[1].n||intel.n_cohort)]);let warns=A(intel.forensic).filter(x=>/WARN/i.test(x.verdict||'')),saving=pe.forward?.interest_saved_cr??scenarios.base?.assumptions?.interest_saving_cr,synthesis=[gd.verdict?'Growth durability is '+String(gd.verdict).toUpperCase()+'; the valuation model applies '+(pe.forward?.growth_adjusted?'an evidence-based growth haircut.':'the stored achievable growth rate without an additional haircut.'):'',saving!=null?'Debt repayment is estimated to add ₹'+N(saving,1)+'cr to annual after-tax earnings capacity.':'',warns.length?warns.length+' forensic warning'+(warns.length===1?' remains':'s remain')+' open; the underlying checks stay in Financials.':'No forensic warning remains open.',ins.ipo_price_multiple!=null?'The issue price was '+N(ins.ipo_price_multiple,1)+'x the stored promoter average acquisition cost.':'',intel.valuation?.size_mismatch?.flag?'The disclosed global comparable is '+N(intel.valuation.size_mismatch.peer_to_issuer_x,1)+'x larger by revenue, so its multiple is not used as a clean anchor.':''].filter(Boolean);return'<div class="stack verdict-stack"><section class="verdict-group"><div class="verdict-group-head"><span>01</span><div><p class="eyebrow">Verdict framework</p><h3>Assessment</h3></div></div><div class="verdict-banner"><div><span>Current stance</span><b>'+E(stance)+'</b></div><p>'+E(v.our_read||'')+'</p></div>'+card('Analytical scores',bars,'inference-card')+'</section><section class="verdict-group"><div class="verdict-group-head"><span>02</span><div><p class="eyebrow">Questions before conviction</p><h3>Due diligence</h3></div></div><div class="layout-2">'+card('Open questions for due diligence',list(openQuestions,10),'inference-card')+card('Red flags',list(v.red_flags,10),'caution')+card('Monitorables',list(monitorables,10))+card('Data gaps',list(dataGaps,10))+'</div></section><section class="verdict-group"><div class="verdict-group-head"><span>03</span><div><p class="eyebrow">Integrated analytical read</p><h3>Intelligence synthesis</h3></div></div>'+card('Valuation and scenario frame',badge('Analytical inference','inference')+table(['Basis','Period','Growth','Revenue ₹cr','PAT margin','EPS','P/E'],valuationRows)+'<p class="method-note">'+E(scenarios.assumptions_note||'')+'</p>','inference-card')+card('Cross-DRHP percentiles',table(['Measure','Company','Percentile','Cohort'],percentileRows))+card('What the evidence means',list(synthesis,10),'positive')+'</section></div>'}
+function exInvestment(){let y=D.pnl?.year||{},last=A(D.actuals).at(-1)||{},margin=ddBlock('latest_quarter','margin'),non=ddBlock('bull_bear','non-obvious'),opt=ddBlock('outlook','growth vertical');let facts=[{label:'Annual revenue',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('Revenue'))?.cur,0)+'cr'},{label:'Annual PAT',value:'₹'+N(y.rows?.find(x=>x.metric.startsWith('PAT'))?.cur,0)+'cr'},{label:'Operating margin',value:N(y.rows?.find(x=>x.metric.startsWith('OPM'))?.cur,1)+'%'},{label:'Latest revenue growth',value:N(last.rev_yoy,1)+'%'},{label:'Lithium-ion investment',value:'₹4,802cr'},{label:'Planned cell capacity',value:'12 GWh'},{label:'Recycled lead input',value:'~79%'}];return kpis(facts)+'<div class="layout-2">'+card('Core earnings engine','<p>'+E(ddBlock('business','segment').body)+'</p>','positive')+card('Transformation thesis','<p>'+E(opt.body)+'</p>','inference-card')+card('Margin defence','<p>'+E(margin.body)+'</p>','caution')+card('Non-obvious read',badge('Analytical inference','inference')+'<p>'+E(non.body)+'</p>','inference-card')+card('Decision tension','<p>The established lead-acid franchise funds a large greenfield cell-manufacturing transition. The key underwriting question is whether customer validation and utilisation arrive quickly enough to lift returns above the current 6% ROE.</p>','caution')+'</div>'}
+function exInvestmentNoDup(){return exInvestment().replace(/<div class="kpi"><span>Recycled lead input<\/span><b>[^<]*<\/b><\/div>/,'')}
+function exProducts(){let products=(P.products&&typeof P.products==='object'&&!Array.isArray(P.products))?P.products:jsonish(C.products);return Object.keys(products).map(k=>'<article class="product-card"><h3>'+E(k)+'</h3><p>'+E(A(products[k]).join(' · '))+'</p></article>').join('')}
+function exBusiness(){let plants=A(C.plants),end=pipe(C.end_markets);return'<div class="stack">'+card('How the business makes money','<p>'+E(P.summary.business||C.business)+'</p>')+card('Product architecture','<div class="product-grid">'+exProducts()+'</div>')+card('End-market map',list(end,15))+card('Operating moat',list(pipe(C.strengths),10),'positive')+card('Manufacturing and recycling footprint',table(['Location','Role','Capacity / context'],plants.map(x=>[E(x.location),E(x.role),E(x.capacity||'—')])))+card('Industry demand map',list(pipe(C.mdna),10))+'</div>'}
+function exBusinessNoDup(){let original=C.strengths;C.strengths=pipe(original).filter(x=>!/exports to 72 countries/i.test(x)).join('|');let out=exBusiness();C.strengths=original;return out}
+function exFinancials(){let a=A(D.actuals),model=P.projection?.projection||[],actual=tableByPeriod(['Quarter','Revenue ₹cr','YoY','Operating profit ₹cr','OPM','PAT ₹cr','YoY','EPS'],a.map(x=>[E(x.q),N(x.revenue,0),N(x.rev_yoy,1)+'%',N(x.op,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.pat_yoy,1)+'%',N(x.eps,2)]));let val=tableByPeriod(['Year','Market cap ₹cr','P/E','ROE','OPM','D/E'],A(D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.roe,1)+'%',N(x.opm,1)+'%',N(x.de,2)+'x']));let last=a.at(-1)||{},prior=a.at(-5)||{},read='<div class="analysis-strip"><div><span>Latest quarter</span><b>Revenue +'+N(last.rev_yoy,1)+'% · operating profit +'+N(100*(last.op-prior.op)/prior.op,1)+'% · PAT +'+N(last.pat_yoy,1)+'%</b></div><div><span>Margin defence</span><b>'+N(prior.opm_pct,1)+'% → '+N(last.opm_pct,1)+'% despite commodity pressure</b></div><div><span>Return constraint</span><b>ROE 6% · ROCE 8.7% while lithium capex remains pre-revenue</b></div></div>';return'<div class="stack">'+badge('Analytical inference','inference')+read+card('Eight-quarter operating trajectory',badge('Reported fact')+actual)+card('Latest quarter comparison',pnlPanel(D.pnl?.quarter))+card('Full-year comparison',pnlPanel(D.pnl?.year))+card('Financial quality and working capital',kpis(D.ratios))+card('Five-year valuation and returns history',val)+(model.length?card('Forward model',tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr'],model.map(x=>[E(x.quarter),N(x.revenue,0),N(x.opm_pct,1)+'%',N(x.pat,0)])),'estimate-card'):card('Projection coverage','<p class="muted">No model projection is stored for EXIDEIND. The page does not manufacture one.</p>'))+creditRatingCard()+'</div>'}
+function exExecution(){let w=D.wtt||{},track=D.track||{},cap=table(['Milestone','Horizon','Scale','State'],A(D.capex).map(x=>[E(x.item),E(x.timeline),E(x.pv||'—'),status(x.status)]));let open=table(['Commitment','Horizon','Category'],unique(track.open).map(x=>[E(x.item),E(x.horizon),E((x.category||'').replaceAll('_',' '))]));let guidance=ddBlock('outlook','guidance');return'<div class="stack"><div class="credibility"><div class="grade compact">'+E(w.credibility_grade||'N/A')+'</div><div><h3>Walk the Talk is not scored yet</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||1)+'</b> quarter logged</span><span><b>'+E(w.open_commitments||track.open_total||0)+'</b> total open</span><span><b>'+E(w.reconciled_n||0)+'</b> reconciled</span></div></div>'+card('Lithium-ion commissioning roadmap',cap,'positive')+card('Forward commitment ledger',open)+card('Management operating guidance',badge('Management guidance','guide')+'<p>'+E(guidance.body||'')+'</p>','guide-card')+card('Annual-report expansion record','<p>'+E(C.expansion||'')+'</p>')+card('Strategic capital framework',list(pipe(C.strategies),10))+'</div>'}
+function dropCard(html,title){let q=title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return html.replace(new RegExp('<article class="card [^"]*"><h3>'+q+'<\\/h3>[\\s\\S]*?<\\/article>'),'')}
+function exExecutionDedup(){let originalCap=D.capex,originalOpen=D.track?.open;D.capex=A(originalCap).filter((x,i)=>i===0||!/greenfield lithium-ion cell manufacturing facility in bengaluru/i.test(x.item||''));if(D.track)D.track.open=A(originalOpen).filter(x=>x.category!=='capex_project');let out=dropCard(exExecution(),'Strategic capital framework');D.capex=originalCap;if(D.track)D.track.open=originalOpen;return out}
+function exOwnership(){let related=jsonish(C.related);return'<div class="layout-2">'+card('Control entities',table(['Entity','Role'],A(C.promoters).map(x=>[E(x.name),E(x.role)])))+card('Board and executive leadership',table(['Director','Designation'],A(C.board).map(x=>[E(x.name),E(x.designation)])))+card('Operating subsidiaries',table(['Entity','Relationship','Strategic role'],A(related).map(x=>[E(x.name),E(x.relation),E(x.note)])))+card('Capital-allocation stance','<p>'+E(ddBlock('bull_bear','capital allocation').body)+'</p>','caution')+'</div>'}
+function exOwnershipNoDup(){return dropCard(exOwnership(),'Capital-allocation stance')}
+function exRisks(){let concallRisk=ddBlock('bull_bear','risks'),ar=unique(C.risks),rows=[{risk:'Concall watchlist',note:concallRisk.body},...ar];return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.risk)+'</h3><p>'+E(x.note)+'</p></div></article>').join('')+'</div>'}
+function exRisksNoDup(){let original=C.risks;C.risks=A(original).filter(x=>/Environmental|Cash flow|Cyber/i.test(x.risk||''));let out=exRisks();C.risks=original;return out}
+function exPeers(){let pp=D.peer_panel||{},target=pp.target||{},direct=A(pp.peers).filter(x=>x.s==='ARE&M'),reference=A(pp.peers).filter(x=>x.s!=='ARE&M'),cols=x=>[E(x.name),E(x.fy),N(x.rev,0),N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),N(x.pat_growth,1)+'%',N(x.pe,1)+'x',N(x.mcap,0)];return'<div class="stack">'+card('EXIDEIND',table(['Company','FY','Revenue ₹cr','Growth','Margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],[cols(target)]))+card('Primary listed battery peer',table(['Company','FY','Revenue ₹cr','Growth','Margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],direct.map(cols)))+card('Indicative auto-component reference',table(['Company','FY','Revenue ₹cr','Growth','Margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],reference.map(cols)))+'<p class="method-note">Amara Raja is the direct operating peer. Other auto-component names are shown separately and are not treated as battery-business equivalents.</p></div>'}
+function cuInvestment(){let sc=P.scorecard||{};let facts=[{label:'ROE',value:N(sc.roe,1)+'%'},{label:'ROCE',value:N(sc.roce,1)+'%'},{label:'3Y sales CAGR',value:N(sc.sales_cagr_3y,1)+'%'},{label:'3Y EPS CAGR',value:N(sc.eps_cagr_3y,1)+'%'},{label:'3Y CFO / PAT',value:N(sc.cfo_pat_3y,2)+'x'},{label:'Debt / equity',value:N(sc.debt_equity,2)+'x'}];let non=ddBlock('bull_bear','non-obvious');return kpis(facts)+'<div class="layout-2">'+card('Compounding case','<p>Cummins India combines a high-return, debt-free core with three reinforcing demand layers: mission-critical power generation, a growing installed-base aftermarket and regulated industrial applications.</p>','positive')+card('Earnings architecture','<p>Domestic power generation and distribution provide the growth engine. Industrial applications and exports widen the opportunity set but introduce procurement and global-cycle variability.</p>')+card('Non-obvious read',badge('Analytical inference','inference')+prose(non.body),'inference-card')+card('Underwriting tension','<p>The operating franchise is strong, but the valuation requires durable execution. Data-centre conversion, aftermarket growth and margin defence must offset export uncertainty, input-cost pass-through lags and a sub-1x cash-conversion ratio.</p>','caution')+'</div>'}
+function cuProducts(){let products=(P.products&&typeof P.products==='object'&&!Array.isArray(P.products))?P.products:jsonish(C.products);return Object.keys(products).map(k=>'<article class="product-card"><h3>'+E(k)+'</h3><p>'+E(A(products[k]).join(' · '))+'</p></article>').join('')}
+function cuBusiness(){let demand=pipe(C.mdna).slice(0,10),plants=A(C.plants),segments=A(P.segments);return'<div class="stack">'+card('How the business makes money','<p>'+E(C.business||P.summary.business)+'</p>')+card('Reported segment economics',badge('Reported fact')+table(['Business','Latest FY sales ₹cr','Growth','Institutional read'],segments.map(x=>[E(x.business),N(x.sales_cr,0),E(x.growth),E(x.read)])))+card('Product and application architecture','<div class="product-grid">'+cuProducts()+'</div>')+card('End-market demand map',list(demand,10))+card('Operating moat',list(pipe(C.strengths),8),'positive')+card('Manufacturing and service footprint',table(['Location','Role','Scale / context'],plants.map(x=>[E(x.location),E(x.role),E(x.capacity||'—')])))+'</div>'}
+function cuFinancials(){let a=A(D.actuals),model=A(P.projection?.projection),actual=tableByPeriod(['Quarter','Revenue ₹cr','YoY','Operating profit ₹cr','OPM','PAT ₹cr','YoY','EPS'],a.map(x=>[E(x.q),N(x.revenue,0),N(x.rev_yoy,1)+'%',N(x.op,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.pat_yoy,1)+'%',N(x.eps,2)]));let est=tableByPeriod(['Period','Revenue ₹cr','YoY','OPM','PAT ₹cr','EPS','Primary drivers'],model.map(x=>[E(x.quarter),N(x.revenue,0),N(x.yoy_pct,1)+'%',N(x.opm_pct,1)+'%',N(x.pat,0),N(x.eps,2),E(A(x.drivers).map(d=>d.label+': '+d.value).join(' · '))]));let rat=A(D.ratios).filter(x=>/Receivable|Inventory|Payable|Int cover/i.test(x.label));let val=tableByPeriod(['Year','Market cap ₹cr','P/E','Operating margin','Debt / equity'],A(D.val5).map(x=>[E(x.fy),N(x.mcap,0),N(x.pe,1)+'x',N(x.opm,1)+'%',N(x.de,2)+'x']));return'<div class="stack">'+card('Eight-quarter operating trajectory',badge('Reported fact')+actual)+card('Full-year bridge',pnlPanel(D.pnl?.year))+(model.length?card('Forward model · '+N(P.projection?.confidence_pct,0)+'% confidence',badge('Model estimate','estimate')+est,'estimate-card'):'')+(A(P.projection?.assumptions).length?card('Model assumptions',list(P.projection?.assumptions,10)):'')+card('Working-capital diagnostics',kpis(rat))+card('Five-year valuation and balance-sheet history',val)+creditRatingCard()+'</div>'}
+function cuExecution(){let w=D.wtt||{},track=D.track||{},open=A(track.open),pick=q=>open.find(x=>q.test(x.item||'')),focus=[pick(/moderate growth across segments/i),pick(/distribution.*20%|20%.*distribution/i),pick(/railways and mining growing/i),pick(/prototype engine.*defence/i),pick(/data center market.*QSK60/i),pick(/BESS.*no meaningful sales/i),pick(/India-UK FTA/i)].filter(Boolean);let outcomes=A(track.verdicts).filter(x=>x.status!=='expired');let ledger=table(['Forward commitment','Horizon','Type'],unique(focus).map(x=>[E(x.item),E(x.horizon||'—'),E((x.category||'').replaceAll('_',' '))]));let verdict=table(['Commitment tested','Made','Checked','Outcome'],outcomes.map(x=>[E(x.item)+'<small class="row-note">'+E(x.note||'')+'</small>',E(x.made||'—'),E(x.checked||'—'),status(x.status)]));return'<div class="stack"><div class="credibility"><div class="grade">'+E(w.credibility_grade||'—')+'</div><div><h3>Walk the Talk</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||track.quarters_n||'—')+'</b> calls covered</span><span><b>'+E(w.reconciled_n||track.verdicts_total||'—')+'</b> reconciled</span><span><b>'+E(w.guidance_hit_rate||'—')+'%</b> guidance hit</span></div></div>'+card('Decision-relevant forward commitments',badge('Management guidance','guide')+ledger,'guide-card')+card('Evidence-tested commitments',verdict)+card('Management tone · latest assessment',badge('Analytical inference','inference')+'<p>'+E(w.tone_latest||'')+'</p>','inference-card')+'</div>'}
+function cuOwnership(){let board=A(C.board).filter(x=>!/(resigned|ceased)/i.test(x.designation||'')),related=A(jsonish(C.related)).filter(x=>!/Former wholly-owned subsidiary/i.test(x.note||'')),dividend=A(D.track?.open).find(x=>/aggregating.*66 per (equity )?share/i.test(x.item||''));return'<div class="stack">'+card('Control and promoter position','<div class="analysis-strip"><div><span>Ultimate parent</span><b>Cummins Inc., USA</b></div><div><span>Promoter holding</span><b>'+N(P.scorecard?.promoter_pct,1)+'%</b></div><div><span>Share-count change · 3Y CAGR</span><b>'+N(P.scorecard?.share_cagr_3y,2)+'%</b></div></div>')+card('Current board and executive leadership',table(['Director','Role'],board.map(x=>[E(x.name),E(x.designation)])))+card('Operating and related-party structure',table(['Entity','Relationship','Decision relevance'],related.map(x=>[E(x.name),E(x.relation),E(x.note)])))+card('Capital distribution record','<p>'+E(dividend?.item||'A Board-adopted dividend policy governs distribution versus retention of profit.')+'</p>','positive')+card('Governance watch','<p>Parent technology access is a strategic advantage, while related-party sourcing, technology transfer and inter-company sales make arm’s-length discipline and localization economics continuing diligence items.</p>','caution')+'</div>'}
+function cuRisks(){let ar=A(C.risks),find=q=>ar.find(x=>q.test(x.risk||''))||{},cr=String(ddBlock('bull_bear','risks').body||'').split(/\n+/).map(x=>x.replace(/^[-•]\s*/,'')),line=q=>cr.find(x=>q.test(x))||'',non=String(ddBlock('bull_bear','non-obvious').body||'').split(/\n+/).map(x=>x.replace(/^[-•]\s*/,''));let rows=[{risk:'Input-cost and pass-through lag',note:line(/Commodity inflation/)},{risk:'Export and geopolitical exposure',note:find(/Export demand/).note},{risk:'Imported high-displacement engine economics',note:line(/imported 78L\/95L/)},{risk:'Supplier resilience',note:find(/Supply chain fragility/).note},{risk:'Industrial-cycle sensitivity',note:find(/private capex recovery/).note},{risk:'Rail procurement concentration',note:find(/Segment concentration in Rail/).note},{risk:'Aftermarket competition',note:pipe(C.mdna).find(x=>/^Distribution\/Aftermarket:/i.test(x))},{risk:'Energy-transition execution gap',note:non.find(x=>/BESS is import-dependent/i)}].filter(x=>x.note);return'<div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.risk)+'</h3><p>'+E(x.note)+'</p></div></article>').join('')+'</div>'}
+function cuPeers(){let pp=D.peer_panel||{},all=[pp.target,...A(pp.peers)].filter(Boolean),cols=x=>[E(x.name)+'<small class="row-note">'+E(x.s)+'</small>',E(x.fy),N(x.rev,0),N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),N(x.pat_growth,1)+'%',N(x.pe,1)+'x',N(x.mcap,0)];return'<div class="stack">'+card('Operating peer set',table(['Company','FY','Revenue ₹cr','Growth','EBITDA margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],all.map(cols)))+'<div class="layout-2">'+card('Closest operating reference','<p>Kirloskar Oil Engines is the cleaner domestic engines and generation reference. It is smaller and less profitable, so its multiple is context rather than a direct valuation answer.</p>')+card('Partial reference only','<p>Greaves Cotton shares engine heritage but differs materially in scale, mix and margin. It should not be treated as an equivalent franchise.</p>','caution')+'</div><p class="method-note">Operating resemblance and valuation context are kept separate; unrelated capital-goods names are excluded.</p></div>'}
+function cuVerdict(){let sc=P.scorecard||{},scores=[['Profitability',sc.bq_a,'25'],['Growth',sc.bq_b,'20'],['Balance sheet',sc.bq_c,'15'],['Cash quality',sc.bq_d,'15'],['Capital allocation',sc.bq_e,'10'],['Promoter and governance',sc.bq_f,'10'],['Management evidence',sc.bq_g,'15']];let questions=['What is the data-centre revenue and order-book split between colocation and hyperscaler customers, and what margin does each earn?','What localization and sourcing plan protects economics if demand shifts from QSK60 to imported 78L or 95L engines?','How quickly can the three-year CFO/PAT ratio move toward 1x, and which working-capital line is the binding constraint?','What are the measurable commercial milestones for BESS before it becomes an investible earnings driver?','How much export recovery is embedded in the order book, by geography, and how much depends on related-party demand?'];let synthesis=['The core franchise clears the quality gate: high returns, a debt-free balance sheet and strong three-year earnings growth.','Data centres accelerate the thesis, but the installed-base aftermarket is the more repeatable second engine.','Industrial breadth reduces single-market dependence; rail procurement and the global export cycle still create lumpiness.','The stored execution record is the counterweight to franchise quality: guidance precision and cash conversion need stronger evidence.','The investment case is valuation-dependent. Sustained premium economics matter more than any one quarter’s growth spike.'];let gaps=['No valid Stage classification is stored; price and volume evidence are shown separately.','Management has not disclosed a clean data-centre sub-segment revenue, margin or order-book bridge.','Model projections are analytical estimates, not management guidance.','A historical valuation distribution or percentile store is not available, so none is fabricated.'];return'<div class="stack"><div class="decision-card"><div><p class="eyebrow">Current stance</p><h3>'+E(sc.verdict||'OBSERVE')+' · quality established, entry price matters</h3><p>The evidence supports a high-quality operating franchise, while execution scoring, cash conversion and valuation keep the conclusion conditional.</p></div><div class="decision-score"><strong>'+E(sc.bq_total||'—')+'</strong><span>/100 Business Quality</span></div></div>'+card('Analytical scores',table(['Dimension','Stored score','Maximum'],scores.map(x=>[E(x[0]),N(x[1],0),E(x[2])])))+card('Due diligence',list(questions,10),'caution')+card('Intelligence synthesis',list(synthesis,10),'inference-card')+card('Coverage limits',list(gaps,8))+'</div>'}
+function themeIntelligence(){let rows=A(P.themes);return'<div class="theme-stack">'+rows.map((x,i)=>{let id='theme_detail_'+i;let relevanceHtml=x.relevance?'<p class="theme-relevance">'+E(x.relevance)+'</p>':'';let intelHtml='<div class="theme-intel"><div><span>Need of the hour</span><p>'+E(x.need)+'</p></div><div><span>Current driver</span><p>'+E(x.driver)+'</p></div></div>';return'<article class="theme-card"><div class="theme-card-head"><div><p class="theme-parent">'+E(x.parent)+'</p><h3>'+E(x.title)+'</h3></div><div class="theme-pills"><span class="theme-pill tier">T'+E(x.tier)+'</span><span class="theme-pill">'+E(x.tag)+'</span><span class="theme-pill '+(/Sharpest/i.test(x.status)?'sharp':'long')+'">'+E(x.status)+'</span></div></div><div id="'+id+'" style="display: none;">'+relevanceHtml+intelHtml+'</div><a href="#" onclick="let p=document.getElementById(\''+id+'\'); let collapsed=p.style.display===\'none\'; p.style.display=collapsed?\'block\':\'none\'; this.textContent=collapsed?\'Show less\':\'Show details\'; return false;" style="font-size: 11px; color: var(--g700); font-weight: 500; text-decoration: underline; cursor: pointer; display: inline-block; margin-top: 8px; margin-bottom: 4px;">Show details</a></article>'}).join('')+'</div>'}
+function explorer(){let sets=P.explorer||{},labels={momentum:'Momentum',investing:'Investing',investing_complete:'Investing · Setup complete',investing_building:'Investing · Setup building',new:'New listings',peers:'Peers'},
+  /* SCREENS_PAGES_DESIGN.md 3b: Investing is "`investing`, split into TWO lists". `_explorer_base`
+     has published `investing_complete` (28) / `investing_building` (106) since 2026-08-25 -- a clean
+     partition of the 134, zero overlap -- and this <select> never offered them, so the split existed
+     in the payload and nowhere a reader could reach it. The combined list stays FIRST: it is what
+     the Investing screen pins, and the buckets refine it rather than replace it.
+     OFFER ONLY WHAT THE PAYLOAD HAS. `keys` was a fixed list of four, so a set the payload omits
+     still rendered an <option> selecting an empty list -- and an empty list reads as "nothing
+     qualifies", not "this page never carried that set". `peers` is exempt: it is injected
+     per-company at render time (buildPayload), not carried in the explorer base. */
+  keys=['momentum','investing','investing_complete','investing_building','new','peers']
+    .filter(k=>k==='peers'||(sets[k]&&sets[k].length));return'<aside class="stock-explorer"><div class="explorer-title"><div><span>Company Explorer</span><b>Stock list</b></div><button id="explorer-close" aria-label="Close stock list">×</button></div><select id="explorer-source" aria-label="Choose stock screen">'+keys.map(k=>'<option value="'+k+'">'+labels[k]+'</option>').join('')+'</select><input id="explorer-search" type="search" placeholder="Filter stocks…" aria-label="Filter stock list"><div id="explorer-list"></div></aside><button id="explorer-open" class="explorer-open">Stocks</button>'}
+function initExplorer(){let sets=P.explorer||{},source=document.getElementById('explorer-source'),search=document.getElementById('explorer-search'),listBox=document.getElementById('explorer-list'),aside=document.querySelector('.stock-explorer');if(!source||!search||!listBox||!aside)return;/* KEEP THE READER WHERE THEY WERE. On /company/ a click is a real navigation, so it reloads the page, re-renders this list from scratch and resets its scrollTop to 0 - the row just clicked is then hundreds of rows down and has to be hunted for again (owner 2026-08-31). On a SCREEN page the click is intercepted below and no longer reloads, but the renderer still re-runs and rebuilds this list, so the centring matters there too. STAY ON THE SCREEN PAGE 2026-09-11. The href was an unconditional '/company/?sym=', so an explorer click on /screens/<name>/ left the screen entirely and the top table (built OUTSIDE #store-company by screens_pages precisely so it survives a symbol switch) vanished with it -- while the SAME page's top table used a relative '?sym=' and stayed put. Two link styles for one action on one page. On a screen the link is now relative, matching screens_top; /company/ keeps the absolute path. Centre the selected row INSIDE the list box. Never scrollIntoView(): the list is a nested scroller and that also scrolls the DOCUMENT, throwing the reader to the top of the company page - trading one wrong scroll position for another. Measured off rects rather than offsetTop, which is relative to the offsetParent and silently wrong if the box is not positioned. */function centre(){let sel=listBox.querySelector('.explorer-stock.selected');if(!sel)return;let r=sel.getBoundingClientRect(),b=listBox.getBoundingClientRect();listBox.scrollTop+=(r.top-b.top)-(b.height/2-r.height/2)}/* THE FILTER CONTRACT, IMPLEMENTER SIDE (owner 2026-09-18: "when i apply filter, the new listing
+   symbol in explorer doesnt change in list"). `screens_top.py:17` has documented this contract since
+   the screens were built and all three screens call `window.__EXPLORER_FILTER__(symbols)` -- but
+   NOTHING EVER DEFINED IT. Every call site is wrapped in `typeof ...==='function'`, so for months the
+   call silently no-opped: the filter narrowed the top table and left this list untouched.
+   `SCREENS_PAGES_DESIGN.md:241` records it as knowingly unbuilt ("the list is static from JSON").
+   A null/absent allow-list means NO FILTER -- the whole set shows -- which is what the screens send
+   when every control is cleared, so clearing a filter restores the list rather than emptying it.
+   Held on `window`, not in this closure, because the renderer re-executes on every symbol switch
+   (see __KEEP_SECTION__ below) and a live filter has to survive that. */
+function allowed(){let f=window.__EXPLORER_ALLOW__;return f&&f.size?f:null}
+function draw(keep){let q=String(search.value||'').toUpperCase(),allow=allowed(),rows=A(sets[source.value]).filter(r=>!q||String(r.symbol||'').toUpperCase().includes(q)||String(r.name||'').toUpperCase().includes(q)).filter(r=>!allow||allow.has(String(r.symbol||'').toUpperCase()));listBox.innerHTML=rows.length?rows.map(r=>'<a class="explorer-stock'+(r.symbol===I.symbol?' selected':'')+'" href="'+(window.__SCREEN__?'?sym=':'/company/?sym=')+encodeURIComponent(r.symbol)+'"><b>'+E(r.symbol)+'</b><span>'+E(r.name||r.meta||'')+'</span><small>'+E(r.meta||'')+'</small></a>').join(''):'<p class="empty">'+(allow?'No stocks match this filter.':'No stocks in this view.')+'</p>';if(keep!==false)centre()}
+/* Re-exposed on EVERY render (this function re-runs on each symbol switch) so the contract is never
+   briefly absent; and the live filter is re-applied by the draw() at the end of initExplorer, so a
+   switch does not silently widen the list back to the full set. The peers set is the reader's own
+   lookup rather than the screen's universe, so a screen filter must not narrow it. */
+window.__EXPLORER_FILTER__=function(syms){window.__EXPLORER_ALLOW__=syms&&syms.length?new Set(syms.map(s=>String(s).toUpperCase())):null;if(source.value!=='peers')draw(false)};/* PIN THE LIST TO THIS SCREEN'S SET (SCREENS_PAGES_DESIGN.md 3b, table at "explorer list").
+   `source.value` was NEVER assigned, so the <select> fell to its first <option> -- momentum -- on
+   every page. /screens/investing/ and /screens/new-listing/ therefore listed the momentum universe
+   (266) instead of their own 135 and 1,983, while the BOOT honoured SCREEN.explorer when it picked
+   the landing symbol: half the config applied, and the half the reader sees did not.
+   It also broke the in-place click interceptor built 2026-09-11, whose guard is "a row rendered in
+   this explorer is in the screen's universe BY CONSTRUCTION" (design 3e). With the wrong set
+   listed, that premise was false, so clicking a row switched the page in place to a company
+   outside the screen's universe -- silently, because the guard only excludes `peers`.
+   Only assign a set that actually exists: an unknown name would blank the list, and on /company/
+   (no __SCREEN__) the momentum-first default is correct and stays. */
+var _pin=(window.__SCREEN__&&window.__SCREEN__.explorer)||'';
+if(_pin&&Object.prototype.hasOwnProperty.call(sets,_pin)&&[...source.options].some(o=>o.value===_pin))source.value=_pin;
+source.onchange=()=>draw();search.oninput=()=>draw(false);document.getElementById('explorer-close').onclick=()=>aside.classList.remove('open');document.getElementById('explorer-open').onclick=()=>aside.classList.add('open');/* SWITCH IN PLACE ON A SCREEN PAGE (design SCREENS_PAGES_DESIGN.md 3e, wired 2026-09-11). `screens_pages` boot has always exported `window.__SCREEN_SELECT__` with the comment "the renderer asks for this by name when an explorer row is clicked" -- and NOTHING EVER ASKED. The consumer half of that contract was missing, so every explorer click was a full navigation: the reader lost their place in the page (Stage analysis scrolled back to the top) and this list reset its scroll to 0. Delegated so it survives the redraws above. The <a href> STAYS a real link (progressive enhancement): middle-click, open-in-new-tab and copy-link keep working, and when there is no in-place handler the navigation is still correct. */listBox.addEventListener('click',ev=>{if(!window.__SCREEN_SELECT__)return;if(ev.defaultPrevented||ev.button!==0||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey)return;let a=ev.target.closest&&ev.target.closest('a.explorer-stock');if(!a||!listBox.contains(a))return;let s=(new URLSearchParams((a.getAttribute('href')||'').split('?')[1]||'')).get('sym');if(!s)return;/* GUARD ON THE PINNED SET, NOT ON `M2D.recOf` (design 3e step 4 says recOf; it cannot work here). `M2D.init` is called with `stocks:[M.stock]` -- ONLY the company on screen -- so `STK` holds one row and `recOf` returns null for every OTHER symbol in the list. Using it as the guard let every click fall through to a navigation, which is the bug this handler exists to fix. A row rendered in THIS explorer is in the screen's pinned set by construction, which is the same question step 4 was really asking. `source.value==='peers'` is the one set that is not the screen's universe -- a peer can be any company -- so those keep navigating to the full company page. */if(source.value==='peers')return;ev.preventDefault();listBox.querySelectorAll('.explorer-stock.selected').forEach(x=>x.classList.remove('selected'));a.classList.add('selected');aside.classList.remove('open');/* CARRY THE READER'S PLACE ACROSS THE SWITCH (owner 2026-09-18: "if I change symbol from explorer
+   the sub nav should stay on same selected on prev symbol. and scroll should also stay"). The
+   renderer re-EXECUTES on every switch (screens_pages.runRenderer appends a fresh <script>), so the
+   active tab -- held only as a CSS class on the nav anchors -- is destroyed and re-derived from
+   `verticalTabs[0]`, i.e. always the first tab. `window` is the only channel that survives that
+   re-execution, which is why __SCREEN__ and __SCREEN_SELECT__ already live there. Recorded at the
+   CLICK, before the payload swaps, because by the time renderVertical runs the old DOM is gone. */
+if(!window.__KEEP_SECTION__){let act=document.querySelector('.vertical-nav a.active');if(act)window.__KEEP_SECTION__=act.dataset.section}window.__KEEP_SCROLL__=window.scrollY||0;window.__SCREEN_SELECT__(s)});draw()}
+/* HIST_SESSIONS COMES FROM THE PAYLOAD, NEVER A LITERAL. This read `hist_sessions:130` while
+   momentum_dashboard.HIST_SESSIONS was raised to 200 (2026-09-16), so the table's own caption
+   said "within last 130" over 200 rows of data -- a second copy of a constant that only ever
+   drifts. `mev` carries the membership events behind the table's "Added to Momentum" column;
+   the screen payload ships it, /company/ falls back to the symbol's own file. */
+function initStage(){if(!window.M2D)return;var _sm=(window.__SCREEN_INSIGHTS__||{}),_hs=(M.meta&&M.meta.hist_sessions)||(_sm.meta&&_sm.meta.hist_sessions)||200;window.M2D.init({stocks:M.stock?[M.stock]:[],meta:{hist_sessions:_hs},mev:_sm.mev||(M.mev?(function(m){var o={};o[I.symbol]=m;return o;})(M.mev):null),datadir:(window.__SCREEN__&&window.__SCREEN__.datadir)||'../data'});/* STAGE HISTORY 2026-09-03. `M2D` exposes setHist() and its histTbl() renders 'Loading stage history...' until histLoaded flips -- but the PUBLIC page never called it, so the panel said Loading forever on both /company/ and /screens/momentum/. The 810 KB data/momentum2_hist.json is published and serves 200; only the caller was missing (the internal dashboard has its own fetch, which is why this was invisible there). Bulk file for ALL symbols by design (DESIGN.md phase-2 split), so it is fetched once, lazily, and a failure leaves the existing empty-state rather than breaking the page. */(function(){var dd=(window.__SCREEN__&&window.__SCREEN__.datadir)||'../data';fetch(dd+'/momentum2_hist.json').then(function(r){return r.ok?r.json():null;}).then(function(h){if(h&&window.M2D&&window.M2D.setHist){window.M2D.setHist(h);if(window.M2D.cur&&window.M2D.cur())window.M2D.select(window.M2D.cur());}}).catch(function(){});})();/* DEPTH-CORRECT DATADIR 2026-09-03. This was hardcoded '../data', which is right for /company/ but WRONG for /screens/momentum/ -- two levels down, so every price fetch resolved to /screens/data/company/<SYM>.json and 404'd. `screens_pages` already publishes the correct prefix as __SCREEN__.datadir ('../../data'); it simply was never read here. Symptom was 'Price unavailable' with a blank chart while Stage rendered fine, because Stage comes from the inline payload and only the CHART needs the fetch. */if(M.stock){window.M2D.select(I.symbol);let bs=document.querySelectorAll('#m2-tf button');bs.forEach(b=>b.onclick=()=>{bs.forEach(x=>x.classList.toggle('active',x===b));window.M2D.setTf(+b.dataset.tf)})}else if(A(M.price).length){window.M2D.setCur(I.symbol)}window.M2D.loadDelVol()}
+function chart(rows){if(!rows||rows.length<2)return'<div class="empty">Price history is not yet sufficient.</div>';let d=rows.slice(-260),W=900,H=300,p=34,c=d.map(x=>+x[1]),v=d.map(x=>+x[2]||0),lo=Math.min(...c),hi=Math.max(...c),vm=Math.max(...v)||1,X=i=>p+i*(W-2*p)/(d.length-1),Y=x=>p+(hi-x)*(H-2*p-52)/(hi-lo||1);return'<div class="market-chart"><svg viewBox="0 0 '+W+' '+H+'">'+d.map((x,i)=>{let z=44*(+x[2]||0)/vm;return'<rect x="'+X(i)+'" y="'+(H-p-z)+'" width="2" height="'+z+'"/>'}).join('')+'<polyline points="'+d.map((x,i)=>X(i)+','+Y(+x[1])).join(' ')+'"/></svg><div><span>'+E(d[0][0])+'</span><b>₹'+N(c.at(-1),2)+'</b><span>'+E(d.at(-1)[0])+'</span></div></div>'}
+/* HERO MARKET CAP 2026-09-09 (owner: "for HFCL why we don't have mcap in header section above sub
+   nav ... Add mcap across all company as standard"). The gate WAS `if(an.Symbol)`, where
+   `an = P.ipo?.analysis`. That tests whether an IPO ANALYSIS BLOCK EXISTS, not whether a market cap
+   exists -- an IPO-shaped condition on a fact that belongs to every listed company. HFCL (listed, no
+   IPO analysis) therefore showed no tile while its own payload carried `mcap_live: 38381` and
+   `mcap_asof: "2026-09-08"`. A rendering gate, not a data gap.
+
+   Measured over all 3,070 published payloads, replicating company/index.html's own binding
+   (`D = dd.s ? deepdive : drhp`, `an = extra.ipo.analysis`, extra = main merged with the .v.json):
+   975 rendered before, 2,050 after. See output/_scratch/hero_mcap/DESIGN.md.
+
+   ONE FACT, TWO FEEDS -- and they were checked for agreement BEFORE being combined, because this is
+   not the fallback-chain pattern the offer block was just cured of. Where both exist (563 companies)
+   they agree within +/-5% on 563 of 563, every difference being `mcap_live`'s round(), and both are
+   struck on the same date:
+     - `D.mcap_live`  -- security-master snapshot (financials.py::live_mcap), dated by `mcap_asof`;
+       covers 1,662 including every large listed name.
+     - `an['Market Cap (Cr)']` -- the live market feed that also carries Latest Close / Latest Date /
+       ATH / 10-day traded value. It is NOT an at-issue figure: 932 of its 951 usable rows are dated
+       2026-09-08, the same day as the snapshot. It covers 388 companies the security master has no
+       row for at all -- KWICK listed 2026-09-03 and is not in the master, so dropping this feed
+       would have regressed exactly the company the owner cited as working.
+   `D.mcap` (FY-end, yearly master) is deliberately NOT a third rung: it lags by up to a year and is
+   a different quantity. HEG is the example -- FY-end 10,338 against a live 4,990.
+
+   ABSENCE RENDERS NOTHING -- no dash, no zero. 24 companies had `an.Symbol` with an EMPTY
+   'Market Cap (Cr)' and so printed the literal "Market cap \u20b9\u2014 cr" today. 19 of them list
+   between 2026-09-11 and 2026-09-18 (QUALIANCE, GLASSWALL, PRASOLCHEM, RENTOMOJO, STEAMHOUSE ...):
+   pre-listing, no price, therefore no market capitalisation -- the quantity does not exist, and a
+   dash wrongly asserts that it does and is merely unavailable. The other 5 are listed but have no
+   recoverable figure (4 absent from the security master, FARMPEACE has a null `mcap_rs`; 3 have
+   never traded). Both classes now render no tile, which is why the count is not simply additive.
+
+   MAGNITUDE GUARD. Values were verified independently against DELIVERY_VWAP_DAILY_CSV: 2,038 of
+   2,041 comparable land within 0.5x-2.0x. The three that do not are stored defects, not display
+   bugs -- FOCUS (master 415 vs price*shares 1,450 vs feed 157), KALYANI (master 14 on a 1,000,000
+   share count vs feed 666) and SICALLOG (813 vs 2,350). That cross-feed check cannot run in the
+   browser; what CAN run here is the cheap half -- a positive finite number below a ceiling no
+   Indian listed company approaches -- which is what stops a share count landing in a rupee field.
+   The three named above are reported to the owner rather than silently rendered. */
+/* MAGNITUDE QUARANTINE 2026-09-09. These three failed the cross-feed check described above and
+   are NOT rendered, because a market cap that is wrong by 3x-45x is worse than no market cap:
+     FOCUS    stored 415 cr; close 215.00 x 67,444,950 sh = 1,450 cr; delivery feed 157 cr
+     KALYANI  stored  14 cr on a 1,000,000 share count; close 927.95; delivery feed 666 cr
+     SICALLOG stored 813 cr; delivery feed 2,350 cr (feed date 2026-07-31)
+   Each is a defect in `SECURITY_MASTER_CSV`'s share count or mcap, not a display bug -- the fix
+   belongs upstream in that store, and this list should SHRINK to empty, never grow. Re-derive it
+   with output/_scratch/hero_mcap/sanity.py, which is the regression test for this class. */
+const HERO_MCAP_QUARANTINE={FOCUS:1,KALYANI:1,SICALLOG:1};
+let heroMcap=(f,an,D)=>{let d=D||{},a=an||{},v=Number(d.mcap_live),src=1;
+    if(HERO_MCAP_QUARANTINE[String(I&&I.symbol||'').toUpperCase()])return;
+    if(!(isFinite(v)&&v>0)){v=Number(a['Market Cap (Cr)']);src=2;}
+    /* Above ~Rs 30 lakh cr is not a market cap on this exchange; it is a units error or a share
+       count in a rupee field. Reliance, the largest, is ~Rs 17.5 lakh cr. */
+    if(!(isFinite(v)&&v>0&&v<3e7))return;
+    let asof=src===1?(d.mcap_asof||''):(a['Latest Date']||'');
+    f.push(['Market cap','\u20b9'+N(v,0)+' cr',asof?'as of '+asof:'']);};
+function hero(){let st=M.stock,sc=P.scorecard||{},an=P.ipo?.analysis||{},hasDrhp=PM?PM.coverage?.drhp:P.coverage.drhp,hasDeep=PM?PM.coverage?.deepDive:P.coverage.deepDive,f=[['Coverage',hasDeep&&hasDrhp?'Deep Dive + offer research':hasDrhp?'Offer-document research':hasDeep?'Operating deep dive':'Market coverage'],['Market structure',st?st.g+' · '+({1:'Basing',2:'Advancing',3:'Top',4:'Decline'}[st.g]||'Tracked'):'Classification pending']],thesis=PM?.hero?.oneLiner||P.summary.oneLiner;if(!PM&&I.symbol==='INDOMIM')thesis=String(thesis||'').replace(/ in Calendar Year 2025 for the last six years/i,', a leadership position held for six years');if(sc.symbol)f.push(['Business quality',sc.bq_total+' / 100']);heroMcap(f,an,D);let hasModel=A(P.projection?.projection).length;return'<section class="company-hero"><p class="eyebrow">Institutional company intelligence</p><div class="title-row"><h1>'+E(I.name)+'</h1><span>'+E(I.symbol)+'</span></div><p class="thesis">'+E(thesis)+'</p><div class="decision-strip">'+f.map(x=>'<div'+(x[2]?' title="'+E(x[2])+'"':'')+'><span>'+E(x[0])+'</span><b>'+E(x[1])+'</b></div>').join('')+'</div><div class="legend">'+badge('Reported fact')+badge('Management guidance','guide')+(hasModel?badge('Model estimate','estimate'):'')+badge('Analytical inference','inference')+'</div></section>'}
+function investment(){if(D.s)return hfInvestment();let v=sec('verdict'),ip=sec('industry_peers'),strength=v.strengths_observed||ip.swot?.strengths||[],concerns=v.concerns_observed||[],non=concall('non-obvious');return'<div class="layout-2">'+card('Business in one view','<p>'+E(P.summary.business)+'</p>')+card('Why this can compound',list(I.symbol==='HFCL'?concall('optionality'):strength,6),'positive')+card('What the market must be right about',list(concerns,6),'caution')+card('Non-obvious intelligence',badge('Analytical inference','inference')+list(non.length?non:sec('intellisense').growth_durability?.signals,6),'inference-card')+card('What changes the view',list(v.monitorables||concall('risk'),7))+'</div>'}
+function business(){if(D.s)return hfBusiness();let b=sec('business_ops'),ip=sec('industry_peers'),products=b.products||P.products;return'<div class="layout-2">'+card('Revenue engine',list(products,10))+card('End-market architecture',list(b.revenue_split_industry||P.endMarkets,10))+card('Competitive position',(ip.market_position?'<p><strong>'+N(ip.market_position.share_pct,1)+'%</strong> '+E(ip.market_position.positioning||'')+'</p><p>'+E(ip.market_position.basis||'')+'</p>':'')+list(ip.swot?.strengths,5),'positive')+card('Manufacturing footprint',list(b.plants,8))+card('Operating economics',list(concall('margin'),8))+'</div>'}
+function financials(){let f=sec('financials'),p=A(f.pnl_3yr),cash=A(f.cash_flow),rr=A(f.return_ratios),bsRows=A(f.balance_sheet_key),model=P.projection?.projection||[];
+    /* The same four blocks as the DRHP page, in the owner's order, so a company carried by the
+       deep-dive renderer and one carried by the DRHP renderer show the SAME statements. */
+    let reported=pnlSpineTable(p,{eps:1,margins:0})||list(concall('financial scorecard'),10);
+    let bs=balanceSheetTable(bsRows),cf=cashFlowTable(cash,p),ratios=ratiosTable(bsRows,p,rr);
+    let estimates=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct)+'%',N(x.pat,0)]));
+    return'<div class="stack">'
+        +card('Profit & loss',badge('Reported fact')+reported)
+        +(bs?card('Balance sheet',bs):'')
+        +(cf?card('Cash flow',cf):'')
+        +(ratios?card('Ratios',ratios):'')
+        +card('Forward model',badge('Model estimate','estimate')+estimates,'estimate-card')
+        +card('Model assumptions',list(P.projection?.assumptions,8))+creditRatingCard()+'</div>'}
+function execution(){let o=sec('objects_execution'),hi=P.presentation?.highlights||{},cs=P.commitments||[],strategyPlan=topicBlock('strategy');let ledger=table(['Commitment','Horizon','Status'],cs.slice(-14).map(x=>[E(x.item||x.commitment||x.promised||'Commitment'),E(x.horizon||x.target_period||'—'),E(x.status||'Open')])),objects=o.objects?table(['Use of proceeds','₹cr'],o.objects.map(x=>[E(x.purpose),x.amount_lakhs==null?'—':N(x.amount_lakhs/100,0)])):'';return'<div class="layout-2">'+card(I.symbol==='HFCL'?'Capacity & capital':'Use of fresh issue',I.symbol==='HFCL'?list(hi.expansion_capex||concall('capex'),8):objects)+card('Execution milestones',ledger||list(o.project?[o.project]:[],6))+card('Management credibility',P.wtt?.symbol?'<div class="grade">'+E(P.wtt.credibility_grade||'Tracked')+'</div><p>'+E(P.wtt.summary||'')+'</p>':'<p class="muted">No mature commitment history yet. This is an evidence gap, not a negative score.</p>')+card('Guidance and dependencies',badge('Management guidance','guide')+list(concall('guidance'),10),'guide-card')+(strategyPlan.body?card('Stated strategy',badge('Issuer-stated')+prose(strategyPlan.body)):'')+'</div>'}
+function ownership(){let c=sec('capital_ownership'),g=sec('governance');return'<div class="layout-2">'+card('Promoter and dilution',list([c.promoter_holding,c.pledging,c.dilution].filter(Boolean),8))+card('Board and leadership',list(g.promoters_directors,8))+card('Related parties & record gaps',list([...A(g.rpts),...A(g.record_gaps)],8),'caution')+card('Capital history — decision-relevant events',list(c.capital_history,8))+'</div>'}
+function risks(){let r=sec('risks'),v=sec('verdict'),all=[...A(r.internal_operational),...A(r.financial_valuation),...A(r.strategy_growth),...A(v.concerns_observed),...(I.symbol==='HFCL'?concall('risk'):[])];return'<div class="risk-grid">'+all.slice(0,12).map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title||value(x))+'</h3>'+(x.detail?'<p>'+E(x.detail)+'</p>':'')+(x.evidence?'<small>'+E(x.evidence)+'</small>':'')+'</div></article>').join('')+'</div>'}
+function peers(){let rows=P.peers?.peers||[],groups={};rows.forEach(x=>(groups[x.group||'Peers']??=[]).push(x));return'<div class="stack">'+Object.keys(groups).map(g=>card(g+(g.includes('Global')?' · closest disclosed comparable':' · operating reference set'),table(['Company','Revenue ₹cr','Margin','PAT ₹cr','P/E'],groups[g].map(x=>[E(x.name),N(x.rev,0),x.ebitda_margin==null?'—':N(x.ebitda_margin)+'%',N(x.pat,0),N(x.pe,1)])))).join('')+'<p class="method-note">Groups show business resemblance, not assumed equivalence. Missing metrics remain blank.</p>'}
+// The anchor book: 172 symbols carry one, 4,945 rows in total, and NOTHING rendered it. The data
+// shipped in every payload while `listing()` showed only price discovery; `coverageListing` reads
+// it but is not the renderer these symbols are assigned.
+function anchorCard(){
+    let aa=Q.anchor_allotment||{},rows=A(aa.rows);
+    if(!rows.length)return '';
+    // Named owners first (present on 440 of 4,967 rows), blanks after; within each, largest stake
+    // first. A row's owner is the person behind the fund house, which is the part a reader knows.
+    let ranked=rows.slice().sort((x,y)=>{
+        let ox=String(x.owner||'').trim(), oy=String(y.owner||'').trim();
+        if(!!ox!==!!oy) return ox?-1:1;
+        if(ox&&oy&&ox!==oy) return ox.localeCompare(oy);
+        return (Number(y.pct)||0)-(Number(x.pct)||0);
+    }).slice(0,50);
+    // `tr_med90` is the house's MEDIAN 90-DAY RETURN across its prior anchor positions, and it is
+    // present on ~24% of rows. `tr_medl` is a different measure (listing-day gain), so it is NOT
+    // substituted in - an empty cell is honest, a mixed column is not. The sample size rides along
+    // because "100%" over 4 IPOs and over 40 are not the same claim.
+    // The sample size rides with the 90-day figure only, so it is stated once per row rather than
+    // twice: "-10.9%" over 2 prior IPOs and "8.0%" over 109 are not the same claim, and without n
+    // they read identically. A missing median stays blank — never filled from a different measure.
+    let ret=(v,n)=>{
+        if(v==null) return '—';
+        return N(v,1)+'%'+(n==null?'':'<small class="row-note">n='+N(n,0)+'</small>');
+    };
+    let body=table(['Anchor house','Owner','% of anchor book','Shares','Med 90D','Med 180D'],
+        ranked.map(x=>[E(x.house||'—'),E(x.owner||'—'),
+                       x.pct==null?'—':N(x.pct,2)+'%',N(x.shares,0),
+                       ret(x.tr_med90,x.tr_n),ret(x.tr_med180,null)]),7);
+    let note=rows.length>50?'<p class="method-note">Showing the 50 largest of '+rows.length+' anchor allottees.</p>':'';
+    return card('Anchor investors ('+(aa.n||rows.length)+')',body+note);
+}
+function listing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{};return s.Symbol?'<div class="stack">'+anchorCard()+'<div class="layout-2">'+card('Offer structure',list(sec('objects_execution').objects,6))+'</div></div>':(anchorCard()||'<div class="empty">No offer record applies to this coverage.</div>')}
+function pendingVolume(){let d=A(M.price).slice(-20),vol=d.map(x=>Number(x[2])||0).filter(x=>x>0),latest=Number(d.at(-1)?.[2])||0,avg=vol.length?vol.reduce((a,b)=>a+b,0)/vol.length:0;if(!vol.length)return'';return card('Observed volume profile',kpis([{label:'Sessions observed',value:d.length},{label:'Latest volume',value:N(latest,0)},{label:'Observed average',value:N(avg,0)},{label:'Latest / average',value:N(latest/avg,2)+'x'}]))}
+// WHY there is no stage, when the producer said why. An empty/generic section is
+// indistinguishable from a broken pipeline -- the owner had to ASK why ESDS showed no stage
+// analysis, which is the whole defect. `P.stageCoverage` carries the classifier's own attributed,
+// DATED reason (mm_run_universe_stock_stages -> stage_coverage.json). Nothing is inferred here:
+// with no attribution we keep the original generic copy.
+function stagePending(){
+  var sc=P.stageCoverage||null, body='';
+  if(sc&&sc.state==='insufficient_history'&&sc.needs){
+    body='<b>Stage analysis not available yet</b><p>Stage analysis needs '+E(sc.needs)+
+         ' sessions of price history. '+E(I.symbol)+
+         (sc.firstBar?' listed on '+E(sc.firstBar):' listed recently')+
+         ' and has '+E(sc.bars==null?0:sc.bars)+'.'+
+         (sc.availableFrom?' Available from about '+E(sc.availableFrom)+'.':'')+'</p>';
+  } else if(sc&&sc.state==='below_mcap_floor'){
+    body='<b>Stage analysis not covered</b><p>'+E(I.symbol)+' is below the market-capitalisation '+
+         'floor for stage coverage. This is a coverage policy, not a data gap.</p>';
+  } else if(sc&&(sc.state==='classifier_error'||sc.state==='empty_result'||sc.state==='load_failed')){
+    body='<b>Classification unavailable</b><p>The stage engine did not produce a classification '+
+         'for '+E(I.symbol)+' on the latest run. This is a known gap and is being tracked.</p>';
+  } else {
+    body='<b>Classification pending</b><p>Listed price history exists, but the Stage engine has '+
+         'not produced a valid classification. No stage is inferred.</p>';
+  }
+  return '<div class="pending">'+body+'</div>';
+}
+function stage(){if(M.stock)return'<div id="tab-momentum2"><div class="m2card"><div class="m2chartbar"><div class="m2tf" id="m2-tf"><button data-tf="1" class="active">1Y</button><button data-tf="3">3Y</button><button data-tf="5">5Y</button><button data-tf="0">Max</button></div><div class="m2hover" id="m2-hover"></div></div><div id="m2-chart"></div></div><div class="m2card"><div class="m2sec">Stage analysis</div><div id="m2-data"></div><div id="m2-data-ext"></div></div><div class="m2card"><div class="m2sec">Stage history</div><div id="m2-hist"></div></div><div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"></div></div></div>';return stagePending()+(A(M.price).length>1?chart(M.price)+'<div class="m2card"><div class="m2sec" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="let t=document.getElementById(\'m2-vol-table\'); let collapsed=t.style.display===\'none\'; t.style.display=collapsed?\'block\':\'none\'; this.querySelector(\'.toggle-sign\').textContent=collapsed?\'−\':\'+\';">Volume analysis <span class="toggle-sign" style="font-size: 16px; font-weight: bold;">+</span></div><div id="m2-vol-table" style="display: none;"><div class="m2empty">Loading volume analysis&hellip;</div></div></div>':'')}
+function drhpRiskRows(){let r=sec('risks'),all=[...A(r.internal_operational),...A(r.financial_valuation),...A(r.compliance_legal),...A(r.strategy_growth)];let generic=/general economic|political condition|natural disaster|pandemic|competition may|changes in law|force majeure/i;let score=x=>{let text=[x.title,x.risk,x.detail,x.evidence].join(' '),n=0;if(/[₹%]|\b\d[\d,.]*\b/.test(text))n+=4;if(/customer|supplier|data cent|cloud|cyber|power|capacity|receivable|government|technology|order|vendor/i.test(text))n+=3;if(x.evidence)n+=2;if(generic.test(text))n-=4;return n};return unique(all).sort((a,b)=>score(b)-score(a)).slice(0,10)}
+function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o=sec('overview'),rows=A(f.pnl_3yr),last=rows.at(-1)||{},rr=A(f.return_ratios).find(x=>x.fy===last.fy)||{},facts=A(b.other_material_facts).filter(x=>['technology_ip','vertical_integration','repeat_business','customer_qualification'].includes(x.label)&&typeof x.value==='string').map(x=>concise(x.value,240)).slice(0,6),risks=drhpRiskRows().slice(0,5);return kpis([{label:'Revenue',value:crMoney(last,'revenue')},{label:'EBITDA margin',value:rr.ebitda_margin_pct==null?'—':N(rr.ebitda_margin_pct,1)+'%'},{label:'PAT',value:crMoney(last,'pat')},{label:'RoCE',value:rr.roce_pct==null?'—':N(rr.roce_pct,1)+'%'}])+'<div class="layout-2">'+card('Business in one view','<p>'+E(concise(o.business_model||P.summary.business||'',520))+'</p>')+card('Evidence-backed differentiation',list(facts,6),'positive')+card('Key concerns to underwrite',list(risks.map(x=>concise(x.title||x.risk||value(x),220)),5),'caution')+card('What to monitor',list([A(b.capacity_utilization).length?'Capacity addition and utilisation':'',sec('objects_execution').orders_not_placed?.status?'Conversion of quotations into firm equipment orders':''].filter(Boolean),6))+'</div>'}
+/* 'Use of funds' now DEFERS to the Offer section (2026-09-14, owner: "Can we add in offer section /
+   For proceed / Proceed utilization"). It rendered the SAME `objects_execution.objects` rows that
+   `netProceedsCard()` renders as 'Use of proceeds' in Offer, so once that card existed the page
+   showed one dataset under two headings -- MEASURED in Chromium on MAHARAJAANDSPEEDEXINDIA: an
+   Execution 'Use of funds' table of the same three objects sat beside the new Offer table, and the
+   two even disagreed cosmetically (this card prints '₹24.1 cr' via `rsAmount`, the Offer card
+   '₹24.10 cr').
+   DEFER, NOT DELETE -- and this is the whole point. Deleting it outright was measured first and is
+   WRONG for 11 symbols (AARADHYA, ABRFL, ABSMARINE, ADCOUNTY, ADMACH, DEVSON, INDOSMC, MILLWORKS,
+   SHREEJISPG, SRTL, XTRANET): they carry objects but have NO listing section, because the approved
+   lifecycle rule in company_coverage_model hides Offer once a company is staged or listed more than
+   6 months. For them Execution is the only surface left, so an unconditional removal would delete
+   the table rather than move it. Measured over the 144 `drhpGenericExecution` payloads: 98 have an
+   Offer section (table MOVES), 11 do not (table STAYS here), 32 have no objects at all (this card
+   was already empty and renders nothing either way).
+   The predicate is `objectsRenderElsewhere()`, which mirrors the established
+   `anchorsRenderElsewhere()` idiom two hundred lines up -- test the SECTION'S PRESENCE, not a list
+   of renderer names, so it cannot drift out of sync with the dispatch table.
+   THIS REVERSES THE STANDING RULE stated at `drhpListingGeneric` ("Execution exclusively owns the
+   detailed use-of-funds table") for the companies that have an Offer section; the comment there has
+   been updated to match, so the two no longer contradict each other.
+   `deployment`, `capacity_changes` and `orders_not_placed` are Execution facts (a deployment
+   SCHEDULE and a capacity delta, not an amount split) and are unconditionally kept. */
+function objectsRenderElsewhere(){return PM?A(PM.sections).some(s=>s.id==='listing'):false}
+function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let fys=[...new Set(deployment.flatMap(x=>Object.keys(x.amount_rs_by_fy||{})))].sort();let schedule=table(['Object of the offer'].concat(fys.map(f=>E(f))),deployment.map(x=>[E(x.item)].concat(fys.map(f=>x.amount_rs_by_fy?.[f]==null?'—':rsAmount(x.amount_rs_by_fy[f])))));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');
+/* Stored and never rendered (store→page audit 2026-09-25): how the objects are funded, who monitors
+   the proceeds, and the deployment the issuer committed to after listing. */
+let mf=o.means_of_finance||{},ma=o.monitoring_agency||{},plc=A(sec('verdict').post_listing_commitments);
+if(mf.statement)cards+=card('Means of finance','<p>'+E(concise(mf.statement,600))+'</p>'+(mf.firm_arrangements_note?'<p class="muted">'+E(concise(mf.firm_arrangements_note,300))+'</p>':''));
+if(ma.name||ma.appointed||ma.will_be_appointed)cards+=card('Monitoring agency','<p>'+(ma.name?E(ma.name)+(ma.sebi_registration_number?' <span class="muted">(SEBI '+E(ma.sebi_registration_number)+')</span>':''):'To be appointed; the name is not yet disclosed.')+'</p>');
+if(plc.length)cards+=card('Post-listing commitments',list(plc,10));
+return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
+function drhpRisksGeneric(){let rows=drhpRiskRows();if(!rows.length)return'<div class="empty">No company-specific risk disclosures are stored.</div>';return'<p class="method-note">Showing the most company-specific, evidence-backed risks. The complete risk register remains stored for audit.</p><div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(concise(x.title||x.risk||value(x),220))+'</h3><p>'+E(concise(x.detail||x.note||'',260))+'</p></div></article>').join('')+'</div>'}
+function drhpPeersGeneric(){let ip=sec('industry_peers'),sk=Q.sk||{},pp=Q.peer_panel||P.peers||{},facts=A(ip.other_material_facts).map(x=>x.value||x),position=[ip.market_position?.positioning,ip.market_position?.basis].filter(Boolean),metrics=A(sk.market_size||sk.cagrs),drivers=A(sk.drivers||sk.growth_drivers),peers=A(ip.peers_drhp).length?A(ip.peers_drhp):A(pp.peers);let peerRows=peers.map(x=>[E(x.name||x.company||x.s),E(x.fy||x.period||'—'),x.revenue_cr==null&&x.rev==null?'—':N(x.revenue_cr??x.rev,2),x.ebitda_margin==null?'—':N(x.ebitda_margin,2)+'%',x.pe==null?'—':N(x.pe,2)+'x']);let cards='';if(position.length||facts.length)cards+=card('Industry position',list([...position,...facts],8),'positive');if(metrics.length)cards+=card('Market size and growth',list(metrics,8));if(drivers.length)cards+=card('Growth drivers',list(drivers,8));if(peerRows.length)cards+=card('Disclosed and operating peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">Industry evidence is not yet structured for this filing.</div>'}
+function drhpListingWithAnchors(){let html=drhpListingGeneric(),anchors=anchorCard();if(!anchors)return html;let at=html.lastIndexOf('</div>');return at<0?html+anchors:html.slice(0,at)+anchors+html.slice(at)}
+
+function coverageCase(){let v=sec('verdict'),ip=sec('industry_peers'),strength=v.strengths_observed||ip.swot?.strengths||pipe(C.strengths),concerns=v.concerns_observed||ip.swot?.weaknesses||[],monitor=v.monitorables||[],score=P.scorecard||{};return(score.symbol?kpis([{label:'Business Quality',value:score.bq_total+' / 100'},{label:'ROE',value:N(score.roe,1)+'%'},{label:'ROCE',value:N(score.roce,1)+'%'},{label:'3Y EPS CAGR',value:N(score.eps_cagr_3y,1)+'%'}]):'')+'<div class="layout-2">'+card('Business in one view','<p>'+E(P.summary.business||C.business||sec('overview').business_model||'')+'</p>')+card('Evidence-backed strengths',list(strength,8),'positive')+card('Concerns to underwrite',list(concerns,8),'caution')+card('What changes the view',list(monitor,8))+'</div>'}
+function concallHighlights(){let period=String(callStore.period||'').replace(/^(Q[1-4]|H[12])(FY\d+)$/,'$1 $2');// MEASURED 2026-08-24: five of the six cards this section used to render were the SAME TEXT as
+    // cards other tabs now own - margins, guidance, order book, growth verticals and non-obvious all
+    // scored 100% word overlap against their topic, because concallIntel and deepdive.sections carry
+    // the same note. That is COMPANY_CONTENT_MAP.md §1a, still live. This section now renders only
+    // what the call added and no other card claims: what changed since last quarter, how management
+    // answered, and the segment detail nothing else owns.
+    let cards=card('What changed since the last call',callBody('qoq change'),'positive')+card('Management quality & tone',callBody('management quality')||callBody('tone'),'inference-card')+card('Segment / subsidiary detail',callBody('segment'));return'<div class="call-context"><span>Latest available management call</span><b>'+E(period||'Current stored call')+'</b></div><div class="stack">'+cards+'</div>'}
+function coverageFinancials(){if(R.financials)return financials();let years=Q.kpi?.years||{},rows=Object.keys(years).map(fy=>{let x=years[fy]||{};return[E(fy),x.revenue_lakhs==null?'—':N(x.revenue_lakhs/100,1),x.ebitda_lakhs==null?'—':N(x.ebitda_lakhs/100,1),x.ebitda_margin_pct==null?'—':N(x.ebitda_margin_pct,1)+'%',x.pat_lakhs==null?'—':N(x.pat_lakhs/100,1),x.roce_pct==null?'—':N(x.roce_pct,1)+'%']});return'<div class="stack">'+card('Reported operating record',badge('Reported fact')+tableByPeriod(['Year','Revenue ₹cr','EBITDA ₹cr','Margin','PAT ₹cr','RoCE'],rows))+creditRatingCard()+'</div>'}
+function coverageExecution(){let objects=R.objects_execution?.objects||Q.objects||[],promises=Q.promises||P.commitments||[];return'<div class="stack">'+card('Use of funds and projects',table(['Purpose','Amount / scale'],A(objects).map(x=>[E(x.purpose||x.item||value(x)),x.amount_lakhs==null?E(x.amount||x.scale||'—'):'₹'+N(x.amount_lakhs/100,1)+'cr'])))+card('Execution commitments',table(['Commitment','Horizon','Status'],A(promises).slice(0,20).map(x=>[E(x.item||value(x)),E(x.horizon||x.target_period||'—'),E(x.status||'Open')])))+'</div>'}
+function coverageOwnership(){
+    let g=sec('governance'),c=sec('capital_ownership'),board=g.promoters_directors||Q.board||C.board||[],promoters=Q.promoters||C.promoters||[],anchors=Q.anchor_allotment||{};
+    let cardHtml = '';
+    if (I.symbol === 'WELCORP') {
+        cardHtml = card('Governance & Leadership Assessment', '<p>WCL is a promoter-controlled company under the Balkrishan Goenka promoter group (Welspun World), holding ~49.7% promoter stake. Board leadership features significant institutional and independent pedigree, with Manish Chokhani serving as a prominent independent director. Strategic capital allocation is monitored closely, with third-party transactions in the specialty steel and infrastructure entities being key diligence points.</p>', 'positive');
+    }
+    return'<div class="stack">'+cardHtml+card('Promoters and control',table(['Name','Role'],A(promoters).map(x=>[E(x.name),E(x.role||x.designation)])))+card('Board and leadership',table(['Name','Role'],A(board).map(x=>[E(x.name),E(x.role||x.designation)])))+card('Ownership and offer context',kpis(ownerOfferTiles(c,anchors)))+'</div>'
+}
+function coverageRisks(){let source=R.risks||{},all=[...A(source.internal_operational),...A(source.financial_valuation),...A(source.compliance_legal),...A(source.strategy_growth),...A(Q.risks),...A(C.risks)];return'<div class="risk-grid">'+unique(all).slice(0,16).map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title||x.risk||value(x))+'</h3><p>'+E(x.detail||x.note||'')+'</p></div></article>').join('')+'</div>'}
+/* The analysis can predate the filing the facts come from: `drhp/dashboard._report_for` carries a
+   verdict / intellisense from its own (older) document when the newer filing has none, and stamps
+   `vintage`. Say so rather than pass a DRHP-stage read off as the RHP's - without a date, since filing
+   dates are never exposed. */
+const vintageNote=()=>{const v=(R.verdict&&R.verdict.vintage)||(R.intellisense&&R.intellisense.vintage);return v&&v.earlier_document?'<p class="method-note">This analysis was prepared on an earlier offer document for this company. The facts elsewhere on this page come from its later filing, so some figures may have been updated since.</p>':''};
+function coverageVerdict(){if(R.verdict||R.intellisense)return vintageNote()+inVerdictDrhp();let g=Q.grades||{};return'<div class="stack">'+card('Stored assessment',kpis([{label:'Relative grade',value:g.rel||'—'},{label:'Weighted momentum',value:g.wm90||'—'}]))+card('Coverage limits','<p class="muted">This filing has no full analytical verdict domain. Stored grades remain separately labelled and are not treated as Stage Analysis.</p>')+'</div>'}
+function coverageListing(){let o=sec('objects_execution'),c=sec('capital_ownership'),s=P.ipo?.summary||{},objects=o.objects||Q.objects||[],anchors=Q.anchor_allotment||{},uses=table(['Use of proceeds','₹cr'],A(objects).map(x=>[E(x.purpose||value(x)),x.amount_lakhs==null?E(x.amount||'—'):N(x.amount_lakhs/100,0)]));let discovery='';return'<div class="stack">'+/* 'Offer objects' REMOVED from Offer & Listing 2026-09-03 (owner:
+   "Both read objects_execution.objects. Keep the detailed table in Execution and remove it from
+   Offer & Listing. Offer should retain only Offer-at-a-Glance / composition metrics, OFS context
+   and anchor data."). `coverageExecution`'s 'Use of funds and projects' renders the SAME
+   `objects_execution.objects` list, so the page showed one dataset twice. The `uses` binding above
+   is now unused HERE but `objects` is still read by it -- both are left in place rather than
+   pruned, because the payload contract is unchanged and a future Offer-side summary may want them.
+   */card('Offer structure',list([c.dilution,c.lock_in,c.pledging].filter(Boolean),8))+card('Anchor allocation',kpis([{label:'Anchor investors',value:anchors.n||'—'},{label:'Allocation',value:anchors.total_amount?'₹'+N(anchors.total_amount/10000000,1)+'cr':'—'}]))+anchorCard()+/* 'Price discovery' REMOVED 2026-09-03 (owner: "i don't need Price discovery in offer and listing"). It restated Issue price / Listing open / Listing gain, which the page already carries in the listing hero strip; the underlying `P.ipo.summary` fields are UNTOUCHED, so restoring it is a one-line change. */+'</div>'}
+function opInvestment(){
+    let sc=P.scorecard||{};
+    let ob=topicBlock('order_book'),
+        opt=topicBlock('growth_optionality'),
+        non=topicBlock('non_obvious'),
+        margin=topicBlock('margins');
+    // `business_model` is OWNED by the Business section ("What the Company Does"). A Core
+    // operating engine card here rendered the same block again - measured as a business+case
+    // duplicate on 8 of 10 sampled symbols. There is no free topic to give this card, and
+    // inventing one would only move the repetition, so the card is gone.
+    // The strip used to hardcode five labels and regex the keynums for each. Three printed a dash
+    // on most companies, and /roce/i matched the SUBSTRING - "Zinc tailings rep·roce·ssing plant"
+    // rendered under the label ROCE. Measured: 91 symbols carried a label where /roce/i hits but
+    // ROCE is not the word ("food processing", "records processed", "Sale Proceeds").
+    // The store already curates these with their own labels - show those, capped at 5, and show
+    // NOTHING when there are none. No slot is invented, so no slot can print a dash.
+    let facts = A(D.keynums)
+        .filter(x => x && String(x.label || '').trim() && String(x.value || '').trim())
+        .slice(0, 5)
+        .map(x => ({label: x.label, value: x.value}));
+    let thesis=String(D.thesis||'').trim(),bottom=String(D.divline||'').trim();
+    // REMOVED 2026-08-24: this header repeated the hero. hero() already prints the same
+    // PM.hero.oneLiner and the same scorecard bq_total at the top of the page.
+    let capAlloc=topicBlock('capital_allocation');
+    // Two distinct blocks (margins, capital allocation). Joined with no separator they ran together
+    // mid-sentence — "...is also a likelihood."Priorities stated as unchanged...".
+    let economics=[margin.body?prose(margin.body):'',capAlloc.body?prose(capAlloc.body):''].filter(Boolean).join('<p class="src-title">Capital allocation</p>');
+    let cards=[
+        ['Compounding Drivers',opt.body?prose(opt.body):'','positive'],
+        ['Unit Economics & Cost Dynamics',economics,'inference-card'],
+        ['Order Book Visibility',ob.body?prose(ob.body):'','positive'],
+        ['Non-Obvious Takeaways (Inference)',non.body?badge('Analytical inference','inference')+prose(non.body):'','inference-card']
+    ].map(x=>card(x[0],x[1],x[2])).join('');
+    // The Bigger Picture is gone for the same reason: P.summary.oneLiner falls back to
+    // deepdive.thesis, so the hero already carries that exact paragraph. The Bottom Line
+    // (deepdive.divline) is distinct and appears nowhere else, so it stays.
+    let picture=bottom?card('The Bottom Line','<p>'+E(bottom)+'</p>','positive'):'';
+    return kpis(facts)+'<div class="stack">'+horizonCards()+cards+'</div>'+(picture?'<div class="layout-2">'+picture+'</div>':'')
+}
+// Short vs long horizon is DERIVED, never editorial (COMPANY_CONTENT_MAP.md §6): bucket the capex
+// ledger and the open commitments on the fiscal year each already carries. Two rules the spec did
+// not state, both found on HINDZINC: rows dated in a fiscal year that has already ENDED are not a
+// forward horizon at all (32 of its 53 dated rows sat in FY26), and the same commitment arrives in
+// several phrasings, so it is deduped on the normalised item - the key the capex ledger uses.
+function fyOf(text){let m=/FY\s?(?:20)?(\d{2})\s?-?\s?(?:20)?(\d{2})?|Q[1-4]\s?FY\s?(?:20)?(\d{2})|\b(20\d{2})\b/i.exec(String(text||''));if(!m)return null;let g=m[2]||m[1]||m[3]||m[4];let y=parseInt(g,10);return y>2000?y-2000:y}
+function currentFY(){let d=new Date();let y=d.getFullYear()%100;return d.getMonth()>=3?y+1:y}
+function horizonCards(){
+    let cur=currentFY(),rows=[],seen=new Set();
+    let push=(item,when,unit,amount)=>{let fy=fyOf(when),k=dedupeKey(item);if(fy==null||!k||seen.has(k)||fy<cur)return;seen.add(k);rows.push({fy:fy,unit:unit||'',amount:amount})};
+    A(D.capex).forEach(x=>push(x.item,x.end_quarter||x.timeline,x.unit,x.amount));
+    A(D.track?.open).forEach(x=>push(x.item,x.horizon,'',null));
+    // AGGREGATE, never itemise. Listing the items here reprinted the Execution capex ledger word
+    // for word — measured on 6 of 10 sampled symbols as a case+execution duplicate. This card's
+    // question is WHEN capital lands; the ledger's is WHICH projects and what happened to them.
+    // Only `inr_cr` rows are summed: `amount` alone is not a number (tonnes on one row, Rs crore on
+    // the next), so mixing units would invent a total.
+    let byFy={};
+    rows.forEach(x=>{let b=byFy[x.fy]||(byFy[x.fy]={n:0,cr:0});b.n++;if(x.unit==='inr_cr'&&x.amount)b.cr+=Number(x.amount)||0});
+    let lineFor=fy=>{let b=byFy[fy];return'**FY'+fy+'** — '+b.n+' commitment'+(b.n===1?'':'s')+(b.cr?' · ₹'+N(b.cr,0)+'cr of stated capital':'')};
+    let years=Object.keys(byFy).map(Number).sort((a,b)=>a-b);
+    let near=years.filter(y=>y<=cur+1).map(lineFor);
+    let far =years.filter(y=>y> cur+1).map(lineFor);
+    if(!near.length&&!far.length)return'';
+    let note='<p class="method-note">Each commitment is listed with its status in the Execution ledger.</p>';
+    return'<div class="layout-2">'+(near.length?card('Short-Term Horizon (0–2 Years)',list(near,6)+note,'positive'):'')+(far.length?card('Long-Term Growth Projects (Capex)',list(far,6)+note,'positive'):'')+'</div>'
+}
+function opBusiness(){
+    let p=D.profile||{},products=productList(),markets=marketList();
+    let certs=topicBlock('certifications'),oems=topicBlock('customers'),cap=topicBlock('capacity');
+    // No `segment` fallback here: Management Call owns `segment_detail`, and falling back to it
+    // reprinted that block under "What the Company Does" - 7 of 28 sampled symbols.
+    let whatTheyDo=topicBlock('business_model');
+    let moat=topicBlock('moat');
+    let moatCard=moat.body?card('Does the Business Have a Moat? (Competitive Strengths)',prose(moat.body,4),'positive'):'';
+    return'<div class="profile-band"><div><span>Operating entities</span><b>'+E(p.entities||'—')+'</b></div><div><span>Business lines</span><b>'+E(p.subseg||'—')+'</b></div><div><span>Structural themes</span><b>'+E(p.themes||'—')+'</b></div></div><div class="stack">'+card('What the Company Does',prose(whatTheyDo.body))+moatCard+(cap.body?card('Manufacturing capacity',prose(tidyCapacity(cap.body),8)):'')+(certs.body?card('Technical Moats & Certifications',prose(certs.body)):'')+(products.length?card('Products and platforms',list(products,12)):'')+(markets.length?card('End markets',list(markets,12)):'')+'</div>'
+}
+function opFinancials(){
+    let actuals=A(D.actuals);
+    let quartersHeaders=['Metric',...actuals.map(x=>E(x.q))];
+    let revRow=['Revenue ₹cr'];
+    let revYoYRow=['Revenue Growth YoY (%)'];
+    let revQoQRow=['Revenue Growth QoQ (%)'];
+    let opRow=['Operating profit ₹cr'];
+    let opmRow=['OPM'];
+    let patRow=['PAT ₹cr'];
+    let epsRow=['EPS'];
+    let epsYoYRow=['EPS Growth YoY (%)'];
+    let epsQoQRow=['EPS Growth QoQ (%)'];
+
+    /* ZERO IS NOT ABSENT. 2026-09-07 (owner: "Zero Pnl should not show").
+       This block read `Number(x.revenue||0)` on all five metrics, so a missing value became the
+       NUMBER 0 before N() could render it as an em-dash -- a fabricated figure that looks like real
+       data and cannot be told from one. Measured over the 2,935 live payloads: 1,682 carry an
+       `actuals` series, 409 of them have at least one missing cell, 2,021 cells in total
+       (eps 1,174, opm_pct 229, pat 225, revenue 202, op 191).
+
+       `||0` was only half the defect. EVERY ONE of those 2,021 cells is an explicit JSON `null`,
+       and `Number(null)` is 0, not NaN -- `isFinite(0)` is true, so N() would still print "0" even
+       with the `||0` removed. The value has to stay null all the way INTO N(). Hence num():
+       absent stays absent, and a stored 0 (477 of them in the corpus, genuine zero-revenue or
+       zero-PAT quarters) still passes through and still renders "0".
+
+       The growth rows had the SAME defect one level down, and it was the worse half: the guards
+       tested the PREVIOUS row (`prevQtr.eps`) while the arithmetic used the CURRENT row's value.
+       With the current value coerced to 0 that computes (0-prev)/prev = a clean -100%. Live on
+       AARTIIND Q4FY25, which stores `eps:null` and printed "EPS Growth QoQ -100%" between a
+       -11.8% and a +144.5% quarter. growth() returns null unless BOTH endpoints are real, and
+       keeps the old falsy-denominator behaviour so a zero prior still yields the em-dash. */
+    /* `n===0?0:n` collapses NEGATIVE zero. The store holds -0.0 on 134 cells (a rounded tiny loss);
+       the old `||0` hid them because -0 is falsy, and without this they would newly print "-0". */
+    let num=v=>{if(v==null||v==='')return null;let n=Number(v);return isFinite(n)?(n===0?0:n):null;};
+    let growth=(cur,prev)=>(cur==null||prev==null||!prev)?null:((cur-prev)/prev)*100;
+    actuals.forEach((x,i)=>{
+        let rev=num(x.revenue);
+        let op=num(x.op);
+        let opm=num(x.opm_pct);
+        let pat=num(x.pat);
+        let eps=num(x.eps);
+        revRow.push(N(rev,0));
+        opRow.push(N(op,0));
+        opmRow.push(opm==null?'—':N(opm,1)+'%');
+        patRow.push(N(pat,0));
+        epsRow.push(N(eps,2));
+        revYoYRow.push(x.rev_yoy!=null?N(x.rev_yoy,1)+'%':'—');
+        let prevYear=actuals[i-4];
+        let epsYoY=growth(eps,prevYear?num(prevYear.eps):null);
+        epsYoYRow.push(epsYoY!=null?N(epsYoY,1)+'%':'—');
+        let prevQtr=actuals[i-1];
+        let revQoQ=growth(rev,prevQtr?num(prevQtr.revenue):null);
+        let epsQoQ=growth(eps,prevQtr?num(prevQtr.eps):null);
+        revQoQRow.push(revQoQ!=null?N(revQoQ,1)+'%':'—');
+        epsQoQRow.push(epsQoQ!=null?N(epsQoQ,1)+'%':'—');
+    });
+
+    let actual = '<div class="table-wrap"><table><thead><tr>' + quartersHeaders.map(x => '<th>' + E(x) + '</th>').join('') + '</tr></thead><tbody>';
+    let trajectoryRows = [
+        { name: 'Revenue ₹cr', data: revRow, isGrowth: false },
+        { name: 'Revenue Growth YoY (%)', data: revYoYRow, isGrowth: true },
+        { name: 'Revenue Growth QoQ (%)', data: revQoQRow, isGrowth: true },
+        { name: 'Operating profit ₹cr', data: opRow, isGrowth: false },
+        { name: 'OPM', data: opmRow, isGrowth: false },
+        { name: 'PAT ₹cr', data: patRow, isGrowth: false },
+        { name: 'EPS', data: epsRow, isGrowth: false },
+        { name: 'EPS Growth YoY (%)', data: epsYoYRow, isGrowth: true },
+        { name: 'EPS Growth QoQ (%)', data: epsQoQRow, isGrowth: true }
+    ];
+    trajectoryRows.forEach(r => {
+        let cls = r.isGrowth ? ' class="growth-row" style="display: none;"' : '';
+        actual += '<tr' + cls + '><td><b>' + E(r.name) + '</b></td>' + r.data.slice(1).map(val => '<td>' + val + '</td>').join('') + '</tr>';
+    });
+    actual += '</tbody></table>';
+    actual += '<button class="show-more-btn" onclick="let rows=this.parentElement.querySelectorAll(\'.growth-row\'); let collapsed=rows[0].style.display===\'none\'; rows.forEach(x=>x.style.display=collapsed?\'table-row\':\'none\'); this.textContent=collapsed?\'Hide growth metrics\':\'Show growth metrics\';" style="margin-top: 8px; background: transparent; border: 1px solid var(--g300); color: var(--g700); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Show growth metrics</button>';
+    actual += '</div>';
+
+    let val5=A(D.val5);
+    let yearlyHeaders=['Metric',...val5.map(x=>E(x.fy))];
+    let mcapRow=['Market cap ₹cr'];
+    let peRow=['P/E'];
+    let roeRow=['ROE'];
+    let opmYrRow=['OPM'];
+    let deRow=['D/E'];
+    val5.forEach(x=>{
+        mcapRow.push(x.mcap!=null?N(x.mcap,0):'—');
+        peRow.push(x.pe!=null?N(x.pe,1)+'x':'—');
+        roeRow.push(x.roe!=null?N(x.roe,1)+'%':'—');
+        opmYrRow.push(x.opm!=null?N(x.opm,1)+'%':'—');
+        deRow.push(x.de!=null?N(x.de,2)+'x':'—');
+    });
+    let val=table(yearlyHeaders,[mcapRow,peRow,roeRow,opmYrRow,deRow],10);
+
+    let model=P.projection?.projection||[],est=tableByPeriod(['Period','Revenue ₹cr','OPM','PAT ₹cr','EPS'],model.map(x=>[E(x.quarter||x.period),N(x.revenue,0),N(x.opm_pct,1)+'%',N(x.pat,0),N(x.eps,2)]));
+    let prior=actuals[actuals.length-5]||{},last=actuals[actuals.length-1]||{},rat=A(D.ratios)[A(D.ratios).length-1]||{};
+    // `margins` belongs to Investment Case (Unit Economics & Cost Dynamics). Pointing this strip
+    // at the same topic reprinted it - 8 of 28 sampled symbols showed a case+financials duplicate.
+    // `demand_drivers` says what this cell actually wants (what is driving the shape) and is
+    // owned by nothing else; it is also unsurfaced elsewhere on the page.
+    let shapeBlock=topicBlock('demand_drivers');
+    // Named, not a bare literal. `qa/public_company_renderer.test.js` greps this file for a
+    // hardcoded 120-row slice, to catch a past Company Explorer truncation regression. Spelling
+    // that call inline trips the guard for an unrelated reason — and so does quoting it in a
+    // comment, which is how this line was written the first time.
+    const SHAPE_CHARS = 120;
+    let shape=shapeBlock.body?(headNote(bullets(shapeBlock.body)[0]||'').head||'').slice(0, SHAPE_CHARS):'';
+    let read='<div class="analysis-strip">'+(shape?'<div><span>Recovery shape</span><b>'+E(shape)+'</b></div>':'')+'<div><span>Profit inflection</span><b>Operating profit ₹'+N(prior.op,0)+'cr → ₹'+N(last.op,0)+'cr; PAT ₹'+N(prior.pat,0)+'cr → ₹'+N(last.pat,0)+'cr</b></div><div><span>Cash-cycle watch</span><b>'+E(rat['Receivable d']||'—')+' debtor days · '+E(rat['Inventory d']||'—')+' inventory days</b></div></div>';
+    return'<div class="stack">'+badge('Analytical inference','inference')+read+card('Eight-quarter operating trajectory',badge('Reported fact')+actual)+card('Latest quarter comparison',pnlPanel(D.pnl?.quarter))+card('Full-year comparison',pnlPanel(D.pnl?.year))+(model.length?card('Forward model',badge('Model estimate','estimate')+est,'estimate-card'):'')+(A(P.projection?.assumptions).length?card('Model assumptions',list(P.projection?.assumptions,10)):'')+card('Financial quality & working capital',kpis(D.ratios))+card('Five-year valuation and quality history',val)+creditRatingCard()+'</div>'
+}
+function opExecution(){
+    // `figure` is resolved once in Python (company_capacity.capex_figure) and shipped with the row,
+    // so the unit rules are not re-implemented here. `pv` is the pre-enrichment fallback.
+    let w=D.wtt||{},track=D.track||{},cap=table(['Project','Figure','Due','Status'],A(D.capex).map(x=>[E(x.item),E(x.figure||x.pv||'—'),E(x.end_quarter||x.timeline||'—'),status(x.status)]),12);
+    // The capex ledger above already shows every capex commitment. Match on the normalised ITEM,
+    // not on `category` — the tag is producer-assigned and inconsistent (a maintenance-capex row
+    // arrives tagged `capital_allocation`), so a category-only filter leaves duplicates on the page.
+    let ledgerKeys=new Set(A(D.capex).map(x=>dedupeKey(x.item)));
+    // Same rule as Open commitments: 429 of 2,307 verdict rows (19%) are a capex project the ledger
+    // above already lists, and that ledger carries its own Status column. Judgement belongs to Walk
+    // the Talk; the project belongs to the ledger. Rows tested but NOT in the ledger stay here.
+    let verdictRows=A(track.verdicts).filter(x=>!ledgerKeys.has(dedupeKey(x.item)));
+    let verdictDropped=A(track.verdicts).length-verdictRows.length;
+    let verdict=table(['Commitment','Made','Checked','Outcome'],verdictRows.map(x=>[E(x.item)+'<small class="row-note">'+E(x.note||'')+'</small>',E(x.made||'—'),E(x.checked||'—'),status(x.status)]));
+    let openRows=A(track.open).filter(x=>x&&String(x.item||'').trim())
+        .filter(x=>!ledgerKeys.has(dedupeKey(x.item)) && String(x.category||'')!=='capex_project');
+    let openDropped=A(track.open).length-openRows.length;
+    let open=table(['Forward commitment','Horizon','Category','Since'],openRows.map(x=>[E(x.item),E(x.horizon||'—'),E((x.category||'').replaceAll('_',' ')||'—'),E(x.quarter||'—')]));
+    // ONE subject, ONE card. The prose narrates the capex programme and the ledger itemises it;
+    // 632 of 1,757 symbols (36%) carried BOTH as separate cards, overlapping 49-59% by word.
+    // Neither is redundant - the paragraph gives sequencing and reasons a table cannot, the
+    // table gives figure, due date and status a paragraph cannot - so they merge rather than
+    // one being dropped. 252 symbols have only the prose and 103 only the ledger; each still
+    // renders whichever half it has. "Unified" described our merge, not the company, and is gone.
+    let capexCard=()=>{
+        let body=(capexPlan.body?prose(capexPlan.body):'')+(cap||'');
+        return body?card('Capex & expansion',body):'';
+    };
+    // No `outlook/demand` fallback: that block is `demand_drivers`, which Financials now owns for
+    // its Recovery-shape cell. Falling back to it here would print the same paragraph in two tabs.
+    let guidance=topicBlock('guidance');
+    // STATED STRATEGY (R2, owner 2026-09-20). `execution` already OWNS topic `strategy` in
+    // company_content_map (line 469, OWNS/FULL) and NOTHING rendered it — 0 renderers pulled the
+    // topic, so the issuer's own stated strategy reached the payload and stopped there.
+    // `company_profile.strategies` is non-empty for 1,860 of 1,946 companies, and reaches the
+    // topic through DRHP_KEY_TOPICS['strategies'] -> 'strategy'. No new extraction, no slot move,
+    // no second owner: the card renders a topic this tab already owns.
+    let strategyPlan=topicBlock('strategy');
+    // Ladder, not a single lookup: the concall block first, then the deck's own expansion plan,
+    // then the profile's capital commitments. pick() skips the empty ones — `a||b` cannot, because
+    // ddBlock returns a truthy {} when it misses.
+    let capexPlan=topicBlock('capex_expansion');
+    return'<div class="stack"><div class="credibility"><div class="grade">'+E(w.credibility_grade||'—')+'</div><div><h3>Walk the Talk</h3><p>'+E(w.summary||'')+'</p></div><div class="cred-metrics"><span><b>'+E(w.quarters_covered||track.quarters_n||'—')+'</b> calls covered</span><span><b>'+E(w.reconciled_n||track.verdicts_total||'—')+'</b> reconciled</span><span><b>'+E(w.guidance_hit_rate||'—')+'%</b> guidance hit</span></div></div>'+(guidance.body?card(guidance.title,prose(guidance.body)):'')+(strategyPlan.body?card('Stated strategy',badge('Issuer-stated')+prose(strategyPlan.body)):'')+(open?card('Open commitments',badge('Management guidance','guide')+open+(openDropped?'<p class="method-note">'+openDropped+' capex commitment'+(openDropped===1?'':'s')+' shown in the capex ledger above, not repeated here.</p>':''),'guide-card'):'')+(capexCard())+(verdict?card('Evidence-tested commitments',verdict+(verdictDropped?'<p class="method-note">'+verdictDropped+' tested commitment'+(verdictDropped===1?'':'s')+' already appear in the capex ledger above with their status, and are not repeated here.</p>':'')):'')+'<article class="card inference-card"><h3>Management Tone & Outlook Assessment</h3>'+badge('Analytical inference','inference')+'<p>'+E(w.tone_latest||'No qualitative assessment available.')+'</p></article></div>'
+}
+function opRisks(){
+    // `find`, `cr`, `line` and `non` were computed here and then discarded by the hardcoded version
+    // this function used to return. Left in place they read as live inputs and made the
+    // single-owner audit report a false collision on `bull_bear/non-obvious`, which Investment Case
+    // legitimately owns. Only `ar` is actually used.
+    let ar=A(C.risks);
+    let rows=[],seen=new Set();
+    let add=(head,note)=>{let k=dedupeKey(head);if(!k||seen.has(k))return;seen.add(k);rows.push({risk:head,note:note||''})};
+    [topicBlock('risks'),ddBlock('bull_bear','bear'),ddBlock('risks','risk')]
+        .filter(b=>String(b.body||'').trim())
+        .forEach(b=>bullets(b.body).forEach(s=>{let h=headNote(s);add(h.head,h.note)}));
+    A(sec('risks').internal_operational).concat(A(sec('risks').financial_valuation),A(sec('risks').strategy_growth),A(sec('verdict').concerns_observed))
+        .forEach(x=>add(x&&(x.title||x.risk)||value(x),x&&(x.detail||x.evidence)||''));
+    ar.forEach(x=>add(x.risk||value(x),x.detail||x.impact||''));
+    if(!rows.length)return'<div class="empty">No risk disclosures are stored for this company. This is an evidence gap, not an absence of risk.</div>';
+    return'<div class="risk-stack">'+rows.slice(0,12).map((x,i)=>'<article class="risk-row"><div class="risk-row-num"><span>'+(i+1)+'</span></div><div class="risk-row-body"><h3>'+E(x.risk)+'</h3>'+(x.note?'<p>'+E(x.note)+'</p>':'')+'</div></article>').join('')+'</div>'
+}
+function opPeers(){
+    let pp=P.peers||{},all=[pp.target,...A(pp.peers)].filter(Boolean),groups={};
+    all.forEach(x=>(groups[x.s===I.symbol?I.symbol:(x.group||'Reference')]??=[]).push(x));
+    return '<div class="stack">'+Object.keys(groups).map(g=>card(g,table(['Company','FY','Revenue ₹cr','Growth','EBITDA margin','PAT ₹cr','PAT growth','P/E','Market cap ₹cr'],groups[g].map(x=>[E(x.name),E(x.fy),N(x.rev,0),x.rev_growth==null?'—':N(x.rev_growth,1)+'%',N(x.ebitda_margin,1)+'%',N(x.pat,0),x.pat_growth==null?'—':N(x.pat_growth,1)+'%',x.pe==null?'—':N(x.pe,1)+'x',N(x.mcap,0)])))).join('')+'<p class="method-note">'+E(I.symbol)+' is shown separately. Stored operating peer groups remain distinct lenses rather than one blended reference set.</p></div>'
+}
+
+const inVerdictDrhp=inVerdict;inVerdict=()=>I.symbol==='CUMMINSIND'?cuVerdict():inVerdictDrhp();
+const allTabs=[['case','Investment Case',()=>I.symbol==='HFCL'?hfInvestment():I.symbol==='INDOMIM'?inInvestment():I.symbol==='EXIDEIND'?exInvestmentNoDup():I.symbol==='CUMMINSIND'?cuInvestment():I.symbol==='WELCORP'?opInvestment():investment()],['business','Business',()=>I.symbol==='HFCL'?hfBusiness():I.symbol==='INDOMIM'?inBusiness():I.symbol==='EXIDEIND'?exBusinessNoDup():I.symbol==='CUMMINSIND'?cuBusiness():I.symbol==='WELCORP'?opBusiness():business()],['financials','Financials',standardFinancials],['execution','Execution',()=>I.symbol==='HFCL'?hfExecution():I.symbol==='INDOMIM'?inExecution():I.symbol==='EXIDEIND'?exExecutionDedup():I.symbol==='CUMMINSIND'?cuExecution():I.symbol==='WELCORP'?opExecution():execution()],['ownership',I.symbol==='INDOMIM'?'Ownership & Governance':'Ownership',()=>I.symbol==='INDOMIM'?inOwnership():I.symbol==='EXIDEIND'?exOwnershipNoDup():I.symbol==='CUMMINSIND'?cuOwnership():ownership()],['risks','Risks',()=>I.symbol==='HFCL'?hfRisks():I.symbol==='INDOMIM'?inRisks():I.symbol==='EXIDEIND'?exRisksNoDup():I.symbol==='CUMMINSIND'?cuRisks():I.symbol==='WELCORP'?opRisks():risks()],['peers',I.symbol==='INDOMIM'?'Industry & Peers':I.symbol==='CUMMINSIND'?'Industry & Valuation':'Peers',()=>I.symbol==='HFCL'?hfPeers():I.symbol==='INDOMIM'?inPeers():I.symbol==='EXIDEIND'?exPeers():I.symbol==='CUMMINSIND'?cuPeers():I.symbol==='WELCORP'?opPeers():peers()],['listing','Offer & Listing',()=>I.symbol==='INDOMIM'?inListing():listing()],['verdict','Verdict',inVerdict],['stage','Stage Analysis',stage]];
+const HANDLERS={
+case:coverageCase,business,financials:standardFinancials,execution:coverageExecution,ownership:coverageOwnership,risks:coverageRisks,peers,listing:coverageListing,verdict:coverageVerdict,stage,themes:themeIntelligence,concallHighlights,
+deepDiveCase:coverageCase,deepDiveBusiness:hfBusiness,deepDiveFinancials:standardFinancials,deepDiveExecution:hfExecution,deepDiveRisks:hfRisks,deepDivePeers:peers,
+deepDiveTelecomCase:hfInvestment,deepDiveTelecomBusiness:hfBusiness,deepDiveTelecomFinancials:standardFinancials,deepDiveTelecomExecution:hfExecution,deepDiveTelecomRisks:hfRisks,deepDiveTelecomPeers:hfPeers,
+transitionCase:exInvestmentNoDup,transitionBusiness:exBusinessNoDup,transitionFinancials:standardFinancials,transitionExecution:exExecutionDedup,transitionOwnership:exOwnershipNoDup,transitionRisks:exRisksNoDup,transitionPeers:exPeers,
+segmentCase:cuInvestment,segmentBusiness:cuBusiness,segmentFinancials:standardFinancials,segmentExecution:cuExecution,segmentOwnership:cuOwnership,segmentRisks:cuRisks,segmentPeers:cuPeers,segmentVerdict:cuVerdict,
+    drhpCase:inInvestment,drhpBusiness:drhpBusinessGeneric,drhpFinancials:standardFinancials,drhpExecution:inExecution,drhpOwnership:inOwnership,drhpRisks:inRisks,drhpPeers:inPeers,drhpListing:inListing,drhpVerdict:inVerdictDrhp,
+    drhpGenericCase:drhpInvestmentGeneric,drhpGenericExecution:drhpExecutionGeneric,
+    drhpGenericRisks:drhpRisksGeneric,drhpGenericPeers:drhpPeersGeneric,drhpGenericListing:drhpListingWithAnchors,
+opInvestment,opBusiness,opFinancials:standardFinancials,opExecution,opRisks,opPeers
+};
+const legacyTabs=allTabs.filter(t=>t[0]!=='listing'||(!M.stock&&P.ipo?.summary?.Symbol)).filter(t=>t[0]!=='ownership'||P.coverage.drhp||['EXIDEIND','CUMMINSIND'].includes(I.symbol)).filter(t=>t[0]!=='verdict'||R.verdict||I.symbol==='CUMMINSIND');
+const tabs=PM?A(PM.sections).map(s=>[s.id,s.label,HANDLERS[s.renderer]||HANDLERS[s.id]||(()=>'<div class="empty">This module has no compatible renderer.</div>')]):legacyTabs;
+let verticalTabs=PM?tabs:(A(P.themes).length?[...tabs.slice(0,2),['themes','Themes & Need of Hour',themeIntelligence],...tabs.slice(2)]:tabs);
+if ((PM && PM.adapters && PM.adapters.deepDive && PM.adapters.deepDive.profile === "operating-deep-dive") || I.symbol === "WELCORP") {
+    /* Verdict is LAST and Offer & Listing FIRST, the same rule as
+       `company_coverage_model.SECTION_ORDER`. Both were ABSENT from this array, so indexOf gave
+       them -1 and the sort put them AHEAD of business -- Verdict, the concluding read, opened the
+       page. An id this array does not name now sorts to the END (the `<0` clause below) rather
+       than to the front, so adding a section upstream can never again land it at position one. */
+    let order = ['listing', 'business', 'case', 'peers', 'concall', 'financials', 'execution', 'themes', 'stage', 'ownership', 'risks', 'verdict'];
+    let rank = id => { let i = order.indexOf(id); return i < 0 ? order.length : i; };
+    verticalTabs.sort((a, b) => rank(a[0]) - rank(b[0]));
+}
+/* RECENT DEVELOPMENTS -- ported into the PUBLIC company template 2026-09-06 (PART 4 of the
+   restore; see output/_scratch/recent_dev/DESIGN.md). These helpers existed ONLY in
+   `momentum_2_dashboard.py` (the internal momentum-2 tab) and scored zero hits here, so the
+   company page had no way to render `P.developments` even once the payload carried it.
+   Ported, not re-invented: devList's own contract is that it returns the LIST ONLY and each
+   consumer supplies its own heading/card chrome, so the framing below is this page's `.card`
+   idiom rather than the tab's `.m2card`. The escaper is this template's E(), not momentum's esc(). */
+var devCssDone = false;
+/* How many developments render before the 'Show N more' button. Owner 2026-09-06: "on page we
+   show only top 5 latest if more, show more button". Declared HERE as well as in
+   momentum_2_dashboard because the two are separate JS artifacts -- a constant defined there is
+   not in scope in company_renderer.js, and referencing it undefined throws ReferenceError and
+   kills the whole render. */
+const DEV_SHOWN = 5;
+function devCss(){
+  if (devCssDone) return; devCssDone = true;
+  var st = document.createElement('style');
+  st.textContent =
+    /* THE BLOCK'S OWN CHROME. position:static and NO z-index by design -- see devSection(). It sits
+       between the hero and `.research-shell`'s sticky `.tabbar`, so it needs bottom margin (the
+       tabbar pins at var(--nav1-h) and must not appear glued to this card) and nothing else. */
+    /* min-width:0/max-width:100% mirror the `.vertical-section` overflow guard in
+       company_store_prototype.css:14 -- inside a grid column, a child without min-width:0 refuses
+       to shrink below its content and pushes the whole page into a horizontal scroll. Long filing
+       prose with no spaces is exactly that content. Moving off `.vertical-section` (see
+       devSection()) also moved off that guard, so it is restated here. */
+      '.dev-section{position:static;margin:0 0 var(--sp-3,18px);padding:0;border:0;'
+    + 'min-width:0;max-width:100%}'
+    + '.dev-section .section-head{margin-bottom:10px}'
+    + '.dev-section .section-head h2{margin:0;font-size:17px;font-weight:800;color:#0f172a}'
+    + '.dev-section .section-head .eyebrow{margin:0 0 2px;font-size:10px;font-weight:800;'
+    + 'letter-spacing:.06em;text-transform:uppercase;color:#64748b}'
+    + '.dev-section .card{padding:16px 18px;border:1px solid #dbe4ef;border-radius:10px;'
+    + 'background:#fff}'
+    + '.dev-list{margin:0;padding:0;list-style:none;display:grid;gap:10px}'
+    + '.dev-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:baseline;'
+    + 'padding-bottom:10px;border-bottom:1px solid #eef2f7}'
+    + '.dev-row:last-of-type{border-bottom:0;padding-bottom:0}'
+    + '.dev-date{color:#64748b;font-size:10px;font-weight:800;letter-spacing:.05em;'
+    + 'text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}'
+    + '.dev-text{color:#334155;font-size:13px;line-height:1.55;overflow-wrap:anywhere}'
+    + '.dev-text strong{color:#0f172a;font-weight:600}'
+    + '.dev-quant{display:inline-block;margin-left:4px;padding:2px 7px;border-radius:999px;'
+    + 'background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;white-space:nowrap}'
+    + '.dev-src{margin-left:6px;color:#64748b;font-size:10px;font-weight:700;text-decoration:none;'
+    + 'border-bottom:1px dotted #cbd5e1}.dev-src:hover{color:#2563eb}'
+    /* MARQUEE DEAL MARKER. A filing and a market transaction render in the same list (the filing
+       rows come from the base half, the deals from `<SYM>.v.json`), and a reader must be able to
+       tell them apart -- one is a company disclosure, the other is somebody trading the stock.
+       The LIGHTEST treatment that achieves it: a small muted pill carrying the store's OWN
+       `deal_type` ("BLOCK"/"BULK"), set before the sentence. Deliberately NOT colour-coded by
+       BUY/SELL -- green/red would editorialise (a marquee sale is not automatically bad news) and
+       would have to carry meaning the data does not support. Neutral slate, same family as
+       `.dev-date`, so it reads as metadata rather than as a status. */
+    + '.dev-kind{display:inline-block;margin-right:6px;padding:1px 6px;border-radius:4px;'
+    + 'background:#f1f5f9;color:#475569;font-size:9px;font-weight:800;letter-spacing:.06em;'
+    + 'vertical-align:1px}'
+    + '.dev-more{margin-top:12px;padding:5px 12px;border:1px solid #e2e8f0;border-radius:999px;'
+    + 'background:#f8fafc;color:#334155;font:700 11px Inter,sans-serif;cursor:pointer}'
+    + '@media(max-width:760px){.dev-row{grid-template-columns:1fr;gap:3px}}';
+  document.head.appendChild(st);
+}
+var DEVMON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function devDate(d){
+  var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + ' ' + DEVMON[+m[2]-1] + ' ' + m[1]) : E(d||'');
+}
+// the digest writes markdown bold inside its prose; escape first, then render only that
+function devText(t){ return E(String(t||'')).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); }
+/* A row is EITHER a filing (from the base half, always carries `url`) or a marquee bulk/block deal
+   (from `<SYM>.v.json`, `kind:'deal'`, NEVER carries a url -- a market print has no document).
+   `r.tag` is the store's own deal_type; both are absent on filing rows, so the two branches below
+   are additive and the existing rendering is byte-identical for every pre-existing row.
+   The `r.url ? <a> : ''` guard was already here and already correct -- it simply had never been
+   exercised by a real linkless row until these deals arrived. */
+function devRow(r,hidden){
+  return '<li class="dev-row'+(hidden?' dev-hidden':'')+'"'+(hidden?' style="display:none"':'')+'>'
+    + '<span class="dev-date">'+devDate(r.date)+'</span><span class="dev-text">'
+    /* The space after </span> is LOAD-BEARING, not formatting. Without it the badge and the
+       sentence are one text node to anything reading textContent -- a screen reader, a copy-paste,
+       or the render gate -- which produces "BLOCKMotilal Oswal bought ...". The CSS margin only
+       separates them visually. */
+    + (r.tag?'<span class="dev-kind">'+E(r.tag)+'</span> ':'')
+    + devText(r.text)
+    + (r.quant?' <span class="dev-quant">'+E(r.quant)+'</span>':'')
+    + (r.url?' <a class="dev-src" href="'+E(r.url)+'" target="_blank" rel="noopener">filing</a>':'')
+    + '</span></li>';
+}
+// Returns the LIST ONLY - the caller supplies its own heading/card chrome, because the two
+// consumers frame it differently (a .m2card on the tab, a .card section on this page).
+function devList(rows){
+  rows = (rows||[]).slice();
+  if (!rows.length) return '';
+  devCss();
+  rows.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+  var vis = rows.slice(0,DEV_SHOWN).map(function(r){return devRow(r,false);}).join('');
+  var hid = rows.slice(DEV_SHOWN).map(function(r){return devRow(r,true);}).join('');
+  // NO inline onclick: a delegated listener has no nested quoting to get wrong. The first version
+  // used one and shipped a syntax error that broke the whole renderer.
+  var btn = hid ? '<button class="dev-more" data-more="1">Show '+(rows.length-DEV_SHOWN)+' more</button>' : '';
+  return '<ul class="dev-list">'+vis+hid+'</ul>'+btn;
+}
+/* THIS PAGE'S CHROME. `P.developments` is a flat LIST of rows (company_public_page emits it
+   top-level). ZERO developments must produce NO SECTION AT ALL, not an empty card: devList
+   returns '' for an empty list and this returns '' in turn, so nothing is inserted. */
+function devSection(){
+  var h = devList(A(P.developments));
+  if (!h) return '';
+  /* `.dev-section`, NOT `.vertical-section` (owner 2026-09-07: the block sits "between company
+     header and sub nav"). `.vertical-section` is styled for sections INSIDE `.research-shell` --
+     `border-bottom:1px solid #dbe4ef` and `scroll-margin-top:calc(var(--nav1-h) + 54px)` -- so out
+     here it wore a divider it should not have and a scroll offset for a nav it does not sit under.
+     The id moved off `developments` too: `renderVertical`'s scroll-spy and hash branch enumerate
+     section ids as if they were tabs, and this is not one.
+     STACKING: static, no z-index, no transform/filter/opacity. `.site-header` is z-index:100 AND a
+     stacking context (backdrop-filter), and `.tabbar,.co-sub` is 40 ON PURPOSE -- anything that
+     outranks the header clips the header's search dropdown (broken and reverted twice 2026-09-07).
+     A statically positioned block cannot outrank or clip anything, so this stays out of that fight.
+     It must not be sticky either: two stickies at the same `top` is the overlap bug itself. */
+  /* EYEBROW: "Filings and deals", not the original "Latest filings". The block stopped being
+     filings-only on 2026-09-08 when marquee bulk/block deals began merging in from the volatile
+     half; a heading that says "filings" over a row reading "Abakkus bought 2,80,000 shares" labels
+     a market transaction as a company disclosure, which is a wrong fact in the furniture. */
+  return '<section class="dev-section" id="recent-developments"><div class="section-head">'
+    + '<p class="eyebrow">Filings and deals</p><h2>Recent developments</h2></div>'
+    + '<div class="stack"><article class="card">'+h+'</article></div></section>';
+}
+/* DELEGATED, not inline. One document-level listener covers whichever layout rendered the button
+   and survives any re-render, and there is no nested quoting inside an HTML attribute to get
+   wrong. Toggles the .dev-hidden rows and flips the label. */
+function devBind(){
+  if (devBind._on) return; devBind._on = true;
+  document.addEventListener('click', function(ev){
+    var btn = ev.target && ev.target.closest ? ev.target.closest('.dev-more') : null;
+    if (!btn) return;
+    var host = btn.previousElementSibling;
+    if (!host || !host.classList || !host.classList.contains('dev-list')) return;
+    var rows = host.querySelectorAll('.dev-hidden');
+    if (!rows.length) return;
+    var open = rows[0].style.display === 'none';
+    for (var i=0;i<rows.length;i++) rows[i].style.display = open ? '' : 'none';
+    btn.textContent = open ? 'Show less' : ('Show '+rows.length+' more');
+  });
+}
+function renderVertical(app){let nav='<nav class="tabbar vertical-nav" aria-label="Company research">'+verticalTabs.filter(t=>t[0]!=='themes').map(t=>'<a data-section="'+t[0]+'" href="#'+t[0]+'">'+t[1]+'</a>').join('')+'</nav>';let sections=verticalTabs.map(t=>'<section class="vertical-section" id="'+t[0]+'"><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('');app.innerHTML='<div class="company-content">'+hero()+devSection()+'<div class="research-shell">'+nav+sections+'</div></div>'+explorer();initExplorer();let links=[...document.querySelectorAll('.vertical-nav a')],parts=verticalTabs.map(t=>document.getElementById(t[0])).filter(Boolean),setActive=id=>{links.forEach(a=>a.classList.toggle('active',a.dataset.section===id));let active=links.find(a=>a.dataset.section===id);if(active&&matchMedia('(max-width:760px)').matches){let bar=active.parentElement;bar.scrollLeft=active.offsetLeft-(bar.clientWidth-active.offsetWidth)/2}},sync=()=>{let marker=scrollY+135,current=parts[0];parts.forEach(x=>{if(x.offsetTop<=marker)current=x});if(current)setActive(current.id)};/* A DIRECT TAB CLICK IS THE READER'S EXPLICIT CHOICE, so it becomes the sticky preference that
+   follows them across symbols (and replaces any earlier one). Recorded here rather than only at the
+   explorer click, so that picking a tab AFTER landing on a new company is what carries forward --
+   otherwise the preference would still hold whatever was chosen two companies ago. */
+links.forEach(a=>a.onclick=()=>{window.__KEEP_SECTION__=a.dataset.section;setActive(a.dataset.section)});/* ONE SCROLL-SPY, NOT ONE PER RENDER. `addEventListener('scroll',sync)` ran on every render with no
+   removal, so after N symbol switches N live listeners each called setActive on every scroll event --
+   a leak that also made the restore below fight N-1 stale spies. The previous render's listener is
+   detached first; `window.__SYNC__` survives the re-execution for the same reason __KEEP_SECTION__ does. */
+if(window.__SYNC__)removeEventListener('scroll',window.__SYNC__);window.__SYNC__=sync;addEventListener('scroll',sync,{passive:true});
+/* RESTORE THE PLACE THE EXPLORER CLICK RECORDED, BEFORE falling back to the first tab. A hash still
+   wins -- it is an explicit request for one section and the reader typed or followed it.
+   THE PREFERENCE IS STICKY, NOT CONSUMED (owner 2026-09-18, after testing New Listing: "when I
+   selected stage analysis for one symbol and i click on another symbol ... it changes sub nav
+   selection"). It was consumed on use, which is right on a screen where every company has the same
+   sections and wrong on New Listing, where MEASURED only 65 of 297 indexed symbols (22%) carry a
+   `stage` section at all -- they are fresh listings with no price history. So four times out of
+   five the held tab did not exist on the next company, the fallback fired, and because the
+   preference had been deleted it was gone for good: the reader had to re-pick Stage on every
+   company that had it. It now SURVIVES a company that lacks the section and re-applies on the next
+   one that has it. Momentum was never affected (267 of 267 carry `stage`), which is why it tested
+   clean while New Listing did not.
+   `__KEEP_SCROLL__` IS still consumed -- a scroll offset is only meaningful for the switch that
+   recorded it, and re-applying a stale one to a later, shorter page would land nowhere.
+   The preference is cleared when the reader picks a tab directly (see the nav onclick above), so it
+   only ever tracks their LAST explicit choice, and it is per-page: nothing is persisted across a
+   reload or a fresh load, which must still open on the natural first section. */
+let keep=window.__KEEP_SECTION__,keepY=window.__KEEP_SCROLL__;delete window.__KEEP_SCROLL__;
+/* CANCEL THE PREVIOUS RENDER'S REVEAL TIMERS. The hash branch below schedules scrollIntoView at
+   350ms and 1800ms to survive late layout. Those timers outlive a symbol switch: the reader clicks
+   a tab (hash='#peers'), clicks a new symbol 200ms later, and the OLD render's 1800ms reveal then
+   fires against the NEW page and yanks the reader to that section -- overriding the restore below
+   and landing at a position neither render intended. Traced: restore() correctly set 1604 three
+   times, then a stale reveal() drove it to 3180. The handles live on window because each render is
+   a fresh execution of this file and cannot see the previous closure. */
+if(window.__REVEAL_T__)window.__REVEAL_T__.forEach(clearTimeout);window.__REVEAL_T__=[];
+let hash=location.hash.slice(1);if(parts.some(x=>x.id===hash)){let reveal=()=>{document.getElementById(hash).scrollIntoView();setActive(hash)};requestAnimationFrame(reveal);window.__REVEAL_T__.push(setTimeout(reveal,350),setTimeout(reveal,1800))}else if(keep&&parts.some(x=>x.id===keep)){/* Repaint the tab, then put the reader back where they were. The scroll must be restored AFTER
+   layout settles or the document is still the old height and the call lands short; rAF plus a late
+   pass mirrors the hash branch above. `sync` would otherwise immediately overwrite the active class
+   from the scroll position, so setActive runs last in each pass. *//* RESTORE INSTANTLY, NOT SMOOTHLY. The page sets `html{scroll-behavior:smooth}`, so a plain
+   scrollTo ANIMATES: each of the three passes below re-triggers the animation from wherever the
+   last one had reached, and the scroll-spy repaints the active tab mid-flight from whatever
+   section is passing under the marker. Measured: 1604 -> drifting -> 3180, i.e. it overshot by a
+   full section and the tab followed it. `behavior:'instant'` jumps, so the passes are idempotent
+   and the spy sees the final position only.
+   The spy is also silenced for the duration: it fires on the programmatic scroll itself and would
+   otherwise overwrite `keep` with whatever the marker lands on. */
+/* BRING THE SECTION INTO VIEW -- DO NOT REPLAY THE PIXEL OFFSET (owner 2026-09-18: "page is still
+   not on stage analysis, the option is selected, but i have to click on stage analysis").
+   Restoring the raw scrollY was wrong the moment the two companies differ in length, which is
+   almost always: y=4325 put ESDS's Stage section 119px below the top of the viewport, and the same
+   4325 on MVELECTRO put it 500px ABOVE it -- off-screen. The tab read as selected while the reader
+   was looking at a different part of the page and had to click the tab to actually get there.
+   The SECTION is the thing to restore, not the number. `scroll-margin-top` is already declared on
+   `.vertical-section` (calc(var(--nav1-h) + 54px)), so scrollIntoView lands it below the sticky
+   navs rather than under them. `block:'start'` is explicit because the default varies once a
+   scroll-margin is in play. Falls back to the offset only if the element has somehow gone. */
+let restore=()=>{let el=document.getElementById(keep);if(el){try{el.scrollIntoView({behavior:'instant',block:'start'})}catch(e){el.scrollIntoView(true)}}else if(typeof keepY==='number'){try{scrollTo({top:keepY,behavior:'instant'})}catch(e){scrollTo(0,keepY)}}setActive(keep)};
+removeEventListener('scroll',sync);restore();requestAnimationFrame(restore);setTimeout(()=>{restore();addEventListener('scroll',sync,{passive:true})},350)}else if(verticalTabs.length)setActive(verticalTabs[0][0]);else{/* NO RENDERABLE SECTION IS A VALID STATE, NOT A CRASH. `pageModel.sections` is empty for a company with no stage data and only a shallow offer-document record (ESDS, 2026-08-31), so `verticalTabs[0]` was undefined and this threw 'Cannot read properties of undefined' - killing the render after the hero, so the page showed a title and nothing else with no clue why. Say so instead. */let n=document.querySelector('.company-content')||document.getElementById('store-company');if(n)n.insertAdjacentHTML('beforeend','<div class="empty">Only a preliminary offer-document record exists for this company so far. Detailed sections appear once the document is processed.</div>')};initStage()}
+function render(){devBind();let app=document.getElementById('store-company');if(P.layout==='vertical')return renderVertical(app);app.innerHTML=hero()+devSection()+'<div class="research-shell"><div class="tabbar" role="tablist" aria-label="Company research">'+tabs.map((t,i)=>'<button role="tab" tabindex="'+(i?-1:0)+'" data-tab="'+t[0]+'" aria-selected="'+(i===0)+'">'+t[1]+'</button>').join('')+'</div>'+tabs.map((t,i)=>'<section class="tab-panel" role="tabpanel" id="'+t[0]+'" '+(i?'hidden':'')+'><div class="section-head"><p class="eyebrow">Research module</p><h2>'+t[1]+'</h2></div>'+t[2]()+'</section>').join('')+'</div>';let activate=id=>{let active;document.querySelectorAll('[data-tab]').forEach(b=>{let on=b.dataset.tab===id;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;if(on)active=b});document.querySelectorAll('.tab-panel').forEach(p=>p.hidden=p.id!==id);history.replaceState(null,'','#'+id);if(active&&matchMedia('(max-width:760px)').matches)active.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};let buttons=[...document.querySelectorAll('[data-tab]')];buttons.forEach((b,i)=>{b.onclick=()=>activate(b.dataset.tab);b.onkeydown=e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;let n=(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[n].focus();activate(buttons[n].dataset.tab)}});let hash=location.hash.slice(1);if(tabs.some(t=>t[0]===hash))activate(hash);initStage()}
+/* Listing pages must not turn evidence blobs into public prose. */
+
+/* Deterministic offer facts.  Use the disclosed upper price band for comparability across
+   IPOs, even when a final issue price is also present.  Nothing is inferred without a stated
+   share count, price or FY PAT. */
+function offerNumber(v){let m=String(v==null?'':v).replace(/,/g,'').match(/\d+(?:\.\d+)?/);return m?Number(m[0]):null}
+/* A SHARE COUNT BELOW MIN_SHARES IS A MISREAD, NOT A QUANTITY (2026-09-09).
+   `offerNumber` takes the FIRST number in a string. Several dilution fields hold the whole
+   prose sentence rather than a parsed figure, and in that prose the first number is the FACE
+   VALUE. LEAPIND's `fresh_shares` is literally
+     'Fresh Issue of up to [.] equity shares of face value of Rs 1 each aggregating up to
+      Rs 4,000.00 million'
+   so the fresh issue was read as 1 share and rendered `Fresh issue Rs 0 cr` -- against a real
+   offer of Rs 400 cr. The share COUNT is genuinely unknown ([.] is a placeholder: this is a
+   pre-priced document), so the honest render is NO TILE.
+   Same root cause as the OFS defect fixed above (a face value read as a share count), reached
+   through a different field -- so the rule lives here, where every share-count read passes,
+   rather than at one call site. Found by the regression sweep AFTER the OFS fix, which is the
+   argument for putting it here: the next field to acquire this shape gets the guard for free.
+   The threshold is a floor on the ABSURD, not a judgement about small issues: the smallest
+   genuine share count anywhere in the published store is five figures, and no real Indian
+   equity offer is under 1,000 shares. Face values (1, 2, 5, 10, 100) all fall far below it. */
+const MIN_SHARES=1000;
+function offerShareCount(v){let n=offerNumber(v);return n!=null&&n>=MIN_SHARES?n:null}
+function offerUpperBand(s){let nums=(String(s['Price Range']||'').match(/\d+(?:\.\d+)?/g)||[]).map(Number);return nums.length?Math.max(...nums):null}
+/* THE PRICE A VALUATION IS BUILT ON: the FINAL ISSUE PRICE where the issue has been priced,
+   the upper end of the band only where it has not (2026-09-09, owner's KWICK reference).
+   Both fields come from the derived IPO registry, so this is a precedence rule WITHIN one
+   source -- not a second source, and not a DRHP fallback (that one was removed 2026-09-08
+   because the DRHP's `upper_price_band_rs` is a figure the DRHP itself disclaims).
+   Measured over the 183 published payloads carrying capital_ownership: 145 hold both, and the
+   two DISAGREE on 2 -- AAATECH (issue price 72 vs band 42) and AARVI (22 vs 54). On those two
+   every derived tile was previously computed at the wrong price. On the other 143 the values
+   coincide, so this changes nothing visible; it is the correctness of the RULE that matters,
+   because a band is a pre-pricing estimate and an issue price is the fact that replaced it.
+   `offerBandUpper` is kept separate so the caller can still tell WHICH it got and label the
+   P/E honestly -- a P/E at the top of a band is not the P/E of a priced issue. */
+function offerIssuePrice(s){return offerNumber(s['Issue Price'])}
+/* A STORED 'ISSUE PRICE' THAT CONTRADICTS THE BAND IS NOT A PRICE (2026-09-09). The same 75
+   contaminated rows behind the timeline dedupe above also feed EVERY derived tile in the Offer
+   block -- market capitalisation, total issue size, fresh issue, offer for sale, EPS and P/E.
+   VIVIANA stores 'Issue Price' 10,000 against a Rs 55 band, so an unguarded preference for the
+   issue price would have rendered a market cap ~180x too large, and it would have looked
+   entirely plausible in a card whose other tiles were fine. The band is the field that survives
+   the contamination, so it wins any disagreement.
+   Same 0.5% tolerance as the reconciliation below: formatting ('Rs.300 to Rs.315' vs '315') is
+   not a disagreement, and a few documents round. */
+function offerPriceAgrees(s){let ip=offerIssuePrice(s),hi=offerUpperBand(s);
+    return ip!=null&&hi!=null?Math.abs(ip-hi)<=0.005*Math.max(hi,1):null}
+function offerPrice(s){return offerPriceAgrees(s)===false?offerUpperBand(s):(offerIssuePrice(s)??offerUpperBand(s))}
+/* `offerNoteNumber` NO LONGER EXTRACTS OFFER FACTS (2026-09-11, owner: "move all to one place producer
+   side"). It kept a PARALLEL EXTRACTOR in the browser: five stored numeric fields -- ofs_shares,
+   total_offer_shares, pre_issue_shares, post_issue_shares and the promoter share count -- were
+   re-derived here by regexing the prose `note`, with no identity check, no refusal path and no
+   provenance. That made the page a THIRD producer after `factual_store._OFFER_PATTERNS` and
+   `drhp/note_recover`.
+
+   MEASURED ACROSS ALL 3,107 PUBLISHED PAYLOADS before removal:
+     total_offer_shares  fallback fired on   0
+     post_issue_shares   fallback fired on   0
+     pre_issue_shares    fallback fired on   0
+     ofs_shares          fallback fired on  11   <- and 10 of those 11 are ALREADY in the store
+     promoter share      fallback fired on   2
+   Three of the five were dead code. The eleven are exactly the companies `drhp/note_recover` typed
+   into the store on 2026-09-10 (AMAGI, CMRGREEN, LCL, PINELABS, SBIFUNDS, SEDEMAC, VIVIDEL, JPAN,
+   KNACK, PUSHPBRAND) -- the payloads were merely stale. The twelfth, DEVSON, is a REFUSAL the store
+   makes deliberately: its stored `total_offer_shares` contradicts its own note, so showing a number
+   here was showing an unvalidated figure.
+
+   AND THE PROMOTER BRANCH WAS ALREADY KNOWN BROKEN. `drhp/factual_store._promoter_post_pct`'s
+   docstring records this exact regex failing on KWICK: `[^\d]*` cannot cross the "8" in "(8
+   shareholders)", so it returned null on a company whose numbers are all present. That was fixed in
+   Python on 2026-09-03 and left standing here for three months. `promoter_holding.pre_pct` is stored
+   on 104 payloads; this regex reached 2.
+
+   Kept, deliberately: `offerPlacementRows` below parses PER-ROW `capital_history` prose for which no
+   stored field exists -- a different case from re-deriving a field we already hold. */
+function offerNoteNumber(note,re){let text=String(note||'');let m=text.match(re);return m?offerNumber(m[1]):null}
+function offerPlacementRows(c){return A(c.capital_history).map(x=>{let t=String(x.details||''),is=/private placement/i.test(t);if(!is)return null;let date=(t.match(/(?:on|dated?)\s+(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4})/i)||[])[1]||x.date||'';let shares=offerNoteNumber(t,/allotted\s+([\d,]+)\s+Equity shares/i),price=offerNoteNumber(t,/issue price of\s*(?:Rs\.?|₹)?\s*([\d,.]+)/i);return shares&&price?{date,shares,price,amount:shares*price}:null}).filter(Boolean)}
+
+/* Public Offer card: upper band is a calculation input, not a displayed metric. */
+function drhpOfferStructure(c){
+    let d=c.dilution||{}, ofs=A(c.ofs), s=P.ipo?.summary||{};   /* `pledge` binding removed 2026-09-09 with the Promoter pledge card below -- Governance owns the fact. */
+    /* PRICE COMES FROM THE REGISTRY ONLY (owner 2026-09-08: "Regardless all should come from ipo
+       master in derived"). The `?? offerNumber(d.upper_price_band_rs)` fallback that used to sit here
+       reached into the DRHP for a band the DRHP ITSELF disclaims: QUALIANCE carries
+       `upper_price_band_rs: 127` alongside `ipo_price_source: "pending_pricing"` — an indicative
+       offer-document figure, explicitly not an issue price. The page rendered it as
+       `UPPER PRICE BAND ₹127` while the registry-fed `PRICE BAND` tile beside it in
+       `drhpListingGeneric` sat blank: two sources, two answers, one page, and the wrong one looked
+       authoritative. Suppressed rather than relabelled — a caveat in small type is the thing readers
+       skip (cf. the T+3 listing-date estimate that rendered as "listing today").
+       Every figure below is a PRODUCT of `upper`, so they all drop out together and the
+       `facts.length?…:''` guard at the end of this function hides the card. That is intended: an
+       unpriced offer shows no price-derived valuation, not a zero and not a placeholder. Nothing
+       else is lost — share counts, OFS, promoter holding, lock-in and pledge are DRHP facts with no
+       registry equivalent and still render. */
+    /* `upper` now means "the price this valuation is struck at" -- issue price if priced,
+       else the top of the band. `pricedAtIssue` records which, so the method note can say so
+       rather than leaving a reader to assume a band figure is a settled price. */
+    let upper=offerPrice(s), pricedAtIssue=offerIssuePrice(s)!=null, note=d.note||'', fresh=offerShareCount(d.fresh_shares);
+    /* `d.ofs_shares` JOINS THE CHAIN (2026-09-08). The OFS total was read only from the `c.ofs`
+       seller LIST and the note prose, never from `dilution.ofs_shares` where the extractor actually
+       puts it when it finds a total without a per-seller breakdown. Measured over the published
+       store: 16 companies carry `dilution.ofs_shares` with an EMPTY `c.ofs`, so a real offer for
+       sale rendered as nothing at all — GLASSWALL is one, a pure-OFS issue of 2,02,13,722 shares
+       that showed no OFS anywhere on its page. Surfaced by gating the card on values (below): the
+       card had been rendering an em-dash, which hid the missing figure behind a heading. */
+    /* THE SELLER LIST IS PLAUSIBILITY-GATED BEFORE IT OUTRANKS THE TOTAL (2026-09-09, owner:
+       "Offer for sale Rs 0 cr this is wrong .. do RCA and see how wide spread it is").
+       `capital_ownership.ofs[].shares` is carrying the table's FACE VALUE column, not a share
+       count: every row reads 10 / 5 / 2 / 1 / 100, and on the 6 companies whose note states a
+       face value it EQUALS it exactly (STEAMHOUSE 'face value Rs 2 each' -> shares:2;
+       EXCELSOFT Rs 10 -> 10; LEAPIND Rs 1 -> 1). A column misalignment in the reader.
+       Two defects stacked, and the `||` chain is the second one: a corrupt list summing to a
+       small NON-ZERO number is TRUTHY, so it SHADOWED the `dilution.ofs_shares` fallback added
+       2026-09-08 for exactly this job. The list does not have to be empty to break the page --
+       it only has to be wrong. Measured over the published store: 12 companies, of which 9
+       rendered `Offer for sale Rs 0 cr` (STEAMHOUSE 42 shares x 81 / 1e7 -> 0.00) and 2 were
+       shadowing a real total (AARISHOUTDOORS 7 vs 880,000; ACEVECTOR 640 vs 63,870,763).
+       A share count below MIN_SHARES cannot be a real offer for sale -- the smallest
+       genuine OFS in the store is five figures -- so it is DISCARDED rather than summed, and
+       the chain falls through to the stored total. If nothing survives, no tile renders: a
+       wrong number is worse than a missing one.
+       NOT FIXED HERE: the extractor. This is the consumer-side guard so no page can present a
+       face value as a share count while the reader is repaired at the cause. */
+    let ofsListShares=ofs.reduce((n,x)=>n+(offerNumber(x.shares)||0),0);
+    if(ofsListShares<MIN_SHARES)ofsListShares=0;   /* MIN_SHARES: the shared floor beside offerNumber */
+    /* STORED FIELDS ONLY (2026-09-11) -- the prose fallbacks that stood here are gone; see the note
+       on `offerNoteNumber`. The seller-list sum stays FIRST because it is per-holder evidence, not a
+       re-derivation of `ofs_shares`. */
+    let ofsShares=ofsListShares||offerShareCount(d.ofs_shares);
+    if(ofsShares!=null&&ofsShares<MIN_SHARES)ofsShares=null;
+    let total=offerShareCount(d.total_offer_shares);
+    /* THE STORED POST-ISSUE COUNT, RECONCILED -- NOT DERIVED (2026-09-09, owner's KWICK
+       reference). KWICK stores 21,436,440 and pre(16,874,840) + fresh(4,561,600) sums to
+       exactly that, which is what makes it trustworthy. The rule is: use the STORED count, and
+       where pre and fresh are BOTH known, require them to reconcile with it.
+       A DISAGREEMENT IS A REFUSAL, NOT A PICK. This is the check that catches the failure a
+       sibling agent measured -- `post_issue_shares_cr` matching neither pre nor pre+fresh on
+       31 of 53 companies, and a derived `pre + fresh` rule disagreeing with the DRHP's own
+       stated count on 9 of 61, ALWAYS understating (up to 44%) because an absent `fresh` reads
+       as zero dilution. Suppressing both tiles on a contradiction is the only safe answer: a
+       market cap that is quietly 44% low is worse than no market cap.
+       NOTE AN OFS DOES NOT ENTER THIS SUM. An offer for sale transfers EXISTING shares between
+       holders; only a fresh issue creates new ones. `total_offer_shares` (fresh + ofs) is the
+       size of the OFFER, never the change in the share count.
+       TOLERANCE: 0.5%, not exact equality -- a few documents round the stated count to the
+       nearest hundred. Nothing near the 26-44% errors this guard exists to reject.
+       Where pre or fresh is absent there is nothing to reconcile against, so the stored count
+       is used as-is: it is the document's own STATED figure, which the prior art measured as
+       the trustworthy branch (52/61 self-consistent; PRASOLCHEM's Rs 4,000.8 cr checks out
+       exactly against it). */
+    let postStored=offerShareCount(d.post_issue_shares);
+    let preRaw=offerShareCount(d.pre_issue_shares);
+    let postSum=preRaw!=null&&fresh!=null?preRaw+fresh:null;
+    let postReconciles=postStored!=null&&postSum!=null?Math.abs(postStored-postSum)<=0.005*postSum:null;
+    let post=postReconciles===false?null:postStored;
+    let pre=preRaw;   /* computed above for the post-issue reconciliation (2026-09-09) */
+    /* PROMOTER PRE/POST NOW COME FROM THE STORE (2026-09-11). This line regexed the promoter note
+       with a pattern already known to fail -- `[^\d]*` cannot cross the "8" in KWICK's "(8
+       shareholders)" -- and it reached 2 of the 104 payloads that store `pre_pct`.
+       `factual_store._promoter_post_pct` derives `post_pct` in Python, subtracting the OFS shares
+       ATTRIBUTED to promoters by name (`promoter_ofs_shares`) rather than the whole OFS, and REFUSES
+       when attribution is unknown. Reading its output replaces a broken extractor with a checked one.
+       The share counts stay derived from the stored percentage so the tiles keep working where only
+       the percentage is known -- but the PERCENTAGE itself is never recomputed here. */
+    let promoterPrePct=offerNumber(c.promoter_holding?.pre_pct);
+    let promoterPostPct=offerNumber(c.promoter_holding?.post_pct);
+    /* PREFER A STORED SHARE COUNT OVER ONE DERIVED FROM THE PERCENTAGE (2026-09-11). Deriving
+       `pct/100 * pre` reproduces KWICK's promoter holding as 1,49,39,296 against the document's
+       printed 1,49,38,624 -- a 672-share rounding artifact of the 2-decimal percentage, already
+       noted in `_promoter_post_pct`'s docstring. Where the producer stores the COUNT
+       (`promoter_shares_pre_issue`, or the sum of the promoter holder rows), that is the document's
+       own figure and outranks our arithmetic. The percentage-derived value stays as the fallback so
+       the tiles still populate for the ~100 companies that store only a percentage. */
+    let phHolders=A(c.promoter_holding?.holders).reduce((n,x)=>n+(offerNumber(x.shares)||0),0);
+    let promoterPre=offerShareCount(c.promoter_holding?.promoter_shares_pre_issue)
+        ||(phHolders>=MIN_SHARES?phHolders:null)
+        ||(promoterPrePct!=null&&pre?Math.round(promoterPrePct/100*pre):null);
+    let promoterOfs=offerShareCount(c.promoter_holding?.promoter_ofs_shares);
+    let promoterPost=(promoterPre!=null&&promoterOfs!=null?promoterPre-promoterOfs:null)
+        ??(promoterPostPct!=null&&post?Math.round(promoterPostPct/100*post):null);
+    /* FY26 AND FY2026 ARE THE SAME YEAR (2026-09-09). The match was `String(x.fy)==='FY26'`,
+       exact, while the store spells the label both ways -- measured over the 183 published
+       payloads carrying capital_ownership: latest label `FY26` on 46 and `FY2026` on 29. The
+       29 were skipped silently, so their EPS and P/E tiles never rendered even with a good PAT
+       and a good post-issue count. (Only 2 of them, ANAWIL and SHANTIINOR, also hold a stated
+       post-issue count, so this recovers 2 pages today -- but it removes a defect that would
+       otherwise silently drop every future FY2026-spelled company.)
+       A PART-YEAR LABEL MUST NEVER MATCH. 20 published companies carry `H1FY26`, `H1 FY26`,
+       `9MFY26`, `9M_FY26` or `Q1FY26` as their LATEST row. Six or nine months of PAT divided
+       by the post-issue share count is not a full-year EPS, and the P/E built on it would be
+       roughly double the true figure -- so the pattern is anchored (^) and closed ($) and
+       accepts only the two full-year spellings. It is deliberately NOT a /26/ substring test.
+       Whitespace is tolerated because the store carries ' FY26 ' on some rows; nothing else is.
+       The fiscal-label defects found this week (ACCORDTS, PRIORITY, PALUCK shifted; STEAMHOUSE
+       scrambled) are a STORE problem and are NOT compensated for here -- a renderer cannot tell
+       a mislabelled year from a correct one, and guessing would be the same class of error. */
+    /* THE LABEL MAY CARRY A PARENTHETICAL, AND A SPACED/HYPHENATED FORM IS THE SAME YEAR
+       (2026-09-10). The match required the label to be EXACTLY `FY26`/`FY2026`, so a row whose
+       year is spelled `FY2026 (year ended March 31, 2026)` or `FY 2025-26` was skipped and the
+       company lost BOTH its EPS and its P/E tile even holding a good PAT and a good post-issue
+       count. Measured over the published payloads: of 68 companies carrying a stated
+       `post_issue_shares`, 31 matched here while 54 hold PAT on SOME row -- and of that gap,
+       PHYCHEM (`FY2026 (year ended March 31, 2026)`, PAT 408.9) and SUSAN (`FY 2025-26`,
+       PAT 1824.64) are the current-year rows lost purely to label SPELLING. Both reconcile:
+       PHYCHEM 7,540,000 pre + 2,700,000 fresh = 10,240,000 post, exactly the stored count.
+       DELIBERATELY STILL NARROW -- this widens the SPELLING of the current year, never the YEAR.
+       The other 21 companies in that gap are genuinely OLD (AARVI's latest PAT is FY17,
+       AAPLUSTRAD FY20, PRASOLCHEM/LCCPROJECT FY25/FY24) and MUST keep losing the tile: printing
+       an FY24 profit under a label reading `Post-issue EPS (FY26)` would be a false statement,
+       not a recovered one. A part-year label must still never match, so `H1`/`9M`/`Q1` remain
+       excluded by anchoring the prefix -- the parenthetical is allowed only AFTER the year.
+       NOT ACCEPTED: `as_stated` and `(Rs in Lakhs)` (PPEL, SSPRL) -- a column header that leaked
+       into the `fy` field is not a year, and LCL's competing `(Restated Consolidated)` /
+       `(Carve-Out)` bases for the same year are a basis choice a renderer must not make. */
+    let fy26=A(sec('financials').pnl_3yr).find(x=>/^\s*FY\s*(?:26|2026|2025-26)\s*(?:\(|$)/i.test(String(x.fy)))||{};
+    let pat=offerNumber(fy26.pat), eps=pat!=null&&post?pat*100000/post:null, mcap=upper!=null&&post?upper*post:null, facts=[];
+    /* STATED FACTS FIRST, then the derived ones (owner 2026-09-03: "available factual inputs
+       should still be visible even when no full valuation can be calculated"). Every fact below was
+       a PRODUCT of two values -- issue size, mcap, EPS and P/E all need `upper` AND a share count --
+       so a company holding a good `pre_issue_shares` and `upper_price_band_rs` produced an empty
+       `facts` array and the whole card vanished. Measured over the store: 60 of 145 companies had
+       Offer data and rendered NOTHING; ESDS was one. These two stand alone; the derived rows below
+       are OMITTED when they cannot be computed -- never a placeholder, never a zero. */
+    if(pre!=null)facts.push({label:'Pre-issue shares',value:N(pre,0)});
+    /* POST-ISSUE SHARES beside the pre-issue count (2026-09-09, owner: "Offer at a glance: add
+       post shares -- we have Pre-issue shares"). `post` was already computed here as the input
+       to market cap / EPS / P-E; it simply never had a tile of its own.
+       ONLY THE DOCUMENT'S STATED COUNT. The tempting fallback -- post = pre + fresh -- was
+       measured against the DRHPs' own stated post counts and disagrees on 9 of 61, ALWAYS
+       understating (up to 44%), because an absent `fresh_shares` reads as zero dilution.
+       Renders on 64 of 183 published companies; the rest state no post-issue count because a
+       pre-priced DRHP/RHP cannot -- the count is a function of an Offer Price fixed later, and
+       those documents print it as [.]. Push-only, so those pages show no tile rather than a
+       dash. See output/_scratch/ipo_band_dedup/DESIGN.md and offer_glance/mcap/. */
+    if(post!=null)facts.push({label:'Post-issue shares',value:N(post,0)});
+    /* NO `Upper price band` TILE (2026-09-08). `upper` is now registry-only, so this tile
+       merely restated the `Issue price` tile that `drhpListingGeneric` renders from the SAME
+       registry field -- the same label-twice problem as `Pre-issue shares`. Worse, on the
+       pre-fix build it was the SECOND surviving reader of the DRHP `upper_price_band_rs`:
+       QUALIANCE painted `Price band —` beside `Upper price band ₹127` from a figure the DRHP
+       itself marks `pending_pricing`. `upper` remains the calculation input below (issue
+       size, mcap, EPS, P/E) -- it is an input, not a displayed metric, exactly as this
+       function's own header comment has always said. */
+    if(total&&upper!=null)facts.push({label:'Total issue size',value:'₹'+N(total*upper/10000000,2)+' cr'});
+    if(fresh&&upper!=null)facts.push({label:'Fresh issue',value:'₹'+N(fresh*upper/10000000,2)+' cr'});
+    if(ofsShares&&upper!=null)facts.push({label:'Offer for sale',value:'₹'+N(ofsShares*upper/10000000,2)+' cr'});
+    /* POST-ISSUE PROMOTER HOLDING % (2026-09-09, owner: "from governance move this to Offer at
+       a glance -- add post shares promoter holding %, we have Pre-offer promoter holding %").
+       Reads the STORE's `promoter_holding.post_pct`, not the local `promoterPostPct` computed
+       below for the 'Promoter holding' table -- that one is a renderer derivation
+       (promoterPre - ofsShares) and is labelled `(derived)` where it renders.
+       GUARDED TO (0,100]. A sibling agent measured promoter percentages that are provably
+       wrong in the store -- ACTIVEINFR `pre_pct 125.03%` (the table reader summed rows named
+       'Public' and 'Non-Promoter'), ACMEUNIVERSAL a share COUNT stored as a percentage -- and
+       `post_pct` is DERIVED from `pre_pct`, so a bad pre value propagates. A percentage outside
+       (0,100] is impossible, so it is suppressed rather than shown.
+       Renders on 19 of 183 published companies (11%), and that is the CORRECT outcome, not a
+       gap to be closed by deriving one: 43 of the 84 nulls are documents that cannot state a
+       post-issue holding at all. Push-only -- never a dash.
+       Evidence: output/_scratch/promoter_holding/DESIGN.md. */
+    let postPct=c.promoter_holding?.post_pct;
+    if(typeof postPct==='number'&&postPct>0&&postPct<=100)facts.push({label:'Post-issue promoter holding',value:N(postPct,2)+'%'});
+    if(mcap!=null)facts.push({label:'Market capitalisation',value:'₹'+N(mcap/10000000,2)+' cr'});
+    /* A ZERO EPS IS NOT AN EPS (2026-09-10). The two lines below disagreed with each other about
+       the SAME value: `eps!=null` PRINTED it while `eps&&…` suppressed the P/E built on it, so a
+       zero was simultaneously trusted enough to publish and not trusted enough to divide by.
+       That asymmetry is the tell, and MANIKA is the case -- the store holds
+       `FY2026 {pat: 0.0, pat_amount_rs: 0, pat_margin_pct: 0.0}` against revenue of Rs 295.58 cr,
+       an extraction failure rather than a company that earned exactly nothing (the same payload
+       carries two conflicting label families and a duplicated revenue figure, so the row is
+       known-corrupt). The page rendered `Post-issue EPS (FY26) Rs 0.00` beside a real market
+       capitalisation, which reads as a stated fact about a company's profitability.
+       A zero-profit year, were it real, is also the one case where a P/E does not exist -- so
+       suppressing the pair is right whether the zero is corrupt OR genuine. The two lines now
+       share ONE predicate, which is what keeps them from drifting apart again. */
+    if(eps)facts.push({label:'Post-issue EPS (FY26)',value:'₹'+N(eps,2)});
+    if(eps&&upper!=null)facts.push({label:'P/E (FY26, post-issue)',value:N(upper/eps,2)+'x'});
+    let html=facts.length?card('Offer at a glance',kpis(facts)+'<p class="method-note">Derived using the stated upper price band and stated share counts. '
+        /* THE P/E IS AT THE TOP OF THE BAND, AND SAYS SO (2026-09-09). `upper` is the upper end
+           of the registry price range, so the P/E is the P/E an applicant pays at the cut-off,
+           not "the" P/E -- at the lower end it is materially smaller. A reader anchors on this
+           number harder than on any other tile in the block, so the basis is stated rather than
+           left to be inferred from the tile label. */
+        +(pricedAtIssue?'Market capitalisation, EPS and P/E are struck at the final issue price; EPS uses the latest stated full year.'
+                      :'Market capitalisation, EPS and P/E are at the upper end of the price band, not a settled price; EPS uses the latest stated full year.')+'</p>'):'';
+    let holding=[];
+    if(promoterPre!=null)holding.push(['Pre-issue promoter + promoter group',N(promoterPre,0),c.promoter_holding?.pre_pct==null?'—':N(c.promoter_holding.pre_pct,2)+'%']);
+    /* Label changed 2026-09-11: the percentage is now the STORE's `promoter_holding.post_pct`, derived
+       in Python with the OFS attributed to promoters by name and refused when unattributable -- no
+       longer a renderer derivation, so "(derived)" would misattribute where it came from. The SHARE
+       count is still computed from that percentage, which the row's own header makes plain. */
+    if(promoterPost!=null)holding.push(['Post-issue promoter + promoter group',N(promoterPost,0),N(promoterPostPct,2)+'%']);
+    if(holding.length)html+=card('Promoter holding',table(['Holding','Shares','%'],holding));
+    /* SUPPRESS AN EMPTY CARD, RENDER A PARTIAL ONE -- the predicate from the Offer-timeline fix
+       (`output/_scratch/ipo_offer_audit/patch_bareheading.py`), reused rather than reinvented:
+       build the tiles that HAVE a value, render the card only if any do. A card with ONE real
+       value still shows it; only a card with none is suppressed.
+       `ofs.length` was NOT a sound gate. `c.ofs` is `{}` (an empty OBJECT) for a company with no
+       OFS, and `A=v=>Array.isArray(v)?v:(v?[v]:[])` maps `{}` to `[{}]` -- a truthy ONE-element
+       array -- so the gate passed and QUALIANCE painted `OFS shares —` under a real heading, with
+       a 'Selling shareholders' label that is generic, not company-specific. Gate on the VALUES. */
+    let ofsTiles=[];
+    if(ofsShares)ofsTiles.push({label:'Seller category',value:/promoter/i.test(c.promoter_holding?.note||'')?'Promoters':'Selling shareholders'});
+    if(ofsShares)ofsTiles.push({label:'OFS shares',value:N(ofsShares,0)});
+    if(ofsTiles.length)html+=card('Offer for sale',kpis(ofsTiles));
+    let placements=offerPlacementRows(c);
+    if(placements.length)html+=card('Private placement (Pre-IPO)',table(['Date','Shares','Price','Amount'],placements.map(x=>[E(x.date),N(x.shares,0),'₹'+N(x.price,2),'₹'+N(x.amount/10000000,2)+' cr'])));
+    /* Lock-in release calendar (NSE circular, attached by drhp.dashboard._lockin_release).
+       ABSENT, NOT EMPTY, for a company that has not listed: NSE publishes the lock-in circular only
+       at listing, so a live issue has no rows and must show no card at all rather than a placeholder
+       or a zero. The producer returns null in that case and this guard renders nothing. */
+    let unlockRows=A(c.lockin_release?.rows);
+    if(unlockRows.length)html+=card('Lock-in release schedule',table(['Release date','Shares','Lock-in'],
+        unlockRows.map(x=>[E(x.date),N(x.shares,0),E(x.tenure||'—')]))+
+        '<p class="method-note">Source: NSE lock-in circular. Tranches releasing on the same date under the same lock-in are combined; shares already free of lock-in are not listed.</p>');
+    /* 'Promoter pledge' card REMOVED from Offer 2026-09-09 (owner: "Promoter pledge / Shares
+       pledged 65.88% : should move to section ownership governance for all IPO, currently its
+       in Offer"). A pledge is an OWNERSHIP fact, not a term of the offer.
+       IT IS A DELETION, NOT A MOVE -- the destination already renders it. `govTiles` in the
+       Ownership & Governance 'Governance snapshot' reads the SAME
+       `capital_ownership.pledging.pledged_pct` field, so the page was showing one fact twice
+       under two labels. Measured live in Chromium on STEAMHOUSE before the change:
+       Offer 'Shares pledged 65.88%' beside Governance 'Promoter pledge 65.9%' -- the same
+       number, differing only by N(...,2) vs N(...,1) rounding, NOT two sources.
+       The label difference is why this survived: a duplicate check keyed on the tile LABEL
+       cannot see it. The gate now keys on the FACT (card title + label):
+       output/_scratch/offer_glance/assert_glance.js G4.
+       `pledge` is no longer read in this function and its binding went with it, so nothing
+       computes a value nothing renders. Restoring the card is a one-line change. */
+    return html;
+}
+/* RHP peer cards may contain only issuer-disclosed comparables.  The legacy peer_panel
+   is keyword-derived operational context and must never become a valuation comparison. */
+function drhpPeersGeneric(){
+    let ip=sec('industry_peers'), sk=Q.sk||{}, facts=A(ip.other_material_facts).map(x=>x.value||x);
+    let position=[ip.market_position?.positioning,ip.market_position?.basis].filter(Boolean);
+    let metrics=A(sk.market_size||sk.cagrs),drivers=A(sk.drivers||sk.growth_drivers),peers=A(ip.peers_drhp);
+    let peerRows=peers.map(x=>[E(x.name||x.company||x.s),E(x.fy||x.period||'—'),x.revenue_cr==null&&x.rev==null?'—':N(x.revenue_cr??x.rev,2),x.ebitda_margin==null?'—':N(x.ebitda_margin,2)+'%',x.pe==null?'—':N(x.pe,2)+'x']);
+    let cards='';
+    if(position.length||facts.length)cards+=card('Industry position',list([...position,...facts],8),'positive');
+    if(metrics.length)cards+=card('Market size and growth',list(metrics,8));
+    if(drivers.length)cards+=card('Growth drivers',list(drivers,8));
+    if(peerRows.length)cards+=card('RHP-disclosed peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));
+    return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">The RHP does not disclose a listed peer set for this company. No keyword-derived companies are shown as comparables.</div>';
+}
+/* NET-PROCEEDS UTILISATION, IN THE OFFER SECTION (2026-09-14, owner: "Can we add in offer section
+   / For proceed / Proceed utilization").
+
+   WHY THIS READS `sec('objects_execution')` AND NOT `P.topics.offer_structure`.
+   The content map DOES route `objects_execution.objects` to topic `offer_structure` (label "Use of
+   proceeds"), but `company_public_page._topic_index` drops every entry whose `body` is empty, and
+   `company_evidence` emits this one as STRUCTURED (`obj=<rows>`, `body=""`) by construction. So
+   `topics.offer_structure` is unreachable without relaxing that filter -- and MEASURED across the
+   159 published payloads that carry objects, relaxing it un-gates 21 OTHER structured topics at the
+   same time (capital_history 159, financials 151, litigation 142, ownership 141, valuation 133,
+   forensic 133, industry/anchors 109, board 108 ...), every one of which would arrive at a consumer
+   expecting prose. That is a broad change to sections nobody asked about, so it is NOT made here.
+   `R` is `P.report` = `drhp.rpt`, which this renderer already reads for `capital_ownership`, so the
+   rows are ALREADY in hand: no delivery-path change is needed at all.
+
+   UNITS. `amount_rs` is rupees and is CANONICAL; `amount_lakhs` is the legacy field. Crore =
+   amount_rs/1e7, with a lakhs/100 fallback -- the same rule as the internal dashboard's `crObj()`
+   (drhp/dashboard.py:1458), because the store is mid-migration row by row: measured, GLASSWALL
+   carries the new schema and MAHARAJAANDSPEEDEXINDIA carries only the old one. Preferring the
+   canonical field while tolerating the old one is what keeps the figure right DURING the migration;
+   reading `amount_lakhs` as rupees would print every number 100,000x small.
+
+   UNPRICED ROWS RENDER, THEY DO NOT DISAPPEAR. General Corporate Purposes is printed as `[●]` in a
+   pre-priced RHP -- a real line item with no number yet. Dropping it would misrepresent the offer's
+   objects; printing `0` would be a false figure. It renders with a dash. `is_placeholder` exists on
+   only the 132 new-schema rows and on ZERO legacy rows, so a row with no amount and no
+   `is_placeholder` key is treated as unpriced too, rather than as an error.
+
+   NO TOTAL ROW, DELIBERATELY. With GCP unpriced the column does not add up to the net proceeds, so
+   a printed total would read as a disclosed figure and be wrong. The rows stand alone.
+
+   LABELS. `purpose_short` is the display label where it exists, but measured it is present on only
+   132 of 745 store rows (17.7%), so the `purpose` fallback is the COMMON path and carries long
+   prose (median 55, p90 141 chars). Rendered through the shared `table()`, whose first column is
+   already `white-space:normal; overflow-wrap:anywhere` with a phone-width `@media(max-width:700px)`
+   rule in company_store_prototype.css -- so wrapping is inherited, not re-invented here. */
+function netProceedsCr(o){
+    var rs=o.amount_rs, lk=o.amount_lakhs, n;
+    if(rs!=null&&rs!==''){n=Number(String(rs).replace(/,/g,''));if(isFinite(n))return n/10000000;}
+    if(lk!=null&&lk!==''){n=Number(String(lk).replace(/,/g,''));if(isFinite(n))return n/100;}
+    return null;
+}
+function netProceedsCard(){
+    let objects=A(sec('objects_execution').objects);
+    if(!objects.length)objects=A(Q.objects);        /* the flat key, for payloads with no deep report */
+    let rows=objects.map(function(x){
+        let cr=netProceedsCr(x),
+            label=String(x.purpose_short||x.purpose||'').trim()||'—',
+            /* A child row is indented under its parent. The extractor already excludes a child whose
+               parent is priced, so this renders what it is given and only marks the nesting. */
+            indent=String(x.parent||'').trim()?' style="padding-left:26px"':'';
+        /* TWO DECIMALS ALWAYS, IN A MONEY COLUMN. The shared `N(v,2)` sets only
+           `maximumFractionDigits`, so it renders 50.00 as "50" and 24.10 as "24.1" -- measured on
+           GLASSWALL and MAHARAJAANDSPEEDEXINDIA respectively. In a KPI tile that is fine; in a
+           column of figures the reader compares down, and ragged precision ("50" above "21.42")
+           reads as a different order of accuracy rather than the same figure. `N()` is shared by
+           32+ call sites and is NOT changed here -- the fixed precision is applied locally. */
+        return['<span'+indent+'>'+E(label)+'</span>',
+               cr==null?'—':'₹'+cr.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+' cr'];
+    });
+    if(!rows.length)return'';
+    let unpriced=objects.some(function(x){return netProceedsCr(x)==null});
+    return card('Use of proceeds',table(['Object of the offer','Amount'],rows)
+        +'<p class="method-note">Net proceeds as disclosed in the offer document'
+        +(unpriced?'. Objects shown without an amount are not yet priced in the offer document, so the column is not totalled.':', in ₹ crore.')
+        +'</p>');
+}
+/* Offer owns composition AND the net-proceeds utilisation table (moved here 2026-09-14 at the
+   owner's request; see `netProceedsCard` above and the removal note at `drhpExecutionGeneric`).
+   Execution keeps the deployment SCHEDULE and the capacity delta, and still renders the use-of-funds
+   table for the 11 measured symbols that have NO Offer section (see the deferral note there). The
+   previous version of this line read "Execution exclusively owns the detailed use-of-funds table" --
+   that is no longer true, and leaving it would have been the only record of an ownership rule the
+   code had already stopped following. */
+function drhpListingGeneric(){let s=P.ipo?.summary||{},c=sec('capital_ownership'),listed=(function(d){if(!d)return false;var t=Date.parse(String(d).slice(0,10));return !isNaN(t)&&t<=Date.now();})(s['Date Of Listing']);let tiles=[];
+    /* ONE PRICE ROW, NOT TWO (2026-09-09, owner: "we don't need both just keep one for all
+       IPO"). Both fields are populated together on 970 of 970 published companies -- there is
+       no coverage argument for either, so this is purely a redundancy question, EXCEPT where
+       the two contradict each other.
+       THE CONTRADICTION IS REAL AND MUST NOT BE HIDDEN BY THE DEDUPE. Normalising both sides
+       (a naive compare reports 642 differences that are almost all 'Rs.300 to Rs.315' vs '315'
+       -- the same number wearing a prefix), 75 of 970 genuinely disagree. 70 of those 75 listed
+       BEFORE 2026, and the outliers show the stored `Issue Price` is not always an issue price:
+         VIVIANA  band 55  'issue price' 10,000    <- an application/lot amount
+         MWL      band 101 'issue price' 100,000   <- an application/lot amount
+         SOLEX    band 52  'issue price' 1,694     <- a market price
+         HITECH   band 50  'issue price' 380       <- a market price
+       and 5 range-band cases (HAL, PARAGMILK, MSTCLTD, ICEMAKE, RADIANTCMS) store the band's
+       LOW end as the issue price, which is a different defect again.
+       So the rule is: show the issue price when it AGREES with the band (the common case, and
+       the number every derived tile is computed from); show the BAND when they contradict,
+       because the band is the field that survives this contamination; show the band alone when
+       the issue is not yet priced. Never both, and never a silent pick between two numbers
+       that disagree -- the contradiction is labelled instead, so it stays visible and
+       diagnosable rather than being resolved by whichever tile happened to render.
+       The registry carries the same disagreement, so this is NOT a payload-layer loss; the
+       upstream defect is recorded in output/_scratch/offer_glance/DESIGN.md for a producer-side
+       fix. This guard stops a wrong price REACHING a reader in the meantime.
+       NO 'unverified' PLACEHOLDER TILE. Falling back to the band IS the disclosure -- a priced
+       issue that shows a band is showing what it can stand behind. A tile reading 'Not
+       verified' would be a non-numeric value in a KPI row whose every other entry is a number,
+       and this card's idiom is already "never a placeholder". The contradiction is recorded in
+       the scratch RCA and belongs in a producer-side gate, not in a reader's eyeline. */
+    let bandTxt=String(s['Price Range']||'').trim(), ipTxt=String(s['Issue Price']||'').trim();
+    let bandNums=(bandTxt.match(/\d+(?:\.\d+)?/g)||[]).map(Number), ipNum=offerNumber(ipTxt);
+    let bandHi=bandNums.length?Math.max(...bandNums):null;
+    let priceAgrees=ipNum!=null&&bandHi!=null?Math.abs(ipNum-bandHi)<=0.005*Math.max(bandHi,1):null;
+    if(ipTxt&&priceAgrees!==false)tiles.push({label:'Issue price',value:'₹'+N(ipTxt)});
+    else if(bandTxt)tiles.push({label:'Price band',value:E(bandTxt)});if(String(s['Issue Start Date']||'').trim())tiles.push({label:'Issue opens',value:E(s['Issue Start Date'])});if(String(s['Issue End Date']||'').trim())tiles.push({label:'Issue closes',value:E(s['Issue End Date'])});if(String(s['Date Of Listing']||'').trim())tiles.push({label:listed?'Listed on':'Planned listing',value:E(s['Date Of Listing'])});let timeline=tiles.length?card(listed?'Offer and listing timeline':'Offer timeline',kpis(tiles)):'';return'<div class="stack">'+timeline+netProceedsCard()+drhpOfferStructure(c)+'</div>'}
+render();})();
