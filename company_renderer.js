@@ -401,7 +401,10 @@ const gridBand=rows=>{
            read as header, the band grew to cover the entire 3-row grid, and `gridTable` found no
            body. PANCHATV p143 is the same shape. A row numbered `1.` is never a header. */
         if(/^\d{1,3}[.)]?$/.test(label))break;
-        if(label&&vals.length&&vals.every(c=>/^[\d,.%()\s-]+$/.test(c)))break;
+        /* MOSTLY FIGURES, FOOTNOTE MARKS ALLOWED. SPEEDEX p191's data row ends `88.41*`; requiring
+           EVERY value to be a bare number read it as header and the band swallowed the only row. */
+        const num=vals.filter(c=>/^[\d,.%()\s-]+$/.test(c.replace(/[*#†‡^]+$/,''))).length;
+        if(label&&vals.length&&num>=Math.ceil(vals.length*0.6))break;
         n++;
     }
     /* Never let the band eat the whole grid: if every row looked like a header, the LAST row is
@@ -434,19 +437,55 @@ const gridHeader=rows=>{
    blanks that reads as missing data. */
 function gridTable(grid,maxVisibleRows=12){
     if(!grid||!Array.isArray(grid.rows)||!grid.rows.length)return'';
-    const rows=grid.rows,band=gridBand(rows),head=gridHeader(rows);
-    const body=rows.slice(band).filter(r=>r&&r.some(c=>String(c==null?'':c).trim()));
+    const rows=grid.rows,band=gridBand(rows),head=gridHeader(rows).slice();
+    const txt=v=>String(v==null?'':v).trim();
+    let body=rows.slice(band).filter(r=>r&&r.some(c=>txt(c))).map(r=>r.slice());
     if(!body.length)return'';
+    const labelOnly=r=>!!txt(r[0])&&r.slice(1).every(c=>!txt(c));
+    /* A WRAPPED LABEL CLOSING THE TABLE folds into the row above. SPEEDEX p191 prints its product as
+       `Single + Double` / `Wall Bottles` over two lines, the figures on the first; the second line
+       rendered as a row of em-dashes. A label-only row that data rows FOLLOW is a sub-heading
+       (`Revenue by Source`, p180) and is kept as one, below. */
+    if(body.length>1&&labelOnly(body[body.length-1])&&!labelOnly(body[body.length-2])){
+        const last=body.pop();body[body.length-1][0]=txt(body[body.length-1][0])+' '+txt(last[0]);
+    }
     const width=Math.max(head.length,...body.map(r=>r.length));
+    const hasData=c=>body.some(r=>!labelOnly(r)&&txt(r[c]));
+    /* A HEADER THAT SITS ONE COLUMN RIGHT OF ITS FIGURES. SPEEDEX p182/p186 print `Amount` twice, so
+       the extractor shifted every value one column left: the `% of Revenue from Operations` header
+       sits over an empty column and the percentages sit under a second `Amount`. A header-only
+       column naming a share hands its label to the nearest unlabelled-as-share column to its left
+       whose cells ARE percentages, keeping that column's period. */
+    const pctCol=c=>{const v=body.filter(r=>!labelOnly(r)).map(r=>txt(r[c])).filter(Boolean);
+        return v.length&&v.every(x=>/%$|^\d{1,3}(?:\.\d+)?$/.test(x))&&v.some(x=>/\./.test(x))};
+    /* A column's OWN header cells, below the spanning row. A word the PDF split across two cells
+       (`% of Revenue fro` | `m`) is rejoined, and a cell that is only such a fragment is not a label. */
+    const frag=v=>/^[a-z]{1,2}$/.test(v);
+    const own=c=>{const out=[];for(let r=1;r<band;r++){let v=txt((rows[r]||[])[c]);const nx=txt((rows[r]||[])[c+1]);
+        if(frag(v))continue;if(v&&frag(nx))v+=nx;if(v)out.push(v)}return out.join(' ')};
+    const fragOnly=c=>{const v=[];for(let r=0;r<band;r++){const x=txt((rows[r]||[])[c]);if(x)v.push(x)}return v.length>0&&v.every(frag)};
+    for(let c=1;c<width;c++){
+        if(hasData(c)||!/%|share|per\s*cent/i.test(own(c)))continue;
+        for(let k=c-1;k>=Math.max(1,c-2);k--){
+            if(hasData(k)&&!/%|share/i.test(own(k))&&pctCol(k)){
+                const period=((head[k]||'').match(/(?:Fiscal|FY|Financial Year)\s*'?\d{2,4}|(?:March|June|September|December)\s+\d{1,2},?\s+\d{4}/i)||[''])[0];
+                head[k]=((period?period+' ':'')+own(c)).trim();head[c]='';break;
+            }
+        }
+    }
     const keep=[];
     for(let c=0;c<width;c++){
-        const hasHead=!!String(head[c]||'').trim();
-        const hasData=body.some(r=>String(r[c]==null?'':r[c]).trim());
-        if(hasHead||hasData)keep.push(c);
+        /* A header-only column SURVIVES (JSIPL p172: it is the only clue that 22,500 is the June
+           quarter). It goes only once its label has been handed on above, or when all it holds is a
+           stray fragment like the `m` a wrapped `from` leaves behind. */
+        const hasHead=!!txt(head[c])&&!fragOnly(c);
+        if(hasHead||hasData(c))keep.push(c);
     }
     if(!keep.length)return'';
-    const h=keep.map(c=>String(head[c]||'').trim()||'—');
-    const cells=body.map(r=>keep.map(c=>E(String(r[c]==null?'':r[c]).trim())||'—'));
+    const h=keep.map(c=>txt(head[c])||'—');
+    const cells=body.map(r=>labelOnly(r)
+        ? keep.map((c,i)=>i===0?'<strong>'+E(txt(r[0]))+'</strong>':'')
+        : keep.map(c=>E(txt(r[c]))||'—'));
     const page=grid.source_page?'<p class="method-note">Source: page '+E(grid.source_page)+' of the filing.</p>':'';
     return table(h,cells,maxVisibleRows)+page;
 }
@@ -573,8 +612,13 @@ function drhpBusinessGeneric(){
     let capValue=(x,fy)=>{let full='FY20'+fy.slice(2),installed=x.installed_capacity_by_fy?.[fy]??x.installed_capacity_by_fy?.[full],production=x.production_by_fy?.[fy]??x.production_by_fy?.[full],used=x.utilization_pct_by_fy?.[fy]??x.utilization_pct_by_fy?.[full],parts=[];if(installed!=null)parts.push(N(installed,0)+' '+E(x.capacity_unit||''));if(production!=null)parts.push('output '+N(production,0));if(used!=null)parts.push(N(used,1)+'% used');return parts.join(' · ')||'—'};
     if(capLegacy.some(x=>x.installed_capacity_by_fy||x.production_by_fy))capacity=gridTables(b.capacity_utilization)+table(['Resource','FY2024','FY2025','FY2026'],capLegacy.map(x=>[E(x.unit_or_product),capValue(x,'FY24'),capValue(x,'FY25'),capValue(x,'FY26')]));
     let cards=card('How the business makes money','<p>'+E(concise(o.business_model||P.summary.business,520))+'</p>');
-    let productGroups=productsLegacy(b.products).slice(0,8).map(x=>{let items=A(x.items);if(!items.length&&x.items)items=[x.items];return'<article class="product-card"><h3>'+E(concise(x.category||'Product group',90))+'</h3>'+list(items,8)+'</article>'});
-    let productsHtml=productsBlock(b.products,productGroups.length?'<div class="product-grid">'+productGroups.join('')+'</div>':'');
+    /* EVERY STORED PRODUCT FACT REACHES THE PAGE (2026-09-25). `note` - the description the filing
+       prints beside each group, held on 485 stored entries - was never rendered, categories were
+       cut at 90 characters and only 8 groups showed; measured, 31% of stored product text reached
+       the page. Groups past the eighth sit behind a toggle so the card stays scannable. */
+    let productGroups=productsLegacy(b.products).map(x=>{let items=A(x.items);if(!items.length&&x.items)items=[x.items];return'<article class="product-card"><h3>'+E(concise(x.category||'Product group',180))+'</h3>'+list(items,12)+(x.note?'<p class="muted">'+E(concise(x.note,600))+'</p>':'')+'</article>'});
+    let groupsHtml=productGroups.length?'<div class="product-grid">'+productGroups.slice(0,8).join('')+'</div>'+(productGroups.length>8?'<details class="more-groups"><summary>Show '+(productGroups.length-8)+' more product group'+(productGroups.length-8===1?'':'s')+'</summary><div class="product-grid">'+productGroups.slice(8).join('')+'</div></details>':''):'';
+    let productsHtml=productsBlock(b.products,groupsHtml);
     if(productsHtml)cards+=card('Products and solutions',productsHtml);
     let differentiation=evidence(['technology_ip','vertical_integration','cost_advantage','customer_qualification'],10);if(differentiation.length)cards+=card('Technology, platform and differentiation',list(differentiation,10),'positive');
     if(A(b.revenue_split_product).length)cards+=card('Revenue mix by product group',mixTable(b.revenue_split_product));
@@ -611,7 +655,14 @@ function drhpBusinessGeneric(){
     let em=b.employees,emHtml=gridTables(em);
     if(plainObj(em)){let t=[em.total,em.total_headcount,em.permanent_employees,em.permanent].find(x=>x!=null&&x!==''&&isFinite(Number(x)));
         if(t!=null)emHtml+=kpis([{label:'Employees'+(em.as_of?' as of '+em.as_of:''),value:N(t,0)}]);}
+    /* The OVERVIEW reader stores headcount too (`overview.employee_strength`, 33 companies with a
+       count and often a department / attrition / contract-labour note) and nothing rendered it. */
+    let es=plainObj(o.employee_strength);
+    if(!emHtml&&es&&es.count!=null&&isFinite(Number(es.count)))emHtml=kpis([{label:'Employees'+(es.as_of?' as of '+es.as_of:''),value:N(es.count,0)}])+(es.note?'<p class="muted">'+E(concise(es.note,700))+'</p>':'');
     if(emHtml)cards+=card('Employees',emHtml);
+    /* Key inputs and how they are sourced (`raw_materials`), stored and never rendered. */
+    let rm=plainObj(b.raw_materials);
+    if(rm){let inputs=A(rm.key_inputs||rm.key_materials||rm.materials);if(inputs.length||rm.sourcing)cards+=card('Raw materials and sourcing',(inputs.length?list(inputs,12):'')+(rm.sourcing?'<p>'+E(concise(rm.sourcing,600))+'</p>':''));}
     if(A(b.capacity_utilization).length)cards+=card('Capacity utilisation by resource',capacity);
     // Grids first: a captured facility register has no `role`, so the `operating` filter above
     // discards it and this card was silently OMITTED rather than blank — HEROMOTORS p279's six
@@ -1419,7 +1470,14 @@ function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o
    `deployment`, `capacity_changes` and `orders_not_placed` are Execution facts (a deployment
    SCHEDULE and a capacity delta, not an amount split) and are unconditionally kept. */
 function objectsRenderElsewhere(){return PM?A(PM.sections).some(s=>s.id==='listing'):false}
-function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let fys=[...new Set(deployment.flatMap(x=>Object.keys(x.amount_rs_by_fy||{})))].sort();let schedule=table(['Object of the offer'].concat(fys.map(f=>E(f))),deployment.map(x=>[E(x.item)].concat(fys.map(f=>x.amount_rs_by_fy?.[f]==null?'—':rsAmount(x.amount_rs_by_fy[f])))));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
+function drhpExecutionGeneric(){let o=sec('objects_execution'),objects=A(o.objects),deployment=A(o.project?.deployment),changes=A(o.post_expansion_math?.capacity_changes),orders=o.orders_not_placed||{};let uses=objectsRenderElsewhere()?'':table(['Use of funds','Amount'],objects.map(x=>[E(x.purpose),x.amount_rs==null?'To be finalised':rsAmount(x.amount_rs)]));let fys=[...new Set(deployment.flatMap(x=>Object.keys(x.amount_rs_by_fy||{})))].sort();let schedule=table(['Object of the offer'].concat(fys.map(f=>E(f))),deployment.map(x=>[E(x.item)].concat(fys.map(f=>x.amount_rs_by_fy?.[f]==null?'—':rsAmount(x.amount_rs_by_fy[f])))));let capacity=table(['Resource','Current','Post investment','Increase'],changes.map(x=>[E(x.resource),N(x.before,0)+' '+E(x.unit),N(x.after,0)+' '+E(x.unit),N(x.increase_pct,1)+'%']));let cards=(uses?card('Use of funds',uses):'')+(deployment.length?card('Planned deployment',schedule):'')+(changes.length?card('Expected capacity addition',capacity,'positive'):'')+(orders.status?card('Execution status','<p>'+E(orders.note)+'</p>','caution'):'');
+/* Stored and never rendered (store→page audit 2026-09-25): how the objects are funded, who monitors
+   the proceeds, and the deployment the issuer committed to after listing. */
+let mf=o.means_of_finance||{},ma=o.monitoring_agency||{},plc=A(sec('verdict').post_listing_commitments);
+if(mf.statement)cards+=card('Means of finance','<p>'+E(concise(mf.statement,600))+'</p>'+(mf.firm_arrangements_note?'<p class="muted">'+E(concise(mf.firm_arrangements_note,300))+'</p>':''));
+if(ma.name||ma.appointed||ma.will_be_appointed)cards+=card('Monitoring agency','<p>'+(ma.name?E(ma.name)+(ma.sebi_registration_number?' <span class="muted">(SEBI '+E(ma.sebi_registration_number)+')</span>':''):'To be appointed; the name is not yet disclosed.')+'</p>');
+if(plc.length)cards+=card('Post-listing commitments',list(plc,10));
+return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">No execution schedule or capacity plan is disclosed for this company.</div>'}
 function drhpRisksGeneric(){let rows=drhpRiskRows();if(!rows.length)return'<div class="empty">No company-specific risk disclosures are stored.</div>';return'<p class="method-note">Showing the most company-specific, evidence-backed risks. The complete risk register remains stored for audit.</p><div class="risk-grid">'+rows.map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(concise(x.title||x.risk||value(x),220))+'</h3><p>'+E(concise(x.detail||x.note||'',260))+'</p></div></article>').join('')+'</div>'}
 function drhpPeersGeneric(){let ip=sec('industry_peers'),sk=Q.sk||{},pp=Q.peer_panel||P.peers||{},facts=A(ip.other_material_facts).map(x=>x.value||x),position=[ip.market_position?.positioning,ip.market_position?.basis].filter(Boolean),metrics=A(sk.market_size||sk.cagrs),drivers=A(sk.drivers||sk.growth_drivers),peers=A(ip.peers_drhp).length?A(ip.peers_drhp):A(pp.peers);let peerRows=peers.map(x=>[E(x.name||x.company||x.s),E(x.fy||x.period||'—'),x.revenue_cr==null&&x.rev==null?'—':N(x.revenue_cr??x.rev,2),x.ebitda_margin==null?'—':N(x.ebitda_margin,2)+'%',x.pe==null?'—':N(x.pe,2)+'x']);let cards='';if(position.length||facts.length)cards+=card('Industry position',list([...position,...facts],8),'positive');if(metrics.length)cards+=card('Market size and growth',list(metrics,8));if(drivers.length)cards+=card('Growth drivers',list(drivers,8));if(peerRows.length)cards+=card('Disclosed and operating peers',table(['Company','Period','Revenue ₹cr','EBITDA margin','P/E'],peerRows));return cards?'<div class="stack">'+cards+'</div>':'<div class="empty">Industry evidence is not yet structured for this filing.</div>'}
 function drhpListingWithAnchors(){let html=drhpListingGeneric(),anchors=anchorCard();if(!anchors)return html;let at=html.lastIndexOf('</div>');return at<0?html+anchors:html.slice(0,at)+anchors+html.slice(at)}
@@ -1443,7 +1501,12 @@ function coverageOwnership(){
     return'<div class="stack">'+cardHtml+card('Promoters and control',table(['Name','Role'],A(promoters).map(x=>[E(x.name),E(x.role||x.designation)])))+card('Board and leadership',table(['Name','Role'],A(board).map(x=>[E(x.name),E(x.role||x.designation)])))+card('Ownership and offer context',kpis(ownerOfferTiles(c,anchors)))+'</div>'
 }
 function coverageRisks(){let source=R.risks||{},all=[...A(source.internal_operational),...A(source.financial_valuation),...A(source.compliance_legal),...A(source.strategy_growth),...A(Q.risks),...A(C.risks)];return'<div class="risk-grid">'+unique(all).slice(0,16).map((x,i)=>'<article class="risk"><span>'+(i+1)+'</span><div><h3>'+E(x.title||x.risk||value(x))+'</h3><p>'+E(x.detail||x.note||'')+'</p></div></article>').join('')+'</div>'}
-function coverageVerdict(){if(R.verdict||R.intellisense)return inVerdictDrhp();let g=Q.grades||{};return'<div class="stack">'+card('Stored assessment',kpis([{label:'Relative grade',value:g.rel||'—'},{label:'Weighted momentum',value:g.wm90||'—'}]))+card('Coverage limits','<p class="muted">This filing has no full analytical verdict domain. Stored grades remain separately labelled and are not treated as Stage Analysis.</p>')+'</div>'}
+/* The analysis can predate the filing the facts come from: `drhp/dashboard._report_for` carries a
+   verdict / intellisense from its own (older) document when the newer filing has none, and stamps
+   `vintage`. Say so rather than pass a DRHP-stage read off as the RHP's - without a date, since filing
+   dates are never exposed. */
+const vintageNote=()=>{const v=(R.verdict&&R.verdict.vintage)||(R.intellisense&&R.intellisense.vintage);return v&&v.earlier_document?'<p class="method-note">This analysis was prepared on an earlier offer document for this company. The facts elsewhere on this page come from its later filing, so some figures may have been updated since.</p>':''};
+function coverageVerdict(){if(R.verdict||R.intellisense)return vintageNote()+inVerdictDrhp();let g=Q.grades||{};return'<div class="stack">'+card('Stored assessment',kpis([{label:'Relative grade',value:g.rel||'—'},{label:'Weighted momentum',value:g.wm90||'—'}]))+card('Coverage limits','<p class="muted">This filing has no full analytical verdict domain. Stored grades remain separately labelled and are not treated as Stage Analysis.</p>')+'</div>'}
 function coverageListing(){let o=sec('objects_execution'),c=sec('capital_ownership'),s=P.ipo?.summary||{},objects=o.objects||Q.objects||[],anchors=Q.anchor_allotment||{},uses=table(['Use of proceeds','₹cr'],A(objects).map(x=>[E(x.purpose||value(x)),x.amount_lakhs==null?E(x.amount||'—'):N(x.amount_lakhs/100,0)]));let discovery='';return'<div class="stack">'+/* 'Offer objects' REMOVED from Offer & Listing 2026-09-03 (owner:
    "Both read objects_execution.objects. Keep the detailed table in Execution and remove it from
    Offer & Listing. Offer should retain only Offer-at-a-Glance / composition metrics, OFS context
