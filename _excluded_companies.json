@@ -108,7 +108,7 @@
   "DRHP:OMFURNINDIAFPO-20240314",
   "DRSDILIP",
   "DSKULKARNI",
-  "DUDANIRETAIL",
+  "DUDANI",
   "DUROPLY",
   "DYNPRO",
   "EBIX",
@@ -276,6 +276,7 @@
   "RCDL",
   "RELCHEMQ",
   "RKEC",
+  "RKFAL",
   "ROHLTD",
   "ROLLT",
   "ROML",
@@ -363,5 +364,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 359
+ "n_retained": 360
 }
