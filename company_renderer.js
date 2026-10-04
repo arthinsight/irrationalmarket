@@ -1141,10 +1141,13 @@ function ownerOfferTiles(c,a){let t=[],ph=c.promoter_holding||{};
        also has a listing section -- so on that one page these tiles duplicated the full
        `anchorCard()` table sitting above them, verified in Chromium ('Anchor investors 8' beside
        'Anchor investors (8)'). For the other 119 this card is the ONLY anchor surface, because
-       their listing section is retired by the approved 6-month lifecycle rule in
+       their listing section is retired by the approved lifecycle rule in
        `company_coverage_model.build_page_model` -- NOT by a routing defect. Deleting these tiles
        outright, as the duplicate-removal analogy suggests, would blank anchor data on 119 pages to
-       fix 1. So: defer to the Offer surface when it exists, stand in for it when it does not. */
+       fix 1. So: defer to the Offer surface when it exists, stand in for it when it does not.
+       DEFERRING MUST MOVE BOTH FACTS (1.19, owner 2026-09-29): when 1.19 kept Offer & Listing for a
+       year after listing, the 'Anchor allocation' total left every page that gained it, because `anchorCard()`
+       drew the count but not the total. `anchorCard()` now draws the total from the same field. */
     if(!anchorsRenderElsewhere()){
         if(a.n)t.push({label:'Anchor investors',value:E(a.n)});
         if(a.total_amount)t.push({label:'Anchor allocation',value:'₹'+N(a.total_amount/10000000,1)+'cr'});
@@ -1387,9 +1390,16 @@ function peers(){let rows=P.peers?.peers||[],groups={};rows.forEach(x=>(groups[x
 // The anchor book: 172 symbols carry one, 4,945 rows in total, and NOTHING rendered it. The data
 // shipped in every payload while `listing()` showed only price discovery; `coverageListing` reads
 // it but is not the renderer these symbols are assigned.
-function anchorCard(){
+/* THE ANCHOR ALLOCATION TOTAL (plan card 1.19, owner 2026-09-29). When a listing section exists the
+   Ownership card defers its anchor tiles here (`anchorsRenderElsewhere()`), so this card must carry
+   what those tiles carried: the count (title) AND the total. It reads the same field the tile reads
+   (`total_amount`, rupees) with the same format, and draws only when the field is present -- never a
+   placeholder. A total with no allottee rows still stands as a card, since the tile drew it then too.
+   `withTotal=false` is for a renderer that already draws the total beside this card (coverageListing). */
+function anchorCard(withTotal=true){
     let aa=Q.anchor_allotment||{},rows=A(aa.rows);
-    if(!rows.length)return '';
+    let total=withTotal&&aa.total_amount?kpis([{label:'Anchor allocation',value:'₹'+N(aa.total_amount/10000000,1)+'cr'}]):'';
+    if(!rows.length)return total?card('Anchor investors'+(aa.n?' ('+aa.n+')':''),total):'';
     // Named owners first (present on 440 of 4,967 rows), blanks after; within each, largest stake
     // first. A row's owner is the person behind the fund house, which is the part a reader knows.
     let ranked=rows.slice().sort((x,y)=>{
@@ -1414,7 +1424,7 @@ function anchorCard(){
                        x.pct==null?'—':N(x.pct,2)+'%',N(x.shares,0),
                        ret(x.tr_med90,x.tr_n),ret(x.tr_med180,null)]),7);
     let note=rows.length>50?'<p class="method-note">Showing the 50 largest of '+rows.length+' anchor allottees.</p>':'';
-    return card('Anchor investors ('+(aa.n||rows.length)+')',body+note);
+    return card('Anchor investors ('+(aa.n||rows.length)+')',total+body+note);
 }
 function listing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{};return s.Symbol?'<div class="stack">'+anchorCard()+'<div class="layout-2">'+card('Offer structure',list(sec('objects_execution').objects,6))+'</div></div>':(anchorCard()||'<div class="empty">No offer record applies to this coverage.</div>')}
 function pendingVolume(){let d=A(M.price).slice(-20),vol=d.map(x=>Number(x[2])||0).filter(x=>x>0),latest=Number(d.at(-1)?.[2])||0,avg=vol.length?vol.reduce((a,b)=>a+b,0)/vol.length:0;if(!vol.length)return'';return card('Observed volume profile',kpis([{label:'Sessions observed',value:d.length},{label:'Latest volume',value:N(latest,0)},{label:'Observed average',value:N(avg,0)},{label:'Latest / average',value:N(latest/avg,2)+'x'}]))}
@@ -1456,8 +1466,8 @@ function drhpInvestmentGeneric(){let f=sec('financials'),b=sec('business_ops'),o
    DEFER, NOT DELETE -- and this is the whole point. Deleting it outright was measured first and is
    WRONG for 11 symbols (AARADHYA, ABRFL, ABSMARINE, ADCOUNTY, ADMACH, DEVSON, INDOSMC, MILLWORKS,
    SHREEJISPG, SRTL, XTRANET): they carry objects but have NO listing section, because the approved
-   lifecycle rule in company_coverage_model hides Offer once a company is staged or listed more than
-   6 months. For them Execution is the only surface left, so an unconditional removal would delete
+   lifecycle rule in company_coverage_model hid Offer once a company was staged or listed more than
+   6 months (since 1.19 / BUG-40: listed more than 365 days). For them Execution is the only surface left, so an unconditional removal would delete
    the table rather than move it. Measured over the 144 `drhpGenericExecution` payloads: 98 have an
    Offer section (table MOVES), 11 do not (table STAYS here), 32 have no objects at all (this card
    was already empty and renders nothing either way).
@@ -1512,7 +1522,7 @@ function coverageListing(){let o=sec('objects_execution'),c=sec('capital_ownersh
    `objects_execution.objects` list, so the page showed one dataset twice. The `uses` binding above
    is now unused HERE but `objects` is still read by it -- both are left in place rather than
    pruned, because the payload contract is unchanged and a future Offer-side summary may want them.
-   */card('Offer structure',list([c.dilution,c.lock_in,c.pledging].filter(Boolean),8))+card('Anchor allocation',kpis([{label:'Anchor investors',value:anchors.n||'—'},{label:'Allocation',value:anchors.total_amount?'₹'+N(anchors.total_amount/10000000,1)+'cr':'—'}]))+anchorCard()+/* 'Price discovery' REMOVED 2026-09-03 (owner: "i don't need Price discovery in offer and listing"). It restated Issue price / Listing open / Listing gain, which the page already carries in the listing hero strip; the underlying `P.ipo.summary` fields are UNTOUCHED, so restoring it is a one-line change. */+'</div>'}
+   */card('Offer structure',list([c.dilution,c.lock_in,c.pledging].filter(Boolean),8))+card('Anchor allocation',kpis([{label:'Anchor investors',value:anchors.n||'—'},{label:'Allocation',value:anchors.total_amount?'₹'+N(anchors.total_amount/10000000,1)+'cr':'—'}]))+anchorCard(false)+/* 'Price discovery' REMOVED 2026-09-03 (owner: "i don't need Price discovery in offer and listing"). It restated Issue price / Listing open / Listing gain, which the page already carries in the listing hero strip; the underlying `P.ipo.summary` fields are UNTOUCHED, so restoring it is a one-line change. */+'</div>'}
 function opInvestment(){
     let sc=P.scorecard||{};
     let ob=topicBlock('order_book'),
