@@ -413,10 +413,14 @@ const gridBand=rows=>{
 };
 /* Join the band down each column. A blank cell inherits nothing, so `%` under `Fiscal 2026`
    becomes `Fiscal 2026 %` and the two `%` columns of SKOFFSET p180 stop reading identically. */
-const gridHeader=rows=>{
-    const band=gridBand(rows),width=Math.max(...rows.map(r=>r.length));
+const gridHeader=(rows,bandIn)=>{
+    const band=bandIn||gridBand(rows),width=Math.max(...rows.map(r=>r.length));
     const out=[];
     for(let c=0;c<width;c++){
+        /* A cleaned grid (`bandIn` from the JSON) writes every label itself: a column blank on both
+           header rows is unlabelled, and borrowing the group to its left would print `FY 2026` over
+           a column that is not FY 2026 (TNASOLUTIONS p156, after `of Revenu`|`e` was rejoined). */
+        if(bandIn&&!String((rows[0]||[])[c]||'').trim()&&!String((rows[1]||[])[c]||'').trim()){out.push('');continue}
         const parts=[];let carry='';
         for(let r=0;r<band;r++){
             const cell=String((rows[r]||[])[c]==null?'':(rows[r]||[])[c]).trim();
@@ -437,7 +441,10 @@ const gridHeader=rows=>{
    blanks that reads as missing data. */
 function gridTable(grid,maxVisibleRows=12){
     if(!grid||!Array.isArray(grid.rows)||!grid.rows.length)return'';
-    const rows=grid.rows,band=gridBand(rows),head=gridHeader(rows).slice();
+    /* The JSON build says how many header rows it wrote (`header_rows`, 2026-10-05); trust it. The
+       guess below reads a label-only sub-heading (`Unit - I`) as header and folded ORIENTCABL
+       p226's first plant block into the column labels. */
+    const rows=grid.rows,band=grid.header_rows>0?Math.min(grid.header_rows,rows.length-1):gridBand(rows),head=gridHeader(rows,band).slice();
     const txt=v=>String(v==null?'':v).trim();
     let body=rows.slice(band).filter(r=>r&&r.some(c=>txt(c))).map(r=>r.slice());
     if(!body.length)return'';
@@ -486,8 +493,37 @@ function gridTable(grid,maxVisibleRows=12){
     const cells=body.map(r=>labelOnly(r)
         ? keep.map((c,i)=>i===0?'<strong>'+E(txt(r[0]))+'</strong>':'')
         : keep.map(c=>E(txt(r[c]))||'—'));
-    const page=grid.source_page?'<p class="method-note">Source: page '+E(grid.source_page)+' of the filing.</p>':'';
-    return table(h,cells,maxVisibleRows)+page;
+    /* A long text cell (an address, a lease term) wraps instead of widening the table. */
+    const isTxt=x=>x.length>32&&/[a-z]{3}/i.test(x);
+    /* A GROUPED HEADER (2026-10-05). The JSON build folds a captured header into a group row
+       (`Fiscal 2026`, written in the first column it spans) and a leaf row (`In ₹ million` |
+       `As a percentage of revenue from operations (%)`). Printing the period once over its columns
+       instead of in every header halves a 15-column capacity table's width, and every word stays.
+       A column whose label was rewritten above (the share hand-off) or has no group is one cell
+       spanning both header rows. Not routed through `table()`: that helper deletes any column
+       headed `as of`, and on a grid that column is data (ORIENTCABL p125's installed capacity). */
+    const row0=c=>txt((rows[0]||[])[c]);
+    const group=c=>{if(band<2||!txt((rows[1]||[])[c]))return'';for(let k=c;k>=0;k--){if(row0(k))return row0(k)}return''};
+    const g=keep.map(c=>{const gr=group(c);return gr&&txt(head[c]).startsWith(gr+' ')?gr:''});
+    const leaf=keep.map((c,i)=>g[i]?txt(head[c]).slice(g[i].length+1):h[i]);
+    let top='',bottom='';
+    if(g.some(Boolean)){
+        for(let i=0;i<keep.length;){
+            if(!g[i]){top+='<th rowspan="2">'+E(leaf[i])+'</th>';i++;continue}
+            let j=i;while(j+1<keep.length&&g[j+1]===g[i])j++;
+            top+='<th class="grp" colspan="'+(j-i+1)+'">'+E(g[i])+'</th>';
+            for(let k=i;k<=j;k++)bottom+='<th>'+E(leaf[k])+'</th>';
+            i=j+1;
+        }
+    }else top=h.map(x=>'<th>'+E(x)+'</th>').join('');
+    const tr=(r,hidden)=>'<tr'+(hidden?' class="hidden-row" style="display: none;"':'')+'>'+r.map(x=>'<td'+(isTxt(x)?' class="txt"':'')+'>'+x+'</td>').join('')+'</tr>';
+    let html='<div class="table-wrap grid-table"><table><thead><tr>'+top+'</tr>'+(bottom?'<tr>'+bottom+'</tr>':'')+'</thead><tbody>'
+        +cells.map((r,i)=>tr(r,i>=maxVisibleRows)).join('')+'</tbody></table>';
+    if(cells.length>maxVisibleRows)html+='<button class="show-more-btn" onclick="let r=this.parentElement.querySelectorAll(\'.hidden-row\'); let collapsed=r[0].style.display===\'none\'; r.forEach(x=>x.style.display=collapsed?\'table-row\':\'none\'); this.textContent=collapsed?\'Show less\':\'Show more\';" style="margin-top: 8px; background: transparent; border: 1px solid var(--g300); color: var(--g700); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500;">Show more</button>';
+    html+='</div>';
+    /* No "Source: page N of the filing." line (owner 2026-10-05: no source or description notes on
+       any page). `source_page` / `also_pages` stay in the JSON. */
+    return html;
 }
 /* Every grid a field holds, in page order. A field can carry several (HEROMOTORS has six
    `revenue_split_product` grids), and decision 8.2 is that we KEEP THEM ALL. */
@@ -1001,7 +1037,7 @@ function standardFinancials(){
     let pnlRows=A(f.pnl_3yr),bsRows=A(f.balance_sheet_key),
         cfRows=A(f.cash_flow),rrRows=A(f.return_ratios);
     let ratios={};rrRows.forEach(x=>{ratios[x.fy]=x;ratios[fyKey(x)]=x});
-    const blank='<p class="method-note">No data available for this table.</p>';
+    const blank='<p class="muted">No data available for this table.</p>';
     /* FIVE-YEAR VALUATION AND QUALITY HISTORY is the fifth standard card (owner, 2026-09-20: "we
        should add this table to standard"). It came from the per-symbol renderers, which printed it
        under three different headings -- "... and quality history", "... and returns history",
@@ -1423,7 +1459,7 @@ function anchorCard(withTotal=true){
         ranked.map(x=>[E(x.house||'—'),E(x.owner||'—'),
                        x.pct==null?'—':N(x.pct,2)+'%',N(x.shares,0),
                        ret(x.tr_med90,x.tr_n),ret(x.tr_med180,null)]),7);
-    let note=rows.length>50?'<p class="method-note">Showing the 50 largest of '+rows.length+' anchor allottees.</p>':'';
+    let note=rows.length>50?'<p class="muted">Showing the 50 largest of '+rows.length+' anchor allottees.</p>':'';
     return card('Anchor investors ('+(aa.n||rows.length)+')',total+body+note);
 }
 function listing(){let s=P.ipo?.summary||{},a=P.ipo?.analysis||{};return s.Symbol?'<div class="stack">'+anchorCard()+'<div class="layout-2">'+card('Offer structure',list(sec('objects_execution').objects,6))+'</div></div>':(anchorCard()||'<div class="empty">No offer record applies to this coverage.</div>')}
