@@ -276,7 +276,6 @@
   "RCDL",
   "RELCHEMQ",
   "RKEC",
-  "RKFAL",
   "ROHLTD",
   "ROLLT",
   "ROML",
@@ -364,5 +363,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 360
+ "n_retained": 359
 }
