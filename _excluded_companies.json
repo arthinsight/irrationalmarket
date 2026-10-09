@@ -19,7 +19,7 @@
   "ACCPL",
   "ACEALPHA",
   "ACEEDU",
-  "ACMEINDIAINDUSTRIES",
+  "ACMERAIL",
   "ADCINDIA",
   "ADHHATA",
   "ADJIA",
@@ -272,6 +272,7 @@
   "RADHIKAJWE",
   "RAJRATAN",
   "RAMANEWS",
+  "RAVITA",
   "RCDL",
   "RELCHEMQ",
   "RKEC",
@@ -362,5 +363,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 358
+ "n_retained": 359
 }
