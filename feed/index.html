@@ -1330,10 +1330,12 @@ function anncMain(P, BASE){
       '<span><i class="bu-sw" style="background:var(--good);border-radius:50%"></i>Inflection</span>'+
       '<span><i class="bu-sw" style="background:var(--warn);border-radius:50%"></i>Slowing</span></div></div>';
   }
-  /* VIEW 3 — segment growth, YoY %. Hidden when the store holds no trusted segment rows. */
+  /* VIEW 3 — segment growth, YoY %. Says so when the filings give no segment growth (e.g. a split
+     printed only as shares of the total), instead of the view silently missing. */
   function buSeg(b){
     var sg=b.segments||{}, rows=sg.rows||[];
-    if(!rows.length) return "";
+    if(!rows.length) return '<div class="bu-v"><div class="bu-vt">Segment growth (YoY %)</div>'+
+      '<div class="bu-empty">Segment growth is not reported in these filings.</div></div>';
     var shade=function(x){
       if(x==null) return "";
       var a=Math.min(0.32, 0.06+Math.abs(x)/100*0.5);
