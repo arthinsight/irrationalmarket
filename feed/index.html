@@ -361,6 +361,58 @@ a:focus-visible{outline:2px solid var(--hl);outline-offset:2px;border-radius:var
 #annc .annc-day+.annc-day{padding-top:var(--sp-4);border-top:1px solid var(--line)}
 #annc .annc-dayh{position:sticky;top:0;z-index:2;background:var(--bg);font-size:var(--fs-sm);
   font-weight:700;color:var(--txt);padding:var(--sp-1) 0;margin:0 0 var(--sp-2)}
+/* BUSINESS-UPDATE SIGNAL BADGE + "Show details" (2026-10-09, FEED_HANDOVER_REVIEW.md §0). The badge
+   sits right after the leading Filing marker, INSIDE the text, so the hanging-indent column the
+   markers form stays straight. Colours: Step-up = accent, Inflection = good, Slowing = warn. */
+#annc .annc-bu,.bu-modal .annc-bu{display:inline-flex;align-items:center;gap:4px;margin-right:6px;padding:0 7px;
+  border:1px solid var(--line);border-radius:var(--r-pill);font-size:var(--fs-xs);font-weight:700;
+  line-height:1.6;color:var(--txt);background:var(--card);white-space:nowrap;vertical-align:1px;
+  text-indent:0}
+#annc .annc-bu i,.bu-modal .annc-bu i{width:7px;height:7px;border-radius:50%;background:var(--bu-c,var(--hl))}
+.bu-up{--bu-c:var(--hl)} .bu-inf{--bu-c:var(--good)} .bu-slow{--bu-c:var(--warn)}
+#annc .annc-bu-more{font:inherit;font-size:var(--fs-xs);font-weight:600;color:var(--hl);
+  background:none;border:0;padding:0 2px;margin-left:4px;cursor:pointer;text-decoration:underline;
+  text-underline-offset:2px;text-indent:0}
+#annc .annc-bu-more:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
+@media (max-width:600px){#annc .annc-bu-more{min-height:40px;padding:0 6px}}
+/* The modal lives on <body>, outside #annc, so its rules are NOT scoped to it — and every element
+   it uses is styled explicitly here, because the shell styles bare tags (table, th, td, h2).
+   SOLID #fff, not var(--card): /feed/'s template sets --card to rgba(255,255,255,.95), and a 95%
+   card over the page let the Feed's text show through the popup on a phone (measured 2026-10-09). */
+.bu-modal-bg{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.45);display:flex;
+  align-items:center;justify-content:center;padding:16px}
+.bu-modal{background:#fff;color:var(--txt);border-radius:var(--r-md);box-shadow:var(--sh-2);
+  width:min(760px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:var(--sp-4) var(--sp-4) var(--sp-3);
+  position:relative;font-size:var(--fs-sm);line-height:1.5}
+.bu-modal .bu-x{position:absolute;top:6px;right:6px;width:40px;height:40px;border:0;background:none;
+  color:var(--mut);font-size:22px;line-height:1;cursor:pointer;border-radius:var(--r-sm)}
+.bu-modal .bu-x:focus-visible{outline:2px solid var(--hl)}
+.bu-modal .bu-h{font-size:var(--fs-lg);font-weight:700;margin:0 44px 4px 0;line-height:1.3}
+.bu-modal .bu-sub{color:var(--mut);font-size:var(--fs-xs);margin:0 0 var(--sp-2)}
+.bu-modal .bu-why{margin:var(--sp-2) 0 var(--sp-3)}
+.bu-modal .bu-v{margin:var(--sp-4) 0 0}
+.bu-modal .bu-vt{font-size:var(--fs-xs);font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--mut);margin:0 0 var(--sp-2)}
+.bu-modal svg{display:block;width:100%;height:auto}
+.bu-modal .bu-leg svg{display:inline-block;width:18px;height:6px}
+.bu-modal .bu-leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--fs-xs);color:var(--mut);margin-top:4px}
+.bu-modal .bu-leg span{display:inline-flex;align-items:center;gap:5px}
+.bu-modal .bu-sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+.bu-modal .bu-tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.bu-modal table.bu-t{border-collapse:collapse;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;
+  min-width:100%;margin:0;background:none;border:0}
+.bu-modal .bu-t th,.bu-modal .bu-t td{padding:4px 8px;border:0;border-bottom:1px solid var(--line);
+  text-align:right;white-space:nowrap;background:none;color:var(--txt);font-weight:400}
+.bu-modal .bu-t th{color:var(--mut);font-weight:600}
+.bu-modal .bu-t th:first-child,.bu-modal .bu-t td:first-child{text-align:left;position:sticky;left:0;
+  background:#fff}
+.bu-modal .bu-notes{margin:var(--sp-4) 0 0;padding:var(--sp-2) 0 0;border-top:1px solid var(--line);
+  color:var(--mut);font-size:var(--fs-xs)}
+.bu-modal .bu-notes p{margin:2px 0}
+.bu-modal .bu-empty{color:var(--mut);font-size:var(--fs-xs)}
+.bu-modal a{color:var(--hl)}
+@media (max-width:600px){.bu-modal-bg{padding:0}
+  .bu-modal{width:100%;max-height:100vh;height:100%;border-radius:0}}
 /*ANNC-LIBCSS-START*/
 .circ-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:var(--sp-3);
   margin:var(--sp-4) 0}
@@ -1106,6 +1158,196 @@ function anncMain(P, BASE){
       return '<code>'+code[+i]+'</code>';});
   }
 
+  /* BUSINESS-UPDATE SIGNALS (2026-10-09, business_update_intel/FEED_HANDOVER_REVIEW.md §0).
+     A business-update row whose filing fired a signal carries `bu` (set in Python by `_theme_row`,
+     only once the company's `.v.json` holds that filing). The badge says what the update showed
+     against the company's OWN trend; nothing here computes a signal, and no wording advises.
+     "Show details" fetches that ONE `.v.json` — the popup data (`bu`) sits beside `momentum.price`.
+     ⚠ No variable here may be named D or P: `build_feed_payload._scan_renderer_keys` turns every
+     `D.<x>` / `P.<x>` after anncMain into a key each date file MUST carry. */
+  var BU_CLS={"Step-up":"bu-up","Inflection":"bu-inf","Slowing":"bu-slow"};
+  var BU_COL={"Step-up":"var(--hl)","Inflection":"var(--good)","Slowing":"var(--warn)"};
+  var BU_OPEN=null;
+  function buPct(v,sign){
+    if(v==null||v==="") return "–";
+    var n=+v; return (sign&&n>0?"+":"")+n.toFixed(1)+"%";
+  }
+  function buPill(label,tip){
+    return BU_CLS[label]
+      ? '<span class="annc-bu '+BU_CLS[label]+'"'+(tip?' title="'+C.esc(tip)+'"':'')+'><i></i>'+C.esc(label)+'</span>'
+      : '';
+  }
+  function buBadge(m){
+    var b=m&&m.bu; if(!b||!BU_CLS[b.label]) return "";
+    return buPill(b.label, b.label+" — "+(b.period||"")+(b.g!=null?": "+buPct(b.g,1)+" YoY":""));
+  }
+  function buMore(m){
+    var b=m&&m.bu; if(!b||!BU_CLS[b.label]) return "";
+    return ' <button type="button" class="annc-bu-more" data-bu-f="'+C.esc(b.f||b.s)+'" data-bu-s="'+
+      C.esc(b.s)+'" aria-haspopup="dialog">Show details</button>';
+  }
+  function buClose(){
+    if(!BU_OPEN) return;
+    var o=BU_OPEN; BU_OPEN=null;
+    if(o.bg.parentNode) o.bg.parentNode.removeChild(o.bg);
+    document.body.style.overflow=o.ov||"";
+    if(o.opener && o.opener.focus) o.opener.focus();
+  }
+  var BU_X='<button type="button" class="bu-x" aria-label="Close">&times;</button>';
+  function buOpen(f,s,opener){
+    buClose();
+    var bg=document.createElement("div");
+    bg.className="bu-modal-bg";
+    bg.innerHTML='<div class="bu-modal" role="dialog" aria-modal="true" aria-labelledby="bu-h">'+BU_X+
+      '<div class="bu-h" id="bu-h">'+C.esc(s)+'</div><div class="bu-empty">Loading…</div></div>';
+    document.body.appendChild(bg);
+    BU_OPEN={bg:bg, opener:opener, ov:document.body.style.overflow};
+    document.body.style.overflow="hidden";
+    bg.addEventListener("click",function(e){
+      if(e.target===bg || (e.target.closest && e.target.closest(".bu-x"))) buClose();
+    });
+    bg.querySelector(".bu-x").focus();
+    var fail=function(){
+      if(BU_OPEN && BU_OPEN.bg===bg)
+        bg.querySelector(".bu-modal").innerHTML=BU_X+'<div class="bu-h" id="bu-h">'+C.esc(s)+
+          '</div><div class="bu-empty">Details unavailable.</div>';
+    };
+    fetch(BASE+"/company/"+encodeURIComponent(f)+".v.json")
+      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(v){
+        if(!(BU_OPEN && BU_OPEN.bg===bg)) return;
+        if(!v || !v.bu) return fail();
+        var md=bg.querySelector(".bu-modal"), cs=getComputedStyle(md);
+        var w=md.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+        md.innerHTML=buBody(v, s, Math.round(Math.max(280, Math.min(720, w||520))));
+        bg.querySelector(".bu-x").focus();
+      })
+      .catch(fail);
+  }
+  if(!window.__buWired){
+    window.__buWired=1;
+    document.addEventListener("click",function(e){
+      var t=e.target && e.target.closest && e.target.closest(".annc-bu-more");
+      if(t){ e.preventDefault(); buOpen(t.getAttribute("data-bu-f"), t.getAttribute("data-bu-s"), t); }
+    });
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape") buClose(); });
+  }
+  function buBody(v,s,W){
+    var b=v.bu, sg=b.signal||{};
+    var cad={month:"monthly",quarter:"quarterly",half:"half-yearly"}[b.cadence]||"";
+    return BU_X+
+      '<div class="bu-h" id="bu-h">'+C.esc(b.company||s)+'</div>'+
+      '<div class="bu-sub">'+C.esc(s)+' · '+C.esc(b.headline||"")+(cad?', '+cad+' updates':'')+'</div>'+
+      buPill(sg.label)+(sg.period_label?' <span class="bu-sub">'+C.esc(sg.period_label)+
+        (sg.filed_ts?', filed '+C.esc(dmy(String(sg.filed_ts).slice(0,10))):'')+'</span>':'')+
+      (sg.why?'<div class="bu-why">'+C.esc(sg.why)+'</div>':'')+
+      buBars(b,W)+buPrice(v,b,W)+buSeg(b)+
+      '<div class="bu-notes">'+(b.notes||[]).map(function(n){return '<p>'+C.esc(n)+'</p>';}).join("")+
+      '<p>Signals compare reported growth with the company’s own trend. For information and '+
+      'education only; not investment advice.</p></div>';
+  }
+  /* VIEW 1 — growth bars against the company's own trend (dashed). */
+  function buBars(b,W){
+    var sr=(b.series||[]).filter(function(r){return r.g!=null;});
+    if(sr.length<2) return '<div class="bu-v"><div class="bu-vt">Growth vs own trend</div>'+
+      '<div class="bu-empty">Not enough history to chart.</div></div>';
+    var H=210,L=40,R=8,T=14,B=30,n=sr.length,bw=(W-L-R)/n;
+    var vals=[0]; sr.forEach(function(r){vals.push(+r.g); if(r.base!=null) vals.push(+r.base);});
+    var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals); if(hi===lo) hi=lo+1;
+    var Y=function(x){return T+(hi-x)*(H-T-B)/(hi-lo);}, X=function(i){return L+i*bw;};
+    var g='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" style="stroke:var(--g400)"/>'+
+      '<text x="'+(L-5)+'" y="'+(Y(hi)+4)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">'+
+        buPct(hi)+'</text>'+
+      (lo<0?'<text x="'+(L-5)+'" y="'+(Y(lo)+4)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">'+
+        buPct(lo)+'</text>':'')+
+      '<text x="'+(L-5)+'" y="'+(Y(0)+4)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">0%</text>';
+    var every=Math.max(1,Math.ceil(n/6)), base=[], path="";
+    sr.forEach(function(r,i){
+      var y0=Y(0), y1=Y(+r.g), top=Math.min(y0,y1), h=Math.max(1,Math.abs(y1-y0));
+      var col=r.src==="results"?"var(--g400)":"var(--hl)";
+      var tip=(r.period_label||r.period)+" · "+(r.measure||"")+" "+buPct(r.g,1)+" YoY"+
+        (r.base!=null?" · trend "+buPct(r.base):"")+(r.label?" · "+r.label:"")+
+        (r.filed_ts?" · filed "+dmy(String(r.filed_ts).slice(0,10)):"");
+      var bar='<rect x="'+(X(i)+bw*0.15)+'" y="'+top+'" width="'+(bw*0.7)+'" height="'+h+
+        '" style="fill:'+col+';opacity:.85"><title>'+C.esc(tip)+'</title></rect>';
+      g+=(r.link?'<a href="'+C.esc(r.link)+'" target="_blank" rel="noopener">'+bar+'</a>':bar);
+      if(r.label && BU_COL[r.label])
+        g+='<circle cx="'+(X(i)+bw/2)+'" cy="'+(Math.min(top,Y(+r.g))-7)+'" r="4.5" style="fill:'+
+          BU_COL[r.label]+';stroke:var(--card);stroke-width:1.5"><title>'+C.esc(tip)+'</title></circle>';
+      if(r.base!=null){ path+=(path?" L":"M")+(X(i)+bw/2)+" "+Y(+r.base); }
+      else if(path){ base.push(path); path=""; }
+      if((i%every===0 && n-1-i>=every) || i===n-1)
+        g+='<text x="'+(i===n-1?W-R:X(i)+bw/2)+'" y="'+(H-10)+'" text-anchor="'+(i===n-1?"end":"middle")+
+          '" style="fill:var(--mut);font-size:11px">'+
+          C.esc(r.period_label||r.period)+'</text>';
+    });
+    if(path) base.push(path);
+    base.forEach(function(p){
+      g+='<path d="'+p+'" style="fill:none;stroke:var(--txt);stroke-width:1.5;stroke-dasharray:4 3;opacity:.7"/>';
+    });
+    var res=sr.some(function(r){return r.src==="results";});
+    return '<div class="bu-v"><div class="bu-vt">Growth vs own trend (YoY %)</div>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Year-on-year growth by period against the trailing average">'+
+      g+'</svg><div class="bu-leg"><span><i class="bu-sw" style="background:var(--hl)"></i>Business update</span>'+
+      (res?'<span><i class="bu-sw" style="background:var(--g400)"></i>Results quarter</span>':'')+
+      '<span><svg width="18" height="6" style="display:inline"><path d="M0 3H18" style="stroke:var(--txt);stroke-dasharray:4 3"/></svg>'+
+      C.esc(b.base_label||"trailing average")+'</span></div></div>';
+  }
+  /* VIEW 2 — price with each update marked. Move / volume were computed in Python. */
+  function buPrice(v,b,W){
+    var px=((v.momentum||{}).price||[]).filter(function(r){return r && r[0]>=(b.window_from||"");});
+    if(px.length<2) return '<div class="bu-v"><div class="bu-vt">Price, with each update marked</div>'+
+      '<div class="bu-empty">Price history not available for this company.</div></div>';
+    var H=190,L=46,R=8,T=12,B=24,n=px.length;
+    var c=px.map(function(r){return +r[1];}), lo=Math.min.apply(null,c), hi=Math.max.apply(null,c);
+    if(hi===lo) hi=lo+1;
+    var X=function(i){return L+i*(W-L-R)/(n-1);}, Y=function(x){return T+(hi-x)*(H-T-B)/(hi-lo);};
+    var pts=px.map(function(r,i){return X(i).toFixed(1)+","+Y(+r[1]).toFixed(1);}).join(" ");
+    var g='<polyline points="'+pts+'" style="fill:none;stroke:var(--txt);stroke-width:1.4"/>'+
+      '<text x="'+(L-5)+'" y="'+(Y(hi)+4)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">'+
+        '₹'+C.fmt(Math.round(hi))+'</text>'+
+      '<text x="'+(L-5)+'" y="'+(Y(lo)+4)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">'+
+        '₹'+C.fmt(Math.round(lo))+'</text>'+
+      '<text x="'+L+'" y="'+(H-6)+'" style="fill:var(--mut);font-size:11px">'+C.esc(dmy(px[0][0]))+'</text>'+
+      '<text x="'+(W-R)+'" y="'+(H-6)+'" text-anchor="end" style="fill:var(--mut);font-size:11px">'+
+        C.esc(dmy(px[n-1][0]))+'</text>';
+    (b.marks||[]).forEach(function(m){
+      var i=-1; for(var k=0;k<n;k++){ if(px[k][0]>=m.date){ i=k; break; } }
+      if(i<0) return;
+      var tip=(m.period_label||m.period)+" update · "+buPct(m.g,1)+" YoY"+(m.label?" · "+m.label:"")+
+        (m.move_pct!=null?" · day move "+buPct(m.move_pct,1):"")+
+        (m.vol_x!=null?" · volume "+(+m.vol_x).toFixed(1)+"× the 20-day median":"")+
+        " ("+dmy(px[i][0])+")";
+      var dot='<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(+px[i][1]).toFixed(1)+'" r="'+(m.label?5:3.5)+
+        '" style="fill:'+(BU_COL[m.label]||"var(--mut)")+';stroke:var(--card);stroke-width:1.5"><title>'+
+        C.esc(tip)+'</title></circle>';
+      g+=(m.link?'<a href="'+C.esc(m.link)+'" target="_blank" rel="noopener">'+dot+'</a>':dot);
+    });
+    return '<div class="bu-v"><div class="bu-vt">Price, with each update marked</div>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Closing price with business-update dates marked">'+
+      g+'</svg><div class="bu-leg"><span><i class="bu-sw" style="background:var(--mut);border-radius:50%"></i>Update</span>'+
+      '<span><i class="bu-sw" style="background:var(--hl);border-radius:50%"></i>Step-up</span>'+
+      '<span><i class="bu-sw" style="background:var(--good);border-radius:50%"></i>Inflection</span>'+
+      '<span><i class="bu-sw" style="background:var(--warn);border-radius:50%"></i>Slowing</span></div></div>';
+  }
+  /* VIEW 3 — segment growth, YoY %. Hidden when the store holds no trusted segment rows. */
+  function buSeg(b){
+    var sg=b.segments||{}, rows=sg.rows||[];
+    if(!rows.length) return "";
+    var shade=function(x){
+      if(x==null) return "";
+      var a=Math.min(0.32, 0.06+Math.abs(x)/100*0.5);
+      return ' style="background:'+(x>=0?"rgba(22,163,74,":"rgba(217,119,6,")+a.toFixed(2)+')"';
+    };
+    return '<div class="bu-v"><div class="bu-vt">Segment growth (YoY %)</div><div class="bu-tw"><table class="bu-t">'+
+      '<tr><th>Segment</th>'+(sg.period_labels||sg.periods||[]).map(function(p){return '<th>'+C.esc(p)+'</th>';}).join("")+'</tr>'+
+      rows.map(function(r){
+        return '<tr><td>'+C.esc(r.name)+(r.measure&&r.measure!=="Revenue"?' <span class="bu-sub">('+C.esc(r.measure)+')</span>':'')+
+          '</td>'+(r.values||[]).map(function(x){
+            return '<td'+shade(x)+'>'+(x==null?"":buPct(x,1))+'</td>';}).join("")+'</tr>';
+      }).join("")+'</table></div></div>';
+  }
+
   function digestDay(_d){
     // ONE day, rendered as strings rather than written to the page: span mode stacks seven of
     // these, so nothing in here may assume it owns the containers.
@@ -1189,7 +1431,7 @@ function anncMain(P, BASE){
                  The emoji it replaces could not be darkened at all. */
               'title="open the filing">&#8599;&#65038;</a>'
             : '<span class="annc-nodoc"></span>';
-          return '<li>'+lk+md(u.text)+'</li>';
+          return '<li>'+lk+buBadge(x.m)+md(u.text)+buMore(x.m)+'</li>';
         }).join("")+'</ul></div>');
     });
     var byth=out.length
