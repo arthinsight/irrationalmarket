@@ -187,6 +187,7 @@
   "KANCOTEA",
   "KAVDEFENCE",
   "KEIL",
+  "KENNAMET",
   "KESARENT",
   "KGPETRO",
   "KGVL",
@@ -364,5 +365,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 360
+ "n_retained": 361
 }
