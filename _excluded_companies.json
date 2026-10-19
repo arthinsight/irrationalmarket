@@ -180,6 +180,7 @@
   "JALAN",
   "JHS",
   "JINDALSAW",
+  "JPL",
   "JUMBO",
   "KAMADGIRI",
   "KAMANWALA",
@@ -302,6 +303,7 @@
   "SHAHINVEST",
   "SHAMFOAM",
   "SHANTIGEAR",
+  "SHELLZINDIA",
   "SHETR",
   "SHILGRAVQ",
   "SHIPROCKET",
@@ -365,5 +367,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 361
+ "n_retained": 363
 }
