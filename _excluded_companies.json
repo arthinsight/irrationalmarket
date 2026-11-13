@@ -31,7 +31,7 @@
   "AEQUS",
   "AGRITECH",
   "AHCL",
-  "AJWAPROJECTS",
+  "AJWA",
   "AMANTA",
   "AMBAAUTO",
   "ANANDPROJ",
@@ -235,6 +235,7 @@
   "MILTON",
   "MINALIND",
   "MKEXIM",
+  "MKJEWELS",
   "MLKFOOD",
   "MNIL",
   "MOHITIND",
@@ -355,7 +356,7 @@
   "VALIANTORG",
   "VANS",
   "VASUPRADA",
-  "VECTRASENPROCON",
+  "VECTRAS",
   "VELJAN",
   "VETOSWITCHGEARSANDCABLES",
   "VIJAYPD",
@@ -375,5 +376,5 @@
   "YASHOPTICS",
   "ZENITHSTL"
  ],
- "n_retained": 371
+ "n_retained": 372
 }
