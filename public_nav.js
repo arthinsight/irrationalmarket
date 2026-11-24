@@ -1,5 +1,27 @@
 (function () {
   'use strict';
+  // VISIT BEACON (site_tracker/ Cloudflare Worker). Lives here because this script is on every
+  // public page (assert_public_site enforces it). Production host only, so :8001 previews and
+  // local QA never log. Empty TRACK_URL = off. `?notrack=1` once excludes this browser for good.
+  (function () {
+    var TRACK_URL = 'https://arth-track.arthinsight.workers.dev/v';
+    try {
+      if (!TRACK_URL || !/^(www\.)?arthinsight\.com$/i.test(location.hostname) || !navigator.sendBeacon) return;
+      if (/[?&]notrack=1/.test(location.search)) localStorage.setItem('arth_notrack', '1');
+      if (localStorage.getItem('arth_notrack') === '1') return;
+      var rid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); };
+      var vid = localStorage.getItem('arth_vid'), nv = !vid;
+      if (nv) { vid = rid(); localStorage.setItem('arth_vid', vid); }
+      var sid = sessionStorage.getItem('arth_sid');
+      if (!sid) { sid = rid(); sessionStorage.setItem('arth_sid', sid); }
+      navigator.sendBeacon(TRACK_URL, JSON.stringify({
+        p: location.pathname, q: location.search, r: document.referrer,
+        s: screen.width + 'x' + screen.height, w: innerWidth + 'x' + innerHeight,
+        l: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        vid: vid, sid: sid, nv: nv
+      }));
+    } catch (e) { /* tracking must never break the page */ }
+  }());
   var nav = [['Home','index.html'],['Big Picture','bigpicture/'],['Feed','feed/'],['IPO Intelligence','ipo/'],['Screens','screens/']];
   function relative(path) {
     var pathname = location.pathname || '/';
