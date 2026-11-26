@@ -1,1 +1,1 @@
-{"leaders":["Pharma","Auto","Bank","Capital Markets","FMCG","IT"],"shown":["MidSmall Healthcare","Pharma","Private Bank","Auto","Bank","Capital Markets","FMCG","IT"],"unmatched":["MidSmall Healthcare","Private Bank"],"source":"intel.json sector_grid (Bull top 6 + Bear weakest 6)"}
+{"leaders":["Capital Markets","Pharma","Auto","Bank"],"shown":["Capital Markets","MidSmall Healthcare","Pharma","Private Bank","Auto","Bank"],"unmatched":["MidSmall Healthcare","Private Bank"],"source":"intel.json sector_grid (Bull top 6 + Bear weakest 6)"}
