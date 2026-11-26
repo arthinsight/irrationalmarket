@@ -926,7 +926,9 @@ if(!window.CIRC){window.CIRC=(function(){
          feed) stay plain rather than becoming links to nowhere. */
       var det=r.url?('<a class="circ-subj" href="'+esc(r.url)+'" target="_blank" rel="noopener">'+
                      esc(r.detail)+'</a>'):esc(r.detail);
-      var body='<span class="circ-free"><span class="circ-tag t-'+esc(r.type)+'">'+esc(r.type)+
+      /* the ISSUE rows (Bid/Offer opens / closes) wear the RE chip colour: same rights event as the
+         entitlement rows beside them, unlike the ex-date BUY BY row (owner 2026-10-28) */
+      var body='<span class="circ-free"><span class="circ-tag t-'+esc(r.issue_open?"RE":r.type)+'">'+esc(r.type)+
         '</span><span class="circ-pct">'+det+'</span>';
       if(r.shares) body+='<span class="circ-num"><i class="circ-lbl">Shares:</i> '+fmt(r.shares)+
         /* the DENOMINATOR is not always the listed base: a lock-in tranche is a share of what is
@@ -936,6 +938,8 @@ if(!window.CIRC){window.CIRC=(function(){
         '% of '+(r.pct_of||"listed")+'</span>':"");
       if(r.re_open) body+='<span class="circ-num"><i class="circ-lbl">Trading period</i> '+
         dmy(r.re_open)+(r.re_close?' → '+dmy(r.re_close):'')+'</span>';
+      if(r.sub_x!=null) body+='<span class="circ-num"><i class="circ-lbl">Subscribed</i> '+
+        r.sub_x.toFixed(2)+'x <i class="circ-lbl">('+fmt(r.sub_bid)+' of '+fmt(r.sub_size)+')</i></span>';
       if(r.re_scrip) body+='<span class="circ-num"><i class="circ-lbl">RE scrip</i> '+
         esc(r.re_scrip)+'</span>';
       body+='</span>';
@@ -1158,7 +1162,7 @@ function anncMain(P, BASE){
       return '<code>'+code[+i]+'</code>';});
   }
 
-  /* BUSINESS-UPDATE SIGNALS (2026-10-09, business_update_intel/FEED_HANDOVER_REVIEW.md §0).
+  /* BUSINESS-UPDATE SIGNALS (2026-10-09, notification/business_update_intel/FEED_HANDOVER_REVIEW.md §0).
      A business-update row whose filing fired a signal carries `bu` (set in Python by `_theme_row`,
      only once the company's `.v.json` holds that filing). The badge says what the update showed
      against the company's OWN trend; nothing here computes a signal, and no wording advises.
